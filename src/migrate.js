@@ -1,3 +1,4 @@
+
 const fs = require('fs'), path = require('path'), { pool } = require('./db');
 (async () => {
   const dir = path.join(__dirname, '..', 'db', 'migrations'), c = await pool.connect();
