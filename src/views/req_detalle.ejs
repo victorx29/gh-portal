@@ -1,0 +1,13 @@
+<div class="mh"><div><h2><%= x.cargo %></h2><p class="sub"><%= x.codigo %> · <%= x.empresa %> · <span class="chip"><%= x.estado.replace('pend_', 'pendiente ').replace('_', ' ') %></span></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<table class="kv"><tr><th>Área</th><td><%= x.area || '—' %></td></tr><tr><th>Tipo</th><td><%= x.tipo === 'nuevo' ? 'Cargo nuevo' : 'Reemplazo' %></td></tr><tr><th>Contratación</th><td><%= x.contratacion %></td></tr>
+<tr><th>Plazas</th><td><%= x.plazas %></td></tr><tr><th>Fecha requerida</th><td><%= x.fecha_requerida ? new Date(x.fecha_requerida).toLocaleDateString('es-VE') : '—' %></td></tr>
+<tr><th>Perfil</th><td>versión <%= x.perfil_v %></td></tr><tr><th>Solicitante</th><td><%= x.solicitante %></td></tr><tr><th>Justificación</th><td><%= x.justificacion || '—' %></td></tr>
+<% if (x.motivo_cierre) { %><tr><th>Motivo de cierre</th><td><%= x.motivo_cierre %></td></tr><% } %></table>
+<% if (a.decidir) { %><form method="post" action="/requisiciones/<%= x.id %>/decidir" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<label for="cm">Comentario (obligatorio al devolver o rechazar)</label><textarea id="cm" name="comentario" rows="2"></textarea>
+<p class="act"><button class="btn p" name="d" value="aprobada">Aprobar</button> <button class="btn" name="d" value="devuelta">Devolver</button> <button class="btn d" name="d" value="rechazada">Rechazar</button></p></form><% } %>
+<p class="act"><% if (a.editar) { %><a class="btn" href="/requisiciones/<%= x.id %>/editar" data-modal>Editar</a> <% } %>
+<% if (a.enviar) { %><form method="post" action="/requisiciones/<%= x.id %>/enviar" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Enviar a aprobación</button></form><% } %>
+<% if (a.mover) { %><form method="post" action="/requisiciones/<%= x.id %>/mover" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Pasar a <%= a.siguiente %></button></form><% } %></p>
+<% if (a.cancelar) { %><form method="post" action="/requisiciones/<%= x.id %>/cancelar" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>"><label for="mo">Cancelar requisición (motivo obligatorio)</label><input id="mo" name="motivo"><p class="act"><button class="btn d">Cancelar requisición</button></p></form><% } %>
+<h3>Aprobaciones</h3><% x.log.forEach(l => { %><div class="log"><b><%= l.paso %> · <%= l.decision %></b> — <%= l.nombre %><br><small><%= new Date(l.fecha).toLocaleString('es-VE') %></small><% if (l.comentario) { %><br><%= l.comentario %><% } %></div><% }) %><% if (!x.log.length) { %><div class="empty">Sin decisiones aún</div><% } %>

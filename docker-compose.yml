@@ -1,0 +1,14 @@
+# Solo para desarrollo local. En EasyPanel, PostgreSQL y la app son servicios separados.
+services:
+  db:
+    image: postgres:16-alpine
+    environment: {POSTGRES_USER: gh, POSTGRES_PASSWORD: gh, POSTGRES_DB: gh}
+    volumes: [pgdata:/var/lib/postgresql/data]
+  app:
+    build: .
+    env_file: .env
+    environment: {NODE_ENV: development}
+    ports: ["3000:3000"]
+    depends_on: [db]
+    volumes: [uploads:/app/uploads]
+volumes: {pgdata: {}, uploads: {}}

@@ -1,0 +1,13 @@
+<div class="mh"><h2><%= v.id ? 'Editar requisición' : 'Nueva requisición' %></h2><button type="button" class="btn" data-close>Cerrar</button></div>
+<% if (!emps.length && !v.id) { %><p class="empty">Tu usuario no tiene rol de Gerente o Director en ninguna empresa. Pide a Gestión Humana que lo configure.</p><% } else { %>
+<form method="post" action="<%= v.id ? '/requisiciones/' + v.id + '/editar' : '/requisiciones' %>"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<div class="g2">
+<div><label for="f-empresa">Empresa</label><select id="f-empresa" name="empresa_id" <%= v.id ? 'disabled' : 'required' %>><% (v.id ? [{id: v.empresa_id, nombre: v.empresa}] : emps).forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div>
+<div><label for="f-area">Área</label><select id="f-area" name="area_id"><option value="">—</option><% areas.forEach(a => { %><option value="<%= a.id %>" data-e="<%= a.empresa_id %>"<%= v.area_id == a.id ? ' selected' : '' %>><%= a.nombre %></option><% }) %></select></div>
+<div><label for="f-perfil">Perfil del cargo</label><select id="f-perfil" name="perfil_id" <%= v.id ? 'disabled' : 'required' %>><% pers.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.codigo %>)</option><% }) %></select></div>
+<div><label for="f-tipo">Tipo</label><select id="f-tipo" name="tipo"><option value="reemplazo"<%= v.tipo === 'reemplazo' ? ' selected' : '' %>>Reemplazo</option><option value="nuevo"<%= v.tipo === 'nuevo' ? ' selected' : '' %>>Cargo nuevo (requiere Presidencia)</option></select></div>
+<div><label for="f-con">Contratación</label><select id="f-con" name="contratacion"><option<%= v.contratacion === 'Permanente' ? ' selected' : '' %>>Permanente</option><option<%= v.contratacion === 'Temporal' ? ' selected' : '' %>>Temporal</option></select></div>
+<div><label for="f-pl">Plazas</label><input id="f-pl" name="plazas" type="number" min="1" value="<%= v.plazas || 1 %>"></div>
+<div><label for="f-fe">Fecha requerida</label><input id="f-fe" name="fecha_requerida" type="date" value="<%= v.fecha_requerida ? new Date(v.fecha_requerida).toISOString().slice(0, 10) : '' %>"></div></div>
+<label for="f-ju">Justificación</label><textarea id="f-ju" name="justificacion" rows="3"><%= v.justificacion || '' %></textarea>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p" type="submit">Guardar borrador</button></p></form><% } %>

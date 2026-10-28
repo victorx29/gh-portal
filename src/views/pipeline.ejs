@@ -1,0 +1,15 @@
+<%- include('partials/head') %>
+<div class="top"><div><h1>Pipeline</h1><p class="sub">Requisiciones del grupo</p></div>
+<div class="row">
+  <form method="get" action="/pipeline"><input type="hidden" name="tab" value="<%= tab %>"><label class="sr" for="emp">Empresa</label>
+    <select id="emp" name="empresa" data-autosubmit><option value="">Todas las empresas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(emp) ? ' selected' : '' %>><%= e.nombre %></option><% }) %></select></form>
+  <a class="btn p" href="/requisiciones/nueva" data-modal>+ Nueva requisición</a></div></div>
+<div class="kpi"><div><small>Activas</small><strong><%= kpi.activas %></strong></div><div><small>En aprobación</small><strong><%= kpi.aprob %></strong></div>
+<div><small>Pendientes por mí</small><strong class="acc"><%= kpi.mias %></strong></div><div><small>En reclutamiento</small><strong><%= kpi.recl %></strong></div></div>
+<nav class="tabs" aria-label="Vistas"><a class="tab<%= tab === 'principal' ? ' on' : '' %>" href="/pipeline?tab=principal&empresa=<%= emp %>">Tablero principal</a><a class="tab<%= tab === 'aprobacion' ? ' on' : '' %>" href="/pipeline?tab=aprobacion&empresa=<%= emp %>">Aprobación</a></nav>
+<div class="board"><% cols.forEach(c => { const L = reqs.filter(x => x.estado === c[0]); %>
+<section class="col k-<%= c[0] %>"><div class="ch"><%= c[1] %><span><%= L.length %></span></div>
+<% L.forEach(x => { %><a class="card<%= x.pendiente ? ' mine' : '' %>" href="/requisiciones/<%= x.id %>" data-modal><h4><%= x.cargo %></h4><p><%= x.codigo %> · <%= x.empresa %></p>
+<span class="chip"><%= x.tipo === 'nuevo' ? 'Cargo nuevo' : 'Reemplazo' %></span><span class="chip"><%= x.plazas %> plaza<%= x.plazas > 1 ? 's' : '' %></span><% if (x.pendiente) { %><span class="chip w">Te toca</span><% } %></a><% }) %>
+<% if (!L.length) { %><div class="empty">Sin requisiciones</div><% } %></section><% }) %></div>
+<%- include('partials/foot') %>

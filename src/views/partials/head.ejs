@@ -1,0 +1,14 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><%= typeof title !== 'undefined' ? title : 'Gestión Humana' %></title><link rel="stylesheet" href="/css/app.css"><script src="/js/app.js" defer></script></head><body>
+<% if (user) { const gh = user.roles.some(r => r.rol === 'gh'); const items = [['/pipeline','pipeline','Pipeline']].concat(gh ? [['/perfiles','perfiles','Perfiles'],['/usuarios','usuarios','Usuarios']] : []); %>
+<div class="app"><aside class="side" id="side">
+  <div class="brand t">GH<i></i></div>
+  <div class="who t"><b><%= user.nombre %></b><br><small><%= user.rolesTxt %></small></div>
+  <% items.forEach(i => { %><a class="nav<%= nav === i[1] ? ' on' : '' %>" href="<%= i[0] %>" title="<%= i[2] %>"><span class="t"><%= i[2] %></span><span class="i"><%= i[2][0] %></span></a><% }) %>
+  <div class="sp"></div>
+  <button class="nav" type="button" id="th"><span class="t">Tema oscuro</span><span class="i">T</span></button>
+  <button class="nav" type="button" id="cl"><span class="t">Colapsar</span><span class="i">‹</span></button>
+  <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="nav" type="submit"><span class="t">Cerrar sesión</span><span class="i">×</span></button></form>
+</aside><main>
+<% } else { %><main class="solo"><% } %>
+<% if (flash) { %><div class="flash <%= flash.type %>" role="status"><%= flash.msg %></div><% } %>

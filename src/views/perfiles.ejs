@@ -1,0 +1,8 @@
+<%- include('partials/head') %><div class="top"><div><h1>Perfiles</h1><p class="sub">Catálogo usado por las requisiciones y por la comparación de CV. Guardar un código existente crea una nueva versión.</p></div></div>
+<div class="tw"><table><tr><th>Código</th><th>Cargo</th><th>Empresa</th><th>Versión</th></tr><% ps.forEach(p => { %><tr><td><%= p.codigo %></td><td><%= p.nombre %></td><td><%= p.empresa || 'Grupo' %></td><td><%= p.version %></td></tr><% }) %></table></div>
+<h3>Crear perfil o nueva versión</h3><form method="post" action="/perfiles" class="form-max"><input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2">
+<div><label for="pc">Código</label><input id="pc" name="codigo" required></div><div><label for="pn">Nombre del cargo</label><input id="pn" name="nombre" required></div>
+<div><label for="pe">Empresa (vacío = grupo)</label><select id="pe" name="empresa_id"><option value="">Grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div></div>
+<label for="po">Objetivo del cargo</label><textarea id="po" name="objetivo" rows="2"></textarea><label for="pr">Requisitos</label><textarea id="pr" name="requisitos" rows="3"></textarea>
+<label for="pk">Criterios de evaluación de CV (uno por línea)</label><textarea id="pk" name="criterios" rows="4"></textarea><p><button class="btn p">Guardar perfil</button></p></form>
+<%- include('partials/foot') %>

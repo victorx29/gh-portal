@@ -1,0 +1,11 @@
+<%- include('partials/head') %><div class="top"><div><h1>Usuarios</h1><p class="sub">Roles y empresas que cada usuario puede ver y aprobar. GH siempre es global.</p></div></div>
+<div class="tw"><table><tr><th>Nombre</th><th>Correo</th><th>Roles</th><th>Asignar rol</th><th></th></tr>
+<% us.forEach(u => { %><tr><td><%= u.nombre %><% if (!u.activo) { %> <span class="chip r">inactivo</span><% } %></td><td><%= u.email %></td>
+<td><% u.roles.forEach(r => { %><form method="post" action="/usuarios/rol/<%= r.id %>/borrar" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><span class="chip"><%= r.rol %> · <%= r.empresa || 'todas' %></span><button class="x" title="Retirar rol" aria-label="Retirar rol <%= r.rol %>">×</button></form> <% }) %></td>
+<td><form method="post" action="/usuarios/<%= u.id %>/rol" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="r<%= u.id %>">Rol</label><select id="r<%= u.id %>" name="rol"><% ROLES.forEach(r => { %><option><%= r %></option><% }) %></select>
+<label class="sr" for="e<%= u.id %>">Empresa</label><select id="e<%= u.id %>" name="empresa_id"><option value="">todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select><button class="btn">Asignar</button></form></td>
+<td><form method="post" action="/usuarios/<%= u.id %>/activo"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn"><%= u.activo ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %></table></div>
+<h3>Crear usuario</h3><form method="post" action="/usuarios" class="g2 form-max"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<div><label for="un">Nombre</label><input id="un" name="nombre" required></div><div><label for="ue">Correo</label><input id="ue" name="email" type="email" required></div>
+<div><label for="up">Clave temporal (mínimo 10 caracteres)</label><input id="up" name="password" type="password" minlength="10" required autocomplete="new-password"></div><div class="end"><button class="btn p">Crear usuario</button></div></form>
+<%- include('partials/foot') %>
