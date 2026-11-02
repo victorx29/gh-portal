@@ -19,19 +19,45 @@ async function cambiar(c, u, r, est, accion) {
 const pasoDe = r => ({ pend_director: 'director', pend_presidencia: 'presidencia' })[r.estado];
 const puedeDecidir = (u, r) => { const p = pasoDe(r); return !!p && P.tiene(u, p, r.empresa_id) && r.solicitante_id != u.id; };
 
+
 async function listar(u, empresaId) {
   const w = [], p = [];
+
   if (!P.esGH(u)) {
     const e = P.empresasDe(u, ['director', 'presidencia']);
-    p.push(u.id); let c = `r.solicitante_id=$${p.length}`;
-    if (e === null) c = 'true'; else if (e.length) { p.push(e); c += ` or r.empresa_id=any($${p.length})`; }
-    w.push(`(${c})`);
+
+    if (e !== null) {
+      p.push(u.id);
+      let c = `r.solicitante_id=$${p.length}`;
+
+      if (e.length) {
+        p.push(e);
+        c += ` or r.empresa_id=any($${p.length})`;
+      }
+
+      w.push(`(${c})`);
+    }
   }
-  if (empresaId) { p.push(+empresaId); w.push(`r.empresa_id=$${p.length}`); }
-  const rows = (await q(SEL + (w.length ? ' where ' + w.join(' and ') : '') + ' order by r.id desc', p)).rows;
-  rows.forEach(r => { r.pendiente = puedeDecidir(u, r); });
+
+  if (empresaId) {
+    p.push(+empresaId);
+    w.push(`r.empresa_id=$${p.length}`);
+  }
+
+  const rows = (await q(
+    SEL +
+    (w.length ? ' where ' + w.join(' and ') : '') +
+    ' order by r.id desc',
+    p
+  )).rows;
+
+  rows.forEach(r => {
+    r.pendiente = puedeDecidir(u, r);
+  });
+
   return rows;
 }
+
 async function obtener(u, id) {
   const r = (await q(SEL + ' where r.id=$1', [id])).rows[0];
   if (!r || !P.puedeVer(u, r)) throw E(404, 'Requisición no encontrada');
