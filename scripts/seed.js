@@ -13,7 +13,7 @@ const EMPRESAS = ['Changan Venezuela', 'Fotón Venezuela'], AREAS = ['Ventas', '
     }
     const mk = async (nombre, mail, pw) => (await c.query('insert into usuario(nombre,email,pass_hash) values($1,$2,$3) on conflict(email) do update set nombre=excluded.nombre returning id', [nombre, mail, await bcrypt.hash(pw, 10)])).rows[0].id;
     const rol = (u, r, e) => c.query('insert into usuario_rol(usuario_id,rol,empresa_id) values($1,$2,$3) on conflict do nothing', [u, r, e]);
-    const admin = await mk('Administrador GH', email, pass); await rol(admin, 'gh', null);
+    const admin = await mk('Administrador GH', email, pass); await rol(admin, 'gh', null); await rol(admin, 'superadmin', null);
     if (process.env.SEED_DEMO === 'true') {
       const ch = ids['Changan Venezuela'], pw = process.env.SEED_DEMO_PASSWORD || pass;
       await rol(await mk('Gerente Demo', 'gerente@demo.local', pw), 'gerente', ch);

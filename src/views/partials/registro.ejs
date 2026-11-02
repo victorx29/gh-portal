@@ -1,0 +1,6 @@
+<% const rg = (et && et.reglas) || {}, ck = rg.checklist || [], cv = (reg && reg.checklist) || {}; if (rg.requiere_resultado || ck.length) { %>
+<form method="post" action="<%= action %>" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= typeof reqId !== 'undefined' ? reqId : '' %>">
+<h3>Etapa «<%= et.nombre %>»: registro</h3>
+<% if (rg.requiere_resultado) { %><label for="rs">Resultado</label><select id="rs" name="resultado"><option value="pendiente">Pendiente</option><option value="apto"<%= reg && reg.resultado === 'apto' ? ' selected' : '' %>>Apto</option><option value="no_apto"<%= reg && reg.resultado === 'no_apto' ? ' selected' : '' %>>No apto</option></select><% } %>
+<% ck.forEach(it => { %><label class="chk"><input type="checkbox" name="check" value="<%= it %>"<%= cv[it] ? ' checked' : '' %>><%= it %></label><% }) %>
+<label for="nt">Nota</label><textarea id="nt" name="nota" rows="2"><%= (reg && reg.nota) || '' %></textarea><p class="act"><button class="btn">Guardar registro</button></p></form><% } %>

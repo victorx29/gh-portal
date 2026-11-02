@@ -16,7 +16,7 @@ app.use(w(async (req, res, next) => {
 }));
 app.use(require('./controllers/auth'));
 app.use((req, res, next) => req.user ? next() : res.redirect('/login'));
-app.use(require('./controllers/pipeline')); app.use(require('./controllers/requisiciones')); app.use(require('./controllers/admin'));
+app.use(require('./controllers/pipeline')); app.use(require('./controllers/seleccion')); app.use(require('./controllers/requisiciones')); app.use(require('./controllers/config')); app.use(require('./controllers/admin'));
 app.use((req, res, next) => { const e = new Error('Página no encontrada'); e.status = 404; next(e); });
 app.use((e, req, res, _n) => { if (!e.status) console.error(e); res.status(e.status || 500).render('error', { title: 'Error', msg: e.status ? e.message : 'Error interno', user: res.locals.user || null, flash: null, csrf: res.locals.csrf || '', nav: '' }); });
 app.listen(cfg.port, () => console.log('GH portal en :' + cfg.port));

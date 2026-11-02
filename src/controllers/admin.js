@@ -1,11 +1,11 @@
-const r = require('express').Router(), bcrypt = require('bcryptjs'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash } = require('../util');
+const r = require('express').Router(), bcrypt = require('bcryptjs'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash, modal } = require('../util');
 r.use(['/usuarios', '/perfiles'], (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana')));
-const ROLES = ['gerente', 'director', 'presidencia', 'gh'];
+const ROLES = ['gerente', 'director', 'presidencia', 'gh', 'superadmin'];
 
 r.get('/usuarios', w(async (req, res) => {
   const us = (await q(`select u.id,u.nombre,u.email,u.activo, coalesce(json_agg(json_build_object('id',ur.id,'rol',ur.rol,'empresa',e.nombre)) filter (where ur.id is not null),'[]') roles
     from usuario u left join usuario_rol ur on ur.usuario_id=u.id left join empresa e on e.id=ur.empresa_id group by u.id order by u.nombre`)).rows;
-  res.render('usuarios', { title: 'Usuarios', nav: 'usuarios', us, ROLES, empresas: (await q('select id,nombre from empresa order by nombre')).rows });
+  res.render('usuarios', { title: 'Usuarios', nav: 'usuarios', us, isSuper: P.esSuper(req.user), ROLES: ROLES.filter(x => x !== 'superadmin' || P.esSuper(req.user)), empresas: (await q('select id,nombre from empresa order by nombre')).rows });
 }));
 r.post('/usuarios', w(async (req, res) => {
   const { nombre, email, password } = req.body;
@@ -15,7 +15,8 @@ r.post('/usuarios', w(async (req, res) => {
 }));
 r.post('/usuarios/:id/rol', w(async (req, res) => {
   if (!ROLES.includes(req.body.rol)) throw E(400, 'Rol inválido');
-  const emp = req.body.rol === 'gh' || !req.body.empresa_id ? null : +req.body.empresa_id;   // GH siempre global
+  if (req.body.rol === 'superadmin' && !P.esSuper(req.user)) throw E(403, 'Solo un superadmin asigna ese rol');
+  const emp = ['gh', 'superadmin'].includes(req.body.rol) || !req.body.empresa_id ? null : +req.body.empresa_id;   // GH siempre global
   await q('insert into usuario_rol(usuario_id,rol,empresa_id) values($1,$2,$3) on conflict do nothing', [+req.params.id, req.body.rol, emp]);
   flash(req, 'ok', 'Rol asignado'); res.redirect('/usuarios');
 }));
@@ -40,5 +41,29 @@ r.post('/perfiles', w(async (req, res) => {
     await c.query('insert into perfil_version(perfil_id,version,contenido,creado_por) values($1,$2,$3,$4)', [p.id, v, contenido, req.user.id]);
   });
   flash(req, 'ok', 'Perfil guardado'); res.redirect('/perfiles');
+}));
+// Eliminar (solo superadmin): se borra si no tiene actividad; si la tiene, se anonimiza y el historial se conserva
+r.get('/usuarios/:id/eliminar', w(async (req, res) => {
+  if (!P.esSuper(req.user)) throw E(403, 'Solo el superadmin elimina usuarios');
+  const u = (await q('select id,nombre,email from usuario where id=$1', [+req.params.id])).rows[0]; if (!u) throw E(404, 'Usuario no encontrado');
+  modal(req, res, 'usuario_eliminar', { title: 'Eliminar usuario', u, nav: 'usuarios' });
+}));
+r.post('/usuarios/:id/eliminar', w(async (req, res) => {
+  if (!P.esSuper(req.user)) throw E(403, 'Solo el superadmin elimina usuarios');
+  const id = +req.params.id; if (id === req.user.id) throw E(400, 'No puedes eliminarte a ti mismo');
+  const esS = (await q("select 1 from usuario_rol where usuario_id=$1 and rol='superadmin'", [id])).rowCount;
+  if (esS && +(await q("select count(*) n from usuario_rol ur join usuario u on u.id=ur.usuario_id where ur.rol='superadmin' and u.activo")).rows[0].n <= 1) throw E(400, 'No puedes eliminar al último superadmin');
+  const out = await tx(async c => {
+    await c.query('savepoint s1');
+    try { await c.query('delete from usuario where id=$1', [id]); return 'eliminado'; }
+    catch (e) {
+      if (e.code !== '23503') throw e;   // tiene actividad: se conserva el historial
+      await c.query('rollback to savepoint s1');
+      await c.query("update usuario set nombre='Usuario eliminado #'||id, email='eliminado+'||id||'@invalid.local', pass_hash='!', activo=false where id=$1", [id]);
+      await c.query('delete from usuario_rol where usuario_id=$1', [id]); return 'anonimizado';
+    }
+  });
+  await q('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [req.user.id, 'usuario', String(id), 'eliminar', { resultado: out }]);
+  flash(req, 'ok', out === 'eliminado' ? 'Usuario eliminado' : 'El usuario tenía actividad: se anonimizó y se conservó el historial'); res.redirect('/usuarios');
 }));
 module.exports = r;

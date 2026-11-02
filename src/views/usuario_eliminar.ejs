@@ -1,0 +1,4 @@
+<div class="mh"><h2>Eliminar usuario</h2><button type="button" class="btn" data-close>Cerrar</button></div>
+<p><b><%= u.nombre %></b> (<%= u.email %>)</p>
+<p class="sub">Si no tiene actividad, se elimina por completo. Si ya solicitó, aprobó o creó registros, se <b>anonimiza</b> (sin nombre, sin correo, sin acceso) y el historial se conserva. No se puede deshacer. Para un cese temporal usa «Desactivar».</p>
+<form method="post" action="/usuarios/<%= u.id %>/eliminar"><input type="hidden" name="_csrf" value="<%= csrf %>"><p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn d">Eliminar definitivamente</button></p></form>

@@ -1,5 +1,5 @@
 const { q, tx } = require('../db'), P = require('./perm'), { E } = require('../util');
-const ORDEN = ['aprobado', 'publicacion', 'convocatoria', 'seleccion'];
+const PL = require('./pipelines');
 const SEL = `select r.*, e.nombre empresa, a.nombre area, pf.nombre cargo, pv.version perfil_v, pv.contenido perfil, s.nombre solicitante
   from requisicion r join empresa e on e.id=r.empresa_id left join area a on a.id=r.area_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id join usuario s on s.id=r.solicitante_id`;
@@ -38,10 +38,18 @@ async function obtener(u, id) {
   r.log = (await q('select ap.*, us.nombre from aprobacion ap join usuario us on us.id=ap.decidido_por where ap.requisicion_id=$1 order by ap.id', [id])).rows;
   return r;
 }
-function acciones(u, r) {
-  const gh = P.esGH(u), i = ORDEN.indexOf(r.estado);
-  return { enviar: r.estado === 'borrador' && r.solicitante_id == u.id, editar: r.estado === 'borrador' && r.solicitante_id == u.id,
-    decidir: puedeDecidir(u, r), mover: gh && i >= 0 && i < ORDEN.length - 1, siguiente: ORDEN[i + 1], cancelar: gh && i >= 0 };
+async function acciones(u, r) {
+  const gh = P.esGH(u), pl = await PL.resolver(r.empresa_id, 'requisicion');
+  const i = pl.flujo.findIndex(e => e.clave === r.estado), et = i >= 0 ? pl.flujo[i] : null, nxt = i >= 0 ? pl.flujo[i + 1] : null;
+  const mover = gh && !!nxt && nxt.clase !== 'exito';
+  const a = { enviar: r.estado === 'borrador' && r.solicitante_id == u.id, editar: r.estado === 'borrador' && r.solicitante_id == u.id, decidir: puedeDecidir(u, r),
+    mover, siguiente: nxt && nxt.nombre, cancelar: gh && !!et && et.clase !== 'exito', seleccion: gh && r.estado === 'seleccion', bloqueos: [], etapa: null, registro: null };
+  if (gh && et) {
+    a.etapa = et;
+    a.registro = (await q('select * from etapa_registro where tipo=$1 and entidad_id=$2 and etapa=$3', ['requisicion', r.id, et.clave])).rows[0] || null;
+    if (mover) a.bloqueos = await PL.problemas({ query: q }, 'requisicion', r.id, et);
+  }
+  return a;
 }
 async function validarArea(areaId, emp) {
   if (areaId && !(await q('select 1 from area where id=$1 and empresa_id=$2', [areaId, emp])).rowCount) throw E(400, 'El área no pertenece a la empresa');
@@ -98,19 +106,28 @@ async function decidir(u, id, d, com) {
 async function mover(u, id) {
   if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana mueve la requisición');
   return tx(async c => {
-    const r = await lock(c, id), i = ORDEN.indexOf(r.estado);
-    if (i < 0 || i >= ORDEN.length - 1) throw E(400, 'No se puede avanzar desde este estado');
-    await cambiar(c, u, r, ORDEN[i + 1], 'mover');
+    const r = await lock(c, id), pl = await PL.resolver(r.empresa_id, 'requisicion', c), i = pl.flujo.findIndex(e => e.clave === r.estado), nxt = pl.flujo[i + 1];
+    if (i < 0 || !nxt) throw E(400, 'No se puede avanzar desde este estado');
+    if (nxt.clase === 'exito') throw E(400, 'El paso a Ingreso es automático al confirmar todas las plazas');
+    const pr = await PL.problemas(c, 'requisicion', id, pl.flujo[i]); if (pr.length) throw E(400, pr.join('. '));
+    await cambiar(c, u, r, nxt.clave, 'mover');
   });
 }
 async function cancelar(u, id, motivo) {
   if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana cancela');
   if (!String(motivo || '').trim()) throw E(400, 'El motivo es obligatorio');
   return tx(async c => {
-    const r = await lock(c, id);
-    if (ORDEN.indexOf(r.estado) < 0) throw E(400, 'No se puede cancelar en este estado');
+    const r = await lock(c, id), pl = await PL.resolver(r.empresa_id, 'requisicion', c), et = pl.flujo.find(e => e.clave === r.estado);
+    if (!et || et.clase === 'exito') throw E(400, 'No se puede cancelar en este estado');
     await c.query('update requisicion set motivo_cierre=$2 where id=$1', [id, motivo.trim()]);
-    await cambiar(c, u, r, 'cancelado', 'cancelar');
+    await cambiar(c, u, r, pl.cierre.clave, 'cancelar');
   });
 }
-module.exports = { listar, obtener, acciones, crear, actualizar, enviar, decidir, mover, cancelar };
+async function registrar(u, id, b) {
+  if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana registra resultados');
+  const r = (await q('select * from requisicion where id=$1', [id])).rows[0]; if (!r) throw E(404, 'No encontrada');
+  const pl = await PL.resolver(r.empresa_id, 'requisicion'), et = pl.flujo.find(e => e.clave === r.estado);
+  if (!et || et.clase === 'exito') throw E(400, 'Esta etapa no admite registro');
+  await PL.registrar(u, 'requisicion', id, et, b);
+}
+module.exports = { listar, obtener, acciones, crear, actualizar, enviar, decidir, mover, cancelar, registrar, lock, cambiar, hist };

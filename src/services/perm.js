@@ -6,7 +6,8 @@ async function cargarUsuario(id) {
   u.rolesTxt = [...new Set(u.roles.map(r => r.rol))].join(', ') || 'sin rol';
   return u;
 }
-const esGH = u => u.roles.some(r => r.rol === 'gh');
+const esGH = u => u.roles.some(r => r.rol === 'gh' || r.rol === 'superadmin');   // superadmin incluye todo lo de GH
+const esSuper = u => u.roles.some(r => r.rol === 'superadmin');
 // rol vigente para esa empresa (empresa_id NULL en el rol = todas las empresas)
 const tiene = (u, rol, emp) => u.roles.some(r => r.rol === rol && (r.empresa_id == null || r.empresa_id == emp));
 // null = todas las empresas; si no, arreglo de ids
@@ -16,4 +17,4 @@ const empresasDe = (u, roles) => {
   return rs.some(r => r.empresa_id == null) ? null : rs.map(r => r.empresa_id);
 };
 const puedeVer = (u, r) => esGH(u) || r.solicitante_id == u.id || tiene(u, 'director', r.empresa_id) || tiene(u, 'presidencia', r.empresa_id);
-module.exports = { cargarUsuario, esGH, tiene, empresasDe, puedeVer };
+module.exports = { cargarUsuario, esGH, esSuper, tiene, empresasDe, puedeVer };

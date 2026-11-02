@@ -1,0 +1,8 @@
+<%- include('partials/head') %>
+<div class="top"><div><h1>Selección · <%= req.codigo %></h1><p class="sub"><%= req.cargo %> · <%= req.empresa %> · Ingresos <%= ing %> de <%= req.plazas %> plaza<%= req.plazas > 1 ? 's' : '' %></p></div>
+<div class="row"><a class="btn" href="/pipeline">Volver al pipeline</a><% if (req.estado === 'seleccion') { %><a class="btn p" href="/requisiciones/<%= req.id %>/candidatos/nuevo" data-modal>+ Candidato</a><% } %></div></div>
+<div class="board"><% pl.etapas.forEach(c => { const L = cands.filter(x => x.etapa === c.clave); %>
+<section class="col k-<%= c.clase === 'cierre' ? 'cancelado' : c.clase === 'exito' ? 'ingreso' : 'seleccion' %>"><div class="ch"><%= c.nombre %><span><%= L.length %></span></div>
+<% L.forEach(x => { %><a class="card" href="/candidaturas/<%= x.id %>" data-modal><h4><%= x.nombre %></h4><p><%= x.email || 'Sin correo' %></p></a><% }) %>
+<% if (!L.length) { %><div class="empty">Sin candidatos</div><% } %></section><% }) %></div>
+<%- include('partials/foot') %>

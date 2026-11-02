@@ -1,0 +1,10 @@
+<div class="mh"><div><h2><%= ca.nombre %></h2><p class="sub"><%= ca.codigo %> · <%= ca.cargo %> · <span class="chip"><%= et ? et.nombre : ca.etapa %></span></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<table class="kv"><tr><th>Correo</th><td><%= ca.email || '—' %></td></tr><tr><th>Teléfono</th><td><%= ca.telefono || '—' %></td></tr><tr><th>Cédula</th><td><%= ca.cedula || '—' %></td></tr>
+<% if (ca.motivo_rechazo) { %><tr><th>Motivo de rechazo</th><td><%= ca.motivo_rechazo %></td></tr><% } %></table>
+<% if (activa) { %>
+<%- include('partials/registro', { action: '/candidaturas/' + ca.id + '/registro', reg: registro, et: et, reqId: ca.requisicion_id }) %>
+<% if (siguiente) { %><div class="blk"><% if (bloqueos.length) { %><div class="flash err" role="alert"><b>No puede avanzar todavía</b><ul><% bloqueos.forEach(b => { %><li><%= b %></li><% }) %></ul></div><% } %>
+<form method="post" action="/candidaturas/<%= ca.id %>/avanzar" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><button class="btn p">Avanzar a <%= siguiente.nombre %></button></form></div><% } %>
+<form method="post" action="/candidaturas/<%= ca.id %>/rechazar" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<label for="mv">Rechazar candidatura (motivo obligatorio; no cierra la requisición)</label><input id="mv" name="motivo"><p class="act"><button class="btn d">Rechazar</button></p></form>
+<% } else { %><p class="empty">Esta candidatura está cerrada.</p><% } %>

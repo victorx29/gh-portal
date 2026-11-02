@@ -1,0 +1,21 @@
+<%- include('partials/head') %>
+<div class="top"><div><h1>Pipelines</h1><p class="sub">Columnas por empresa. Las fijas (inicio, Ingreso y cierre) no se mueven; GH agrega las intermedias y define qué se valida para salir de cada una. Las tarjetas solo avanzan.</p></div></div>
+<form method="get" action="/config/pipelines" class="row"><label class="sr" for="tp">Tablero</label><select id="tp" name="tipo" data-autosubmit><option value="requisicion"<%= tipo === 'requisicion' ? ' selected' : '' %>>Tablero de requisiciones</option><option value="seleccion"<%= tipo === 'seleccion' ? ' selected' : '' %>>Tablero de selección</option></select>
+<label class="sr" for="em">Empresa</label><select id="em" name="empresa" data-autosubmit><option value="">Estándar del grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= e.id === emp ? ' selected' : '' %>><%= e.nombre %></option><% }) %></select></form>
+<% if (!p) { %><div class="empty" style="margin-top:14px">Esta empresa usa el estándar del grupo.
+<form method="post" action="/config/pipelines/clonar" class="act" style="justify-content:center"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><button class="btn p">Personalizar para esta empresa</button></form></div>
+<% } else { %>
+<% if (!editable) { %><p class="flash err">El estándar del grupo solo lo edita el superadmin. Personaliza una empresa para cambiar sus columnas.</p><% } %>
+<div class="tw"><table><tr><th>Columna</th><th>Validaciones para salir de ella</th><th></th></tr>
+<% etapas.forEach(e => { const rg = e.reglas || {}; const fija = e.clase !== 'normal'; %><tr><td colspan="2">
+<form method="post" action="/config/etapas/<%= e.id %>/editar"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>">
+<div class="g2"><div><label for="n<%= e.id %>">Nombre <span class="chip"><%= e.clase %></span></label><input id="n<%= e.id %>" name="nombre" value="<%= e.nombre %>" <%= editable ? '' : 'disabled' %>></div>
+<div><% if (e.clase === 'cierre' || e.clase === 'exito') { %><p class="sub">Sin validaciones: es una columna final.</p><% } else { %><label class="chk"><input type="checkbox" name="requiere_resultado" <%= rg.requiere_resultado ? 'checked' : '' %> <%= editable ? '' : 'disabled' %>>Requiere resultado «Apto»</label>
+<label for="c<%= e.id %>">Checklist (una por línea)</label><textarea id="c<%= e.id %>" name="checklist" rows="2" <%= editable ? '' : 'disabled' %>><%= (rg.checklist || []).join('\n') %></textarea><% } %></div></div>
+<% if (editable) { %><p class="act"><button class="btn">Guardar</button></p><% } %></form></td>
+<td><% if (editable && !fija) { %><form method="post" action="/config/etapas/<%= e.id %>/mover" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><button class="btn" name="dir" value="up" aria-label="Subir columna">↑</button><button class="btn" name="dir" value="down" aria-label="Bajar columna">↓</button></form>
+<form method="post" action="/config/etapas/<%= e.id %>/quitar" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><button class="btn d">Quitar</button></form><% } %></td></tr><% }) %></table></div>
+<% if (editable) { %><h3>Agregar columna</h3><form method="post" action="/config/etapas" class="g2 form-max"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><input type="hidden" name="pipeline_id" value="<%= p.id %>">
+<div><label for="an">Nombre</label><input id="an" name="nombre" required></div><div><label for="ad">Después de</label><select id="ad" name="despues_id"><% etapas.filter(e => e.clase === 'inicio' || e.clase === 'normal').forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div>
+<div class="end"><button class="btn p">Agregar</button></div></form><% } %><% } %>
+<%- include('partials/foot') %>

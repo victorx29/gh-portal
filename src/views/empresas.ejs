@@ -1,0 +1,6 @@
+<%- include('partials/head') %><div class="top"><div><h1>Empresas</h1><p class="sub">Maestro del grupo: cualquier cantidad de empresas, cada una con sus áreas, usuarios y pipelines.</p></div></div>
+<div class="tw"><table><tr><th>Empresa</th><th>Áreas</th><th>Agregar área</th><th></th></tr><% es.forEach(e => { %><tr><td><%= e.nombre %><% if (!e.activa) { %> <span class="chip r">inactiva</span><% } %></td><td><%= e.areas || '—' %></td>
+<td><form method="post" action="/empresas/<%= e.id %>/areas" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="a<%= e.id %>">Nueva área</label><input id="a<%= e.id %>" name="nombre" placeholder="Nueva área" required><button class="btn">Agregar</button></form></td>
+<td><form method="post" action="/empresas/<%= e.id %>/activa"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn"><%= e.activa ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %></table></div>
+<h3>Nueva empresa</h3><form method="post" action="/empresas" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="en">Nombre</label><input id="en" name="nombre" placeholder="Nombre de la empresa" required style="max-width:340px"><button class="btn p">Crear empresa</button></form>
+<%- include('partials/foot') %>

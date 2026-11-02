@@ -1,0 +1,6 @@
+<div class="mh"><h2>Nuevo candidato</h2><button type="button" class="btn" data-close>Cerrar</button></div>
+<form method="post" action="/requisiciones/<%= reqId %>/candidatos"><input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2">
+<div><label for="cn">Nombre completo</label><input id="cn" name="nombre" required></div><div><label for="cc">Cédula</label><input id="cc" name="cedula"></div>
+<div><label for="ce">Correo</label><input id="ce" name="email" type="email"></div><div><label for="ct">Teléfono</label><input id="ct" name="telefono"></div></div>
+<p class="sub">La carga de CV con análisis de IA llega en la siguiente entrega.</p>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p">Agregar</button></p></form>
