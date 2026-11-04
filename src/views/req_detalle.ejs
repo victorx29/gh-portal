@@ -1,8 +1,12 @@
 <div class="mh"><div><h2><%= x.cargo %></h2><p class="sub"><%= x.codigo %> · <%= x.empresa %> · <span class="chip"><%= x.estado.replace('pend_', 'pendiente ').replace(/_/g, ' ') %></span></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
-<table class="kv"><tr><th>Área</th><td><%= x.area || '—' %></td></tr><tr><th>Tipo</th><td><%= x.tipo === 'nuevo' ? 'Cargo nuevo' : 'Reemplazo' %></td></tr><tr><th>Contratación</th><td><%= x.contratacion %></td></tr>
-<tr><th>Plazas</th><td><%= x.plazas %></td></tr><tr><th>Fecha requerida</th><td><%= x.fecha_requerida ? new Date(x.fecha_requerida).toLocaleDateString('es-VE') : '—' %></td></tr>
-<tr><th>Perfil</th><td>versión <%= x.perfil_v %></td></tr><tr><th>Solicitante</th><td><%= x.solicitante %></td></tr><tr><th>Justificación</th><td><%= x.justificacion || '—' %></td></tr>
-<% if (x.motivo_cierre) { %><tr><th>Motivo de cierre</th><td><%= x.motivo_cierre %></td></tr><% } %></table>
+<% const f = d => d ? new Date(d).toLocaleDateString('es-VE') : '—'; %>
+<table class="kv"><tr><th>Área</th><td><%= x.area || '—' %></td></tr><tr><th>Tipo</th><td><%= x.tipo === 'nuevo' ? 'Cargo nuevo' : 'Reemplazo' %><% if (x.sustituye_a) { %> · sustituye a <%= x.sustituye_a %><% } %></td></tr>
+<tr><th>Profesión u oficio</th><td><%= x.profesion || '—' %></td></tr><tr><th>Grado de instrucción</th><td><%= x.grado || '—' %></td></tr><tr><th>Experiencia</th><td style="white-space:pre-line"><%= x.experiencia || '—' %></td></tr>
+<tr><th>Contratación</th><td><%= x.contratacion %><% if (x.contratacion === 'Temporal') { %> · del <%= f(x.vigencia_desde) %> al <%= f(x.vigencia_hasta) %><% } %></td></tr>
+<tr><th>Plazas</th><td><%= x.plazas %></td></tr><tr><th>Fecha requerida</th><td><%= f(x.fecha_requerida) %></td></tr><tr><th>Perfil</th><td>versión <%= x.perfil_v %> · <a href="/perfiles/<%= x.perfil_id %>/vista" data-modal2>ver</a></td></tr>
+<tr><th>Equipos</th><td><%= x.equipos.map(e => e.nombre + (e.requiere_linea ? ' (con línea)' : '')).join(', ') || '—' %><% if (x.equipos_otros) { %><br>Otros: <%= x.equipos_otros %><% } %></td></tr>
+<tr><th>Accesos</th><td><%= x.accesos.map(a => a.nombre + (a.nivel ? ' — ' + a.nivel : '')).join('; ') || '—' %></td></tr><tr><th>Correo corporativo</th><td><%= x.correo_corporativo ? 'Sí' : 'No' %></td></tr>
+<tr><th>Solicitante</th><td><%= x.solicitante %></td></tr><tr><th>Justificación</th><td><%= x.justificacion || '—' %></td></tr><% if (x.motivo_cierre) { %><tr><th>Motivo de cierre</th><td><%= x.motivo_cierre %></td></tr><% } %></table>
 <% if (a.decidir) { %><form method="post" action="/requisiciones/<%= x.id %>/decidir" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>">
 <label for="cm">Comentario (obligatorio al devolver o rechazar)</label><textarea id="cm" name="comentario" rows="2"></textarea>
 <p class="act"><button class="btn p" name="d" value="aprobada">Aprobar</button> <button class="btn" name="d" value="devuelta">Devolver</button> <button class="btn d" name="d" value="rechazada">Rechazar</button></p></form><% } %>
@@ -13,4 +17,19 @@
 <% if (a.mover) { %><form method="post" action="/requisiciones/<%= x.id %>/mover" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Pasar a <%= a.siguiente %></button></form><% } %>
 <% if (a.seleccion) { %><a class="btn p" href="/requisiciones/<%= x.id %>/seleccion">Abrir tablero de selección</a><% } %></p>
 <% if (a.cancelar) { %><form method="post" action="/requisiciones/<%= x.id %>/cancelar" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>"><label for="mo">Cancelar requisición (motivo obligatorio)</label><input id="mo" name="motivo"><p class="act"><button class="btn d">Cancelar requisición</button></p></form><% } %>
-<h3>Aprobaciones</h3><% x.log.forEach(l => { %><div class="log"><b><%= l.paso %> · <%= l.decision %></b> — <%= l.nombre %><br><small><%= new Date(l.fecha).toLocaleString('es-VE') %></small><% if (l.comentario) { %><br><%= l.comentario %><% } %></div><% }) %><% if (!x.log.length) { %><div class="empty">Sin decisiones aún</div><% } %>
+<% if (a.eliminar || a.anular) { %><details><summary>Eliminar o anular el borrador</summary>
+<% if (a.eliminar) { %><form method="post" action="/requisiciones/<%= x.id %>/eliminar"><input type="hidden" name="_csrf" value="<%= csrf %>"><p class="sub">Nunca se envió: se elimina por completo.</p><button class="btn d">Eliminar borrador</button></form><% } %>
+<% if (a.anular) { %><form method="post" action="/requisiciones/<%= x.id %>/anular"><input type="hidden" name="_csrf" value="<%= csrf %>"><label for="an">Anular (se conserva el historial; motivo obligatorio)</label><input id="an" name="motivo"><p class="act"><button class="btn d">Anular</button></p></form><% } %></details><% } %>
+<details open><summary>Comentarios (<%= com.length %>)</summary>
+<% com.forEach(c => { %><div class="cmt<%= c.ambito === 'gh' ? ' gh' : '' %>"><b><%= c.autor %></b><% if (c.ambito === 'gh') { %> <span class="chip w">nota interna GH</span><% } %> <small><%= new Date(c.creado_en).toLocaleString('es-VE') %></small><br><span style="white-space:pre-line"><%= c.texto %></span></div><% }) %>
+<% if (!com.length) { %><p class="sub">Sin comentarios todavía.</p><% } %>
+<form method="post" action="/requisiciones/<%= x.id %>/comentarios"><input type="hidden" name="_csrf" value="<%= csrf %>"><label for="ct">Nuevo comentario (queda en la traza y no se puede editar)</label><textarea id="ct" name="texto" rows="2" required></textarea>
+<% if (user.roles.some(r => r.rol === 'gh' || r.rol === 'superadmin')) { %><label for="ca">Visible para</label><select id="ca" name="ambito"><option value="proceso">Todos los involucrados</option><option value="gh">Solo Gestión Humana (nota interna)</option></select><% } %>
+<p class="act"><button class="btn">Comentar</button></p></form></details>
+<details><summary>Adjuntos (<%= adj.length %>)</summary>
+<% adj.forEach(f => { %><div class="cmt"><a href="/adjuntos/<%= f.id %>"><%= f.nombre_original %></a> <small>· <%= f.autor %> · <%= Math.max(1, Math.round(f.tamano / 1024)) %> KB · <%= new Date(f.subido_en).toLocaleDateString('es-VE') %></small></div><% }) %>
+<% if (!adj.length) { %><p class="sub">Sin archivos.</p><% } %>
+<form method="post" action="/requisiciones/<%= x.id %>/adjuntos?_csrf=<%= csrf %>" enctype="multipart/form-data"><label for="ar">Adjuntar (PDF, imágenes, Word, Excel o texto; máximo 10 MB c/u)</label>
+<input id="ar" type="file" name="archivos" multiple accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx,.txt" required><p class="act"><button class="btn">Subir</button></p></form></details>
+<details><summary>Línea de tiempo (<%= linea.length %>)</summary>
+<% linea.forEach(i => { %><div class="log"><b><%= i.titulo %></b> — <%= i.autor || 'Sistema' %><br><small><%= new Date(i.fecha).toLocaleString('es-VE') %></small><% if (i.detalle) { %><br><span style="white-space:pre-line"><%= i.detalle %></span><% } %></div><% }) %></details>

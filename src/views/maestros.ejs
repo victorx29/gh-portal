@@ -1,0 +1,9 @@
+<%- include('partials/head') %><div class="top"><div><h1>Maestros</h1><p class="sub">Listas que alimentan los formularios. Lo desactivado deja de ofrecerse, pero se conserva en las requisiciones ya creadas.</p></div></div>
+<% Object.entries(MAESTROS).forEach(([k, m]) => { %><h3><%= m[1] %></h3>
+<div class="tw"><table><tr><th>Nombre</th><% if (k === 'equipos') { %><th>Pide línea telefónica</th><% } %><th>Estado</th><th></th></tr>
+<% d[k].forEach(x => { %><tr><td><%= x.nombre %></td><% if (k === 'equipos') { %><td><%= x.requiere_linea ? 'Sí' : 'No' %></td><% } %><td><%= x.activo ? 'Activo' : 'Inactivo' %></td>
+<td><form method="post" action="/config/maestros/<%= k %>/<%= x.id %>/activo"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn"><%= x.activo ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %>
+<% if (!d[k].length) { %><tr><td colspan="4" class="empty">Aún no hay elementos</td></tr><% } %></table></div>
+<form method="post" action="/config/maestros/<%= k %>" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="n-<%= k %>">Nuevo elemento</label><input id="n-<%= k %>" name="nombre" placeholder="Nuevo elemento" required style="max-width:320px">
+<% if (k === 'equipos') { %><label class="chk"><input type="checkbox" name="requiere_linea">Pide línea telefónica</label><% } %><button class="btn p">Agregar</button></form><% }) %>
+<%- include('partials/foot') %>

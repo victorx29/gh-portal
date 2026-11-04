@@ -40,4 +40,21 @@ r.post('/empresas/:id/areas', sup, w(async (req, res) => {
   const n = String(req.body.nombre || '').trim(); if (!n) throw E(400, 'El nombre del área es obligatorio');
   await q('insert into area(empresa_id,nombre) values($1,$2) on conflict do nothing', [+req.params.id, n]); flash(req, 'ok', 'Área agregada'); res.redirect('/empresas');
 }));
+// Maestros configurables (superadmin): nada de listas fijas en el código
+const MAESTROS = { grados: ['grado_instruccion', 'Grados de instrucción'], equipos: ['catalogo_equipo', 'Equipos'], accesos: ['catalogo_acceso', 'Accesos a sistemas'] };
+r.get('/config/maestros', sup, w(async (req, res) => {
+  const d = {}; for (const [k, [t]] of Object.entries(MAESTROS)) d[k] = (await q(`select * from ${t} order by nombre`)).rows;
+  res.render('maestros', { title: 'Maestros', nav: 'maestros', MAESTROS, d });
+}));
+r.post('/config/maestros/:m', sup, w(async (req, res) => {
+  const m = MAESTROS[req.params.m]; if (!m) throw E(404, 'Maestro desconocido');
+  const n = String(req.body.nombre || '').trim(); if (!n) throw E(400, 'El nombre es obligatorio');
+  if (req.params.m === 'equipos') await q('insert into catalogo_equipo(nombre,requiere_linea) values($1,$2) on conflict do nothing', [n, req.body.requiere_linea === 'on']);
+  else await q(`insert into ${m[0]}(nombre) values($1) on conflict do nothing`, [n]);
+  flash(req, 'ok', 'Elemento agregado'); res.redirect('/config/maestros');
+}));
+r.post('/config/maestros/:m/:id/activo', sup, w(async (req, res) => {
+  const m = MAESTROS[req.params.m]; if (!m) throw E(404, 'Maestro desconocido');
+  await q(`update ${m[0]} set activo = not activo where id=$1`, [+req.params.id]); res.redirect('/config/maestros');
+}));
 module.exports = r;

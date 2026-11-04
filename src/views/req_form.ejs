@@ -1,13 +1,27 @@
 <div class="mh"><h2><%= v.id ? 'Editar requisición' : 'Nueva requisición' %></h2><button type="button" class="btn" data-close>Cerrar</button></div>
-<% if (!emps.length && !v.id) { %><p class="empty">Tu usuario no tiene rol de Gerente o Director en ninguna empresa. Pide a Gestión Humana que lo configure.</p><% } else { %>
+<% if (!emps.length) { %><p class="empty">Tu usuario no tiene rol de Gerente o Director en ninguna empresa. Pide a Gestión Humana que lo configure.</p><% } else {
+ const eqSel = {}, acSel = {}; (v.equipos || []).forEach(e => { eqSel[e.equipo_id] = e; }); (v.accesos || []).forEach(a => { acSel[a.acceso_id] = a; });
+ const dt = x => x ? new Date(x).toISOString().slice(0, 10) : ''; %>
 <form method="post" action="<%= v.id ? '/requisiciones/' + v.id + '/editar' : '/requisiciones' %>"><input type="hidden" name="_csrf" value="<%= csrf %>">
-<div class="g2">
-<div><label for="f-empresa">Empresa</label><select id="f-empresa" name="empresa_id" <%= v.id ? 'disabled' : 'required' %>><% (v.id ? [{id: v.empresa_id, nombre: v.empresa}] : emps).forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div>
+<fieldset><legend>Cargo</legend><div class="g2">
+<div><label for="f-empresa">Empresa</label><select id="f-empresa" name="empresa_id" required><% emps.forEach(e => { %><option value="<%= e.id %>"<%= v.empresa_id == e.id ? ' selected' : '' %>><%= e.nombre %></option><% }) %></select></div>
 <div><label for="f-area">Área</label><select id="f-area" name="area_id"><option value="">—</option><% areas.forEach(a => { %><option value="<%= a.id %>" data-e="<%= a.empresa_id %>"<%= v.area_id == a.id ? ' selected' : '' %>><%= a.nombre %></option><% }) %></select></div>
-<div><label for="f-perfil">Perfil del cargo</label><select id="f-perfil" name="perfil_id" <%= v.id ? 'disabled' : 'required' %>><% pers.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.codigo %>)</option><% }) %></select></div>
-<div><label for="f-tipo">Tipo</label><select id="f-tipo" name="tipo"><option value="reemplazo"<%= v.tipo === 'reemplazo' ? ' selected' : '' %>>Reemplazo</option><option value="nuevo"<%= v.tipo === 'nuevo' ? ' selected' : '' %>>Cargo nuevo (requiere Presidencia)</option></select></div>
-<div><label for="f-con">Contratación</label><select id="f-con" name="contratacion"><option<%= v.contratacion === 'Permanente' ? ' selected' : '' %>>Permanente</option><option<%= v.contratacion === 'Temporal' ? ' selected' : '' %>>Temporal</option></select></div>
+<div><label for="f-perfil">Perfil del cargo</label><select id="f-perfil" name="perfil_id" required><% pers.forEach(p => { %><option value="<%= p.id %>"<%= v.perfil_id == p.id ? ' selected' : '' %>><%= p.nombre %> (<%= p.codigo %>)</option><% }) %></select></div>
+<div class="end"><button type="button" class="btn" data-perfil-ver>Ver perfil completo</button></div>
+<div><label for="f-tipo">Tipo</label><select id="f-tipo" name="tipo"><option value="reemplazo"<%= v.tipo !== 'nuevo' ? ' selected' : '' %>>Reemplazo</option><option value="nuevo"<%= v.tipo === 'nuevo' ? ' selected' : '' %>>Cargo nuevo (requiere aprobación de Presidencia)</option></select></div>
+<div data-when="tipo=reemplazo"><label for="f-sus">Sustituye a</label><input id="f-sus" name="sustituye_a" value="<%= v.sustituye_a || '' %>"></div>
 <div><label for="f-pl">Plazas</label><input id="f-pl" name="plazas" type="number" min="1" value="<%= v.plazas || 1 %>"></div>
-<div><label for="f-fe">Fecha requerida</label><input id="f-fe" name="fecha_requerida" type="date" value="<%= v.fecha_requerida ? new Date(v.fecha_requerida).toISOString().slice(0, 10) : '' %>"></div></div>
+<div><label for="f-fe">Fecha requerida</label><input id="f-fe" name="fecha_requerida" type="date" value="<%= dt(v.fecha_requerida) %>"></div></div></fieldset>
+<fieldset><legend>Requisitos</legend><div class="g2"><div><label for="f-pro">Profesión u oficio</label><input id="f-pro" name="profesion" value="<%= v.profesion || '' %>"></div>
+<div><label for="f-gr">Grado de instrucción</label><select id="f-gr" name="grado_id"><option value="">—</option><% grados.forEach(g => { %><option value="<%= g.id %>"<%= v.grado_id == g.id ? ' selected' : '' %>><%= g.nombre %></option><% }) %></select></div></div>
+<label for="f-ex">Experiencia requerida</label><textarea id="f-ex" name="experiencia" rows="3"><%= v.experiencia || '' %></textarea></fieldset>
+<fieldset><legend>Contratación</legend><div class="g2"><div><label for="f-con">Tipo de contratación</label><select id="f-con" name="contratacion"><option<%= v.contratacion !== 'Temporal' ? ' selected' : '' %>>Permanente</option><option<%= v.contratacion === 'Temporal' ? ' selected' : '' %>>Temporal</option></select></div></div>
+<div class="g2" data-when="contratacion=Temporal"><div><label for="f-d">Desde</label><input id="f-d" name="vigencia_desde" type="date" value="<%= dt(v.vigencia_desde) %>"></div><div><label for="f-h">Hasta</label><input id="f-h" name="vigencia_hasta" type="date" value="<%= dt(v.vigencia_hasta) %>"></div></div></fieldset>
+<fieldset><legend>Equipos requeridos</legend><div class="eq"><% equipos.forEach(e => { %><div><label class="chk"><input type="checkbox" name="eq" value="<%= e.id %>"<%= eqSel[e.id] ? ' checked' : '' %>><%= e.nombre %></label>
+<% if (e.requiere_linea) { %><label class="chk sub-chk"><input type="checkbox" name="linea_<%= e.id %>"<%= eqSel[e.id] && eqSel[e.id].requiere_linea ? ' checked' : '' %>>Con línea telefónica</label><% } %></div><% }) %></div>
+<label for="f-ot">Otros equipos o aclaraciones</label><textarea id="f-ot" name="equipos_otros" rows="2"><%= v.equipos_otros || '' %></textarea></fieldset>
+<fieldset><legend>Accesos y correo</legend><label class="chk"><input type="checkbox" name="correo_corporativo"<%= v.correo_corporativo ? ' checked' : '' %>>Necesitará correo corporativo</label>
+<% accesos.forEach(a => { %><div class="row"><label class="chk" style="min-width:200px"><input type="checkbox" name="ac" value="<%= a.id %>"<%= acSel[a.id] ? ' checked' : '' %>><%= a.nombre %></label><label class="sr" for="nv<%= a.id %>">Nivel de acceso a <%= a.nombre %></label><input id="nv<%= a.id %>" name="nivel_<%= a.id %>" placeholder="Nivel de acceso" value="<%= acSel[a.id] ? acSel[a.id].nivel || '' : '' %>" style="max-width:260px"></div><% }) %>
+<% if (!accesos.length) { %><p class="sub">No hay accesos configurados. El superadmin los agrega en Maestros.</p><% } %></fieldset>
 <label for="f-ju">Justificación</label><textarea id="f-ju" name="justificacion" rows="3"><%= v.justificacion || '' %></textarea>
-<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p" type="submit">Guardar borrador</button></p></form><% } %>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p">Guardar borrador</button></p></form><% } %>

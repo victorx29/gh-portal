@@ -33,7 +33,7 @@ r.get('/perfiles', w(async (req, res) => {
 // Mismo código = nueva versión (las versiones son inmutables)
 r.post('/perfiles', w(async (req, res) => {
   const b = req.body; if (!b.codigo || !b.nombre) throw E(400, 'Código y nombre son obligatorios');
-  const contenido = { objetivo: b.objetivo || '', requisitos: b.requisitos || '', criterios: String(b.criterios || '').split('\n').map(s => s.trim()).filter(Boolean) };
+  const contenido = { objetivo: b.objetivo || '', funciones: b.funciones || '', requisitos: b.requisitos || '', competencias: b.competencias || '', conocimientos: b.conocimientos || '', criterios: String(b.criterios || '').split('\n').map(s => s.trim()).filter(Boolean) };
   await tx(async c => {
     let p = (await c.query('select id from perfil where codigo=$1', [b.codigo.trim()])).rows[0];
     if (!p) p = (await c.query('insert into perfil(codigo,nombre,empresa_id) values($1,$2,$3) returning id', [b.codigo.trim(), b.nombre.trim(), b.empresa_id || null])).rows[0];

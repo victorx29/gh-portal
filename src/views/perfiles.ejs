@@ -3,6 +3,6 @@
 <h3>Crear perfil o nueva versión</h3><form method="post" action="/perfiles" class="form-max"><input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2">
 <div><label for="pc">Código</label><input id="pc" name="codigo" required></div><div><label for="pn">Nombre del cargo</label><input id="pn" name="nombre" required></div>
 <div><label for="pe">Empresa (vacío = grupo)</label><select id="pe" name="empresa_id"><option value="">Grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div></div>
-<label for="po">Objetivo del cargo</label><textarea id="po" name="objetivo" rows="2"></textarea><label for="pr">Requisitos</label><textarea id="pr" name="requisitos" rows="3"></textarea>
+<label for="po">Objetivo del cargo</label><textarea id="po" name="objetivo" rows="2"></textarea><label for="pf">Funciones</label><textarea id="pf" name="funciones" rows="3"></textarea><label for="pc2">Competencias</label><textarea id="pc2" name="competencias" rows="2"></textarea><label for="pk2">Conocimientos</label><textarea id="pk2" name="conocimientos" rows="2"></textarea><label for="pr">Requisitos</label><textarea id="pr" name="requisitos" rows="3"></textarea>
 <label for="pk">Criterios de evaluación de CV (uno por línea)</label><textarea id="pk" name="criterios" rows="4"></textarea><p><button class="btn p">Guardar perfil</button></p></form>
 <%- include('partials/foot') %>

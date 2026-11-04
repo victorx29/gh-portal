@@ -1,6 +1,6 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><%= typeof title !== 'undefined' ? title : 'Gestión Humana' %></title><link rel="stylesheet" href="/css/app.css"><script src="/js/app.js" defer></script></head><body>
-<% if (user) { const gh = user.roles.some(r => r.rol === 'gh' || r.rol === 'superadmin'), sa = user.roles.some(r => r.rol === 'superadmin'); const items = [['/pipeline','pipeline','Pipeline']].concat(gh ? [['/config/pipelines','config','Pipelines'],['/perfiles','perfiles','Perfiles'],['/usuarios','usuarios','Usuarios']] : [], sa ? [['/empresas','empresas','Empresas']] : []); %>
+<% if (user) { const gh = user.roles.some(r => r.rol === 'gh' || r.rol === 'superadmin'), sa = user.roles.some(r => r.rol === 'superadmin'); const items = [['/pipeline','pipeline','Pipeline']].concat(gh ? [['/config/pipelines','config','Pipelines'],['/perfiles','perfiles','Perfiles'],['/usuarios','usuarios','Usuarios']] : [], sa ? [['/empresas','empresas','Empresas'],['/config/maestros','maestros','Maestros']] : []); %>
 <div class="app"><aside class="side" id="side">
   <div class="brand t">GH<i></i></div>
   <div class="who t"><b><%= user.nombre %></b><br><small><%= user.rolesTxt %></small></div>
