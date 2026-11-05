@@ -1,17 +1,21 @@
 (() => {
   const d = document, $ = s => d.querySelector(s), dlg = $('#modal'), dlg2 = $('#modal2'), root = d.documentElement;
   try { const t = localStorage.getItem('gh.theme'); if (t) root.dataset.theme = t; if (localStorage.getItem('gh.col') === '1' && $('#side')) $('#side').classList.add('c'); } catch (e) {}
-  function areas(scope) {
-    const em = scope.querySelector('#f-empresa'), ar = scope.querySelector('#f-area'); if (!em || !ar) return;
-    [...ar.options].forEach(o => { o.hidden = !!o.dataset.e && o.dataset.e !== em.value; });
-    if (ar.selectedOptions[0] && ar.selectedOptions[0].hidden) ar.value = '';
+  // Unidades del formulario de requisición: solo las que pertenecen o sirven a la empresa elegida (data-e="1,3")
+  function unidades(scope) {
+    const em = scope.querySelector('#f-empresa'), un = scope.querySelector('#f-unidad'); if (!em || !un) return;
+    [...un.options].forEach(o => { if (o.dataset.e !== undefined) o.hidden = !o.dataset.e.split(',').includes(em.value); });
+    if (un.selectedOptions[0] && un.selectedOptions[0].hidden) un.value = '';
   }
-  // Campos condicionales: data-when="campo=valor" se muestra solo si ese campo tiene ese valor
-  const cond = scope => scope.querySelectorAll('[data-when]').forEach(el => { const [n, v] = el.dataset.when.split('='), f = scope.querySelector('[name="' + n + '"]'); el.hidden = !f || f.value !== v; });
+  // Campos condicionales: data-when="campo=valor" o "campo=a|b"; el campo se busca en el mismo formulario
+  const cond = scope => scope.querySelectorAll('[data-when]').forEach(el => {
+    const [n, v] = el.dataset.when.split('='), f = (el.closest('form') || scope).querySelector('[name="' + n + '"]');
+    el.hidden = !f || !v.split('|').includes(f.value);
+  });
   async function abrir(url, target) {
     const r = await fetch(url, { headers: { 'X-Modal': '1' }, credentials: 'same-origin' });
     if (!r.ok) { if (target === dlg) location.href = url; return; }
-    target.innerHTML = await r.text(); areas(target); cond(target); if (!target.open) target.showModal();
+    target.innerHTML = await r.text(); unidades(target); cond(target); if (!target.open) target.showModal();
   }
   d.addEventListener('click', e => {
     const a = e.target.closest('[data-modal],[data-modal2]');
@@ -24,9 +28,13 @@
   });
   d.addEventListener('change', e => {
     if (e.target.matches('[data-autosubmit]')) e.target.form.submit();
-    if (e.target.matches('#f-empresa')) areas(e.target.closest('form'));
+    if (e.target.matches('#f-empresa')) unidades(e.target.closest('form'));
     const f = e.target.closest('form'); if (f) cond(f);
   });
   cond(d);
-  const ab = new URLSearchParams(location.search).get('abrir'); if (ab && dlg) abrir('/requisiciones/' + encodeURIComponent(ab), dlg);
+  // Volver a abrir el modal tras guardar: ?abrir=<id requisición> o ?modal=/ruta/interna
+  const qs = new URLSearchParams(location.search), ab = qs.get('abrir'), md = qs.get('modal');
+  if (ab && dlg) abrir('/requisiciones/' + encodeURIComponent(ab), dlg);
+  else if (md && dlg && /^\/[a-z]/.test(md) && !md.startsWith('//')) abrir(md, dlg);
+  if ((ab || md) && history.replaceState) { qs.delete('abrir'); qs.delete('modal'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '')); }
 })();

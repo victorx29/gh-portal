@@ -14,12 +14,17 @@ scripts/seed.js  catálogos iniciales y usuario administrador
 ## Roles y alcance
 | Rol | Qué hace | Alcance |
 |---|---|---|
-| gerente | Crea y envía requisiciones | Empresas asignadas |
-| director | Aprueba (si él solicita, se aprueba automática) | Empresas asignadas |
+| gerente | Crea y envía requisiciones | Su unidad y sus dependientes (o una empresa, regla de transición) |
+| director | Aprueba (si él solicita, se aprueba automática) | La unidad marcada «Aprueba» que tiene asignada |
 | presidencia | Aprueba solo cargos nuevos, después del Director | Empresas asignadas |
-| gh | Ve todo, mueve Aprobado→Selección, cancela, administra usuarios y perfiles | Siempre global; no aprueba |
+| gh | Ve todo, mueve Aprobado→Selección, cancela, administra estructura, usuarios y perfiles | Siempre global; no aprueba |
 
 Nadie aprueba su propia requisición. Devolver exige comentario y regresa a borrador; rechazar cierra.
+
+## Estructura organizativa
+Grupos → empresas → unidades de profundidad libre, con dependencia sólida (una vigente) y funcional (varias), ambas con vigencia `[desde, hasta)`.
+Los cambios cierran la dependencia y abren otra; nunca se edita ni se borra (lo impiden disparadores en la base). La aprobación sube por la línea
+sólida hasta la primera unidad «Aprueba» (`unidad_aprobadora()`), y cada aprobación guarda una foto inmutable de la cadena (`aprobacion.estructura`).
 
 ## Desarrollo local
 ```
@@ -40,7 +45,8 @@ DATABASE_URL=postgres://gh:gh@localhost:5432/gh npm run dev
 6. Backups programados del servicio PostgreSQL y prueba de restauración antes de producción.
 
 ## Contrato con n8n
-La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Tipos actuales: `requisicion.pend_director`, `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
+La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Tipos actuales: `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
 
-## Pendiente (siguiente entrega)
-Selección por candidato (4.1 a 4.8), carga de CV en modal y callback de la IA local, creación de trabajador al ingresar, ficha completa del trabajador, catálogos de empresas y áreas desde la interfaz, límite de intentos de login compartido entre réplicas.
+## Pendiente (siguientes entregas)
+0.6 Perfiles y Cargos (código GH-PF-NN-VV, versiones activables, alcance por empresa y unidad) y posiciones con plazas. 0.7 Postulados con IA,
+rúbrica, persona/candidatura y formulario del candidato. 0.8 Notificaciones. Después: SSO Microsoft 365, maestro de empleados y organigrama visual.

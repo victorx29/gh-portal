@@ -47,7 +47,7 @@ async function avanzar(u, id) {
     if (nxt.clase === 'exito') {   // ingreso: se crea la persona y su relación laboral pendiente de formalizar
       let t = cd.cedula ? (await c.query('select id from trabajador where cedula=$1', [cd.cedula])).rows[0] : null;
       if (!t) t = (await c.query('insert into trabajador(cedula,nombres,email,telefono) values($1,$2,$3,$4) returning id', [cd.cedula || null, cd.nombre, cd.email, cd.telefono])).rows[0];
-      await c.query('insert into relacion_laboral(trabajador_id,empresa_id,area_id,cargo,requisicion_id) values($1,$2,$3,$4,$5)', [t.id, r.empresa_id, r.area_id, r.cargo, r.id]);
+      await c.query('insert into relacion_laboral(trabajador_id,empresa_id,unidad_id,cargo,requisicion_id) values($1,$2,$3,$4,$5)', [t.id, r.empresa_id, r.unidad_id, r.cargo, r.id]);
       const n = (await c.query('select count(*)::int n from candidatura where requisicion_id=$1 and etapa=$2', [r.id, nxt.clave])).rows[0].n;
       const rpl = await PL.resolver(r.empresa_id, 'requisicion', c);
       if (n >= r.plazas && r.estado !== rpl.exito.clave) await RS.cambiar(c, u, r, rpl.exito.clave, 'plazas_cubiertas');

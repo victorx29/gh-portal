@@ -1,9 +1,11 @@
-const r = require('express').Router(), S = require('../services/requisiciones'), C = require('../services/comunicacion'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash, modal } = require('../util');
+const r = require('express').Router(), S = require('../services/requisiciones'), ES = require('../services/estructura'), C = require('../services/comunicacion'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash, modal } = require('../util');
 const APROB = ['borrador', 'pend_director', 'pend_presidencia', 'rechazada', 'anulada'];
+// El formulario ofrece solo las unidades (y empresas) para las que el usuario puede solicitar
 async function datosForm(u) {
-  const [emp, per, are, gra, eqp, acc] = await Promise.all([q('select id,nombre from empresa where activa order by nombre'), q('select id,codigo,nombre from perfil where activo order by nombre'), q('select id,empresa_id,nombre from area order by nombre'),
-    q('select id,nombre from grado_instruccion where activo order by orden,nombre'), q('select id,nombre,requiere_linea from catalogo_equipo where activo order by nombre'), q('select id,nombre from catalogo_acceso where activo order by nombre')]);
-  return { emps: emp.rows.filter(e => P.tiene(u, 'gerente', e.id) || P.tiene(u, 'director', e.id)), pers: per.rows, areas: are.rows, grados: gra.rows, equipos: eqp.rows, accesos: acc.rows };
+  const [emp, per, gra, eqp, acc, unidades] = await Promise.all([q('select id,nombre from empresa where activa order by nombre'), q('select id,codigo,nombre from perfil where activo order by nombre'),
+    q('select id,nombre from grado_instruccion where activo order by orden,nombre'), q('select id,nombre,requiere_linea from catalogo_equipo where activo order by nombre'), q('select id,nombre from catalogo_acceso where activo order by nombre'), ES.alcanceSolicitud(u)]);
+  const ids = new Set(unidades.flatMap(x => x.empresas));
+  return { emps: emp.rows.filter(e => ids.has(e.id)), pers: per.rows, unidades, grados: gra.rows, equipos: eqp.rows, accesos: acc.rows };
 }
 r.get('/requisiciones/nueva', w(async (req, res) => modal(req, res, 'req_form', { title: 'Nueva requisición', v: {}, ...await datosForm(req.user) })));
 r.post('/requisiciones', w(async (req, res) => {
@@ -12,8 +14,8 @@ r.post('/requisiciones', w(async (req, res) => {
 }));
 r.get('/requisiciones/:id', w(async (req, res) => {
   const x = await S.obtener(req.user, +req.params.id);
-  const [a, com, adj, linea] = await Promise.all([S.acciones(req.user, x), C.comentarios(req.user, x.id), C.adjuntos(x.id), C.lineaTiempo(req.user, x)]);
-  modal(req, res, 'req_detalle', { title: x.codigo, x, a, com, adj, linea });
+  const [a, com, adj, linea, aps] = await Promise.all([S.acciones(req.user, x), C.comentarios(req.user, x.id), C.adjuntos(x.id), C.lineaTiempo(req.user, x), S.aprobaciones(x.id)]);
+  modal(req, res, 'req_detalle', { title: x.codigo, x, a, com, adj, linea, aps });
 }));
 r.get('/requisiciones/:id/editar', w(async (req, res) => {
   const x = await S.obtener(req.user, +req.params.id); if (!(await S.acciones(req.user, x)).editar) throw E(403, 'No puedes editar');

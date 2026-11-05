@@ -1,0 +1,10 @@
+<div class="mh"><h2><%= v.id ? 'Editar empresa' : 'Nueva empresa' %></h2><button type="button" class="btn" data-close>Cerrar</button></div>
+<form method="post" action="<%= v.id ? '/config/empresas/' + v.id + '/editar' : '/config/empresas' %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2">
+<div><label for="em-n">Nombre comercial</label><input id="em-n" name="nombre" value="<%= v.nombre || '' %>" required placeholder="Changan Venezuela"></div>
+<div><label for="em-r">Razón social</label><input id="em-r" name="razon_social" value="<%= v.razon_social || '' %>" placeholder="Multinacional de Vehículos, C.A."></div>
+<div><label for="em-s">Siglas</label><input id="em-s" name="siglas" value="<%= v.siglas || '' %>" placeholder="MDV" maxlength="12"></div>
+<div><label for="em-f">RIF</label><input id="em-f" name="rif" value="<%= v.rif || '' %>" placeholder="J-12345678-9" pattern="[VJGEPCvjgepc]-?[0-9]{8}-?[0-9]" title="Formato J-12345678-9"></div>
+<div><label for="em-g">Grupo</label><select id="em-g" name="grupo_id" required><% gs.forEach(g => { %><option value="<%= g.id %>"<%= String(g.id) === String(v.grupo_id) ? ' selected' : '' %>><%= g.nombre %></option><% }) %></select></div>
+<div><label for="em-e">Estado</label><select id="em-e" name="estado"><option value="">—</option><% ESTADOS.concat(v.estado && !ESTADOS.includes(v.estado) ? [v.estado] : []).forEach(x => { %><option<%= x === v.estado ? ' selected' : '' %>><%= x %></option><% }) %></select></div>
+<div><label for="em-c">Ciudad</label><input id="em-c" name="ciudad" value="<%= v.ciudad || '' %>"></div></div>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p"><%= v.id ? 'Guardar cambios' : 'Crear empresa' %></button></p></form>

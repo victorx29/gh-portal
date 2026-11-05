@@ -1,0 +1,7 @@
+<%- include('partials/head') %>
+<div class="top"><div><h1>Configuración</h1><p class="sub">Todo lo que alimenta el proceso de personal: la estructura de la organización, quién puede hacer qué y los catálogos de los formularios.</p></div></div>
+<% const esS = user.roles.some(r => r.rol === 'superadmin'); CONFIG_NAV.forEach(g => { const its = g.items.filter(i => i[5] === 'gh' || esS); if (!its.length) return; %>
+<section class="hub"><h2 class="hub-t"><%= g.sec %></h2><div class="hub-g">
+<% its.forEach(i => { %><a class="hub-i" href="<%= i[1] %>"><span class="hub-ic"><%- ic(i[3]) %></span><span><b><%= i[2] %></b><small><%= i[4] %></small></span></a><% }) %>
+</div></section><% }) %>
+<%- include('partials/foot') %>

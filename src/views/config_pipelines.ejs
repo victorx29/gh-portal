@@ -1,5 +1,6 @@
 <%- include('partials/head') %>
-<div class="top"><div><h1>Pipelines</h1><p class="sub">Columnas por empresa. Las fijas (inicio, Ingreso y cierre) no se mueven; GH agrega las intermedias y define qué se valida para salir de cada una. Las tarjetas solo avanzan.</p></div></div>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Pipelines' }) %><h1>Pipelines</h1><p class="sub">Columnas por empresa. Las fijas (inicio, Ingreso y cierre) no se mueven; GH agrega las intermedias y define qué se valida para salir de cada una. Las tarjetas solo avanzan.</p></div></div>
+<%- include('partials/config_nav') %>
 <form method="get" action="/config/pipelines" class="row"><label class="sr" for="tp">Tablero</label><select id="tp" name="tipo" data-autosubmit><option value="requisicion"<%= tipo === 'requisicion' ? ' selected' : '' %>>Tablero de requisiciones</option><option value="seleccion"<%= tipo === 'seleccion' ? ' selected' : '' %>>Tablero de selección</option></select>
 <label class="sr" for="em">Empresa</label><select id="em" name="empresa" data-autosubmit><option value="">Estándar del grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= e.id === emp ? ' selected' : '' %>><%= e.nombre %></option><% }) %></select></form>
 <% if (!p) { %><div class="empty" style="margin-top:14px">Esta empresa usa el estándar del grupo.
@@ -15,7 +16,7 @@
 <% if (editable) { %><p class="act"><button class="btn">Guardar</button></p><% } %></form></td>
 <td><% if (editable && !fija) { %><form method="post" action="/config/etapas/<%= e.id %>/mover" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><button class="btn" name="dir" value="up" aria-label="Subir columna">↑</button><button class="btn" name="dir" value="down" aria-label="Bajar columna">↓</button></form>
 <form method="post" action="/config/etapas/<%= e.id %>/quitar" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><button class="btn d">Quitar</button></form><% } %></td></tr><% }) %></table></div>
-<% if (editable) { %><h3>Agregar columna</h3><form method="post" action="/config/etapas" class="g2 form-max"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><input type="hidden" name="pipeline_id" value="<%= p.id %>">
+<% if (editable) { %><h2 class="h2s">Agregar columna</h2><form method="post" action="/config/etapas" class="g2 form-max"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="tipo" value="<%= tipo %>"><input type="hidden" name="empresa" value="<%= emp %>"><input type="hidden" name="pipeline_id" value="<%= p.id %>">
 <div><label for="an">Nombre</label><input id="an" name="nombre" required></div><div><label for="ad">Después de</label><select id="ad" name="despues_id"><% etapas.filter(e => e.clase === 'inicio' || e.clase === 'normal').forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div>
 <div class="end"><button class="btn p">Agregar</button></div></form><% } %><% } %>
 <%- include('partials/foot') %>

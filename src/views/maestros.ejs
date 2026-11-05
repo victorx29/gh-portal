@@ -1,9 +1,10 @@
-<%- include('partials/head') %><div class="top"><div><h1>Maestros</h1><p class="sub">Listas que alimentan los formularios. Lo desactivado deja de ofrecerse, pero se conserva en las requisiciones ya creadas.</p></div></div>
-<% Object.entries(MAESTROS).forEach(([k, m]) => { %><h3><%= m[1] %></h3>
-<div class="tw"><table><tr><th>Nombre</th><% if (k === 'equipos') { %><th>Pide línea telefónica</th><% } %><th>Estado</th><th></th></tr>
-<% d[k].forEach(x => { %><tr><td><%= x.nombre %></td><% if (k === 'equipos') { %><td><%= x.requiere_linea ? 'Sí' : 'No' %></td><% } %><td><%= x.activo ? 'Activo' : 'Inactivo' %></td>
-<td><form method="post" action="/config/maestros/<%= k %>/<%= x.id %>/activo"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn"><%= x.activo ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %>
-<% if (!d[k].length) { %><tr><td colspan="4" class="empty">Aún no hay elementos</td></tr><% } %></table></div>
-<form method="post" action="/config/maestros/<%= k %>" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="n-<%= k %>">Nuevo elemento</label><input id="n-<%= k %>" name="nombre" placeholder="Nuevo elemento" required style="max-width:320px">
-<% if (k === 'equipos') { %><label class="chk"><input type="checkbox" name="requiere_linea">Pide línea telefónica</label><% } %><button class="btn p">Agregar</button></form><% }) %>
+<%- include('partials/head') %><div class="top"><div><%- include('partials/crumb', { aqui: titulo }) %><h1><%= titulo %></h1><p class="sub">Lo desactivado deja de ofrecerse en los formularios, pero se conserva donde ya se usó.</p></div></div>
+<%- include('partials/config_nav') %>
+<div class="tw"><table class="mid"><tr><th>Nombre</th><% if (m === 'equipos') { %><th>Pide línea telefónica</th><% } %><% if (m === 'tipos') { %><th>Nivel (orden)</th><% } %><th>Estado</th><th></th></tr>
+<% filas.forEach(x => { %><tr<%- x.activo ? '' : ' class="off"' %>><td><%= x.nombre %></td><% if (m === 'equipos') { %><td><%= x.requiere_linea ? 'Sí' : 'No' %></td><% } %><% if (m === 'tipos') { %><td><%= x.nivel %></td><% } %><td><%= x.activo ? 'Activo' : 'Inactivo' %></td>
+<td class="acts"><form method="post" action="/config/maestros/<%= m %>/<%= x.id %>/activo"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn"><%= x.activo ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %>
+<% if (!filas.length) { %><tr><td colspan="4" class="empty">Aún no hay elementos. Agrega el primero abajo.</td></tr><% } %></table></div>
+<form method="post" action="/config/maestros/<%= m %>" class="row addrow"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="n-<%= m %>">Nuevo elemento</label><input id="n-<%= m %>" name="nombre" placeholder="Nuevo elemento" required style="max-width:320px">
+<% if (m === 'equipos') { %><label class="chk"><input type="checkbox" name="requiere_linea">Pide línea telefónica</label><% } %>
+<% if (m === 'tipos') { %><label class="sr" for="nv">Nivel</label><input id="nv" name="nivel" type="number" min="1" max="999" value="50" style="max-width:110px" title="Nivel: ordena la lista (menor = más arriba)"><% } %><button class="btn p">Agregar</button></form>
 <%- include('partials/foot') %>

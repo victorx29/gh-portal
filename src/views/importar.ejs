@@ -1,0 +1,29 @@
+<%- include('partials/head') %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Carga masiva de estructura' }) %><h1>Carga masiva</h1>
+<p class="sub">Grupos, empresas y unidades desde Excel. Nada se aplica hasta que revises la vista previa.</p></div></div>
+<%- include('partials/config_nav') %>
+<ol class="pasos">
+  <li><b>Descarga el Excel.</b> Trae la estructura actual, las instrucciones y la lista de tipos. <a class="btn" href="/config/estructura/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a></li>
+  <li><b>Edítalo.</b> Agrega filas o cambia las existentes. Lo que no esté en el archivo no se toca ni se borra.</li>
+  <li><b>Súbelo y revisa.</b> Verás qué se crea, qué cambia y los errores por fila antes de aplicar.</li>
+</ol>
+<form method="post" action="/config/estructura/importar?_csrf=<%= csrf %>" enctype="multipart/form-data" class="row form-max">
+  <label class="sr" for="ar">Archivo .xlsx</label><input id="ar" type="file" name="archivo" accept=".xlsx" required style="max-width:420px"><button class="btn p"><%- ic('subir') %>Revisar archivo</button></form>
+<% if (res) { const s = res.resumen, nada = !s.grupos && !s.empresas && !s.unidades; %>
+<h2 class="h2s">Vista previa de «<%= res.archivo %>»</h2>
+<div class="kpi"><div><small>Grupos</small><strong><%= s.grupos %></strong></div><div><small>Empresas</small><strong><%= s.empresas %></strong></div>
+<div><small>Unidades nuevas o con cambios</small><strong><%= s.unidades %></strong></div><div><small>Sin cambios</small><strong><%= s.sinCambio %></strong></div>
+<div><small>Dependencias que se cierran / abren</small><strong><%= s.rel.cerrar %> / <%= s.rel.abrir %></strong></div></div>
+<% if (res.errs.length) { %><div class="flash err" role="alert"><%- ic('alerta') %> <span><b><%= res.errs.length %> error<%= res.errs.length > 1 ? 'es' : '' %>.</b> Corrige el archivo y vuelve a subirlo: no se aplica nada mientras haya errores.</span></div>
+<div class="tw"><table><tr><th>Hoja</th><th>Fila</th><th>Qué corregir</th></tr><% res.errs.slice(0, 300).forEach(e => { %><tr><td><%= e.hoja %></td><td><%= e.fila || '—' %></td><td><%= e.msg %></td></tr><% }) %></table></div>
+<% if (res.errs.length > 300) { %><p class="sub">Y <%= res.errs.length - 300 %> más.</p><% } %>
+<% } else if (nada) { %><div class="flash" role="status">El archivo coincide con la estructura actual. No hay nada que aplicar.</div>
+<% } else { %>
+<% [['grupos', 'Grupos'], ['empresas', 'Empresas'], ['unidades', 'Unidades']].forEach(([k, t]) => { if (!res.cambios[k].length) return; %>
+<details<%= res.cambios[k].length <= 40 ? ' open' : '' %>><summary><%= t %> (<%= res.cambios[k].length %>)</summary><ul class="cambios">
+<% res.cambios[k].forEach(c => { %><li><span class="chip<%= c.accion === 'nuevo' ? '' : ' w' %>"><%= c.accion === 'nuevo' ? 'Nueva' : 'Cambia' %></span> <%= c.txt %><% if (c.detalle) { %> <small class="mu">· <%= c.detalle %></small><% } %></li><% }) %></ul></details><% }) %>
+<form method="post" action="/config/estructura/importar/aplicar" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<button class="btn p">Aplicar cambios</button> <a class="btn" href="/config/estructura/importar">Descartar</a></form>
+<p class="sub">Las dependencias que cambian se cierran con fecha de hoy y se abren nuevas. El historial anterior se conserva.</p><% } %>
+<% } %>
+<%- include('partials/foot') %>

@@ -1,0 +1,12 @@
+<div class="mh"><h2>Nueva unidad</h2><button type="button" class="btn" data-close>Cerrar</button></div>
+<form method="post" action="/config/estructura"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="motivo" value="Alta de la unidad">
+<div class="g2">
+<div><label for="un-n">Nombre</label><input id="un-n" name="nombre" required placeholder="Gerencia de Tecnología"></div>
+<div><label for="un-t">Tipo</label><select id="un-t" name="tipo_id" required><% tipos.forEach(t => { %><option value="<%= t.id %>"><%= t.nombre %></option><% }) %></select></div>
+<div><label for="un-g">Grupo</label><select id="un-g" name="grupo_id" required><% grupos.forEach(g => { %><option value="<%= g.id %>"><%= g.nombre %></option><% }) %></select></div>
+<div><label for="un-e">Empresa dueña</label><select id="un-e" name="empresa_id"><option value="">Ninguna: unidad corporativa del grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.nombre %></option><% }) %></select></div>
+</div>
+<label for="un-p">Depende de (línea sólida)</label><select id="un-p" name="padre_id"><option value="">Sin superior</option><% opciones.forEach(o => { %><option value="<%= o.id %>"<%= v.padre_id === o.id ? ' selected' : '' %>><%= '\u00a0\u00a0'.repeat(o.nivel) %><%= o.nombre %> (<%= o.codigo %>)</option><% }) %></select>
+<label class="chk"><input type="checkbox" name="aprueba">Las requisiciones de esta unidad y sus dependientes se aprueban aquí</label>
+<p class="sub">Después de crearla podrás agregar dependencias funcionales y las empresas a las que presta servicio.</p>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p">Crear unidad</button></p></form>

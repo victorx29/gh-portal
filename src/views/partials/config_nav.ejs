@@ -1,0 +1,5 @@
+<% const esS = user.roles.some(r => r.rol === 'superadmin'); %>
+<nav class="cfgnav" aria-label="Secciones de configuración">
+<% CONFIG_NAV.forEach(g => { const its = g.items.filter(i => i[5] === 'gh' || esS); if (!its.length) return; %><div class="cfg-g" role="group" aria-label="<%= g.sec %>"><span class="cfg-t"><%= g.sec %></span>
+<% its.forEach(i => { %><a class="pill<%= sub === i[0] ? ' on' : '' %>" href="<%= i[1] %>"<%- sub === i[0] ? ' aria-current="page"' : '' %>><%- ic(i[3]) %><%= i[2] %></a><% }) %></div><% }) %>
+</nav>
