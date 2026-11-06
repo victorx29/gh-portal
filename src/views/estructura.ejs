@@ -7,17 +7,18 @@
 <%- include('partials/config_nav') %>
 <form method="get" action="/config/estructura" class="filtros">
   <div><label for="fb">Buscar</label><input id="fb" name="buscar" value="<%= f.buscar %>" placeholder="Nombre o código"></div>
-  <div><label for="fg">Grupo</label><select id="fg" name="grupo"><option value="">Todos</option><% grupos.forEach(g => { %><option value="<%= g.id %>"<%= String(g.id) === String(f.grupo) ? ' selected' : '' %>><%= g.nombre %></option><% }) %></select></div>
-  <div><label for="fe">Empresa</label><select id="fe" name="empresa"><option value="">Todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(f.empresa) ? ' selected' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.nombre %></option><% }) %></select></div>
+  <% if (grupos.length > 1) { %><div><label for="fg">Grupo</label><select id="fg" name="grupo"><option value="">Todos</option><% grupos.forEach(g => { %><option value="<%= g.id %>"<%= String(g.id) === String(f.grupo) ? ' selected' : '' %>><%= g.nombre %></option><% }) %></select></div>
+  <% } else { %><div><label for="fd">División</label><select id="fd" name="division"><option value="">Todas</option><% divisiones.forEach(d => { %><option value="<%= d.id %>"<%= String(d.id) === String(f.division) ? ' selected' : '' %>><%= d.nombre %></option><% }) %></select></div><% } %>
+  <div><label for="fe">Empresa</label><select id="fe" name="empresa"><option value="">Todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(f.empresa) ? ' selected' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></option><% }) %></select></div>
   <div><label for="ff">Ver estructura al</label><input id="ff" name="fecha" type="date" value="<%= f.fecha || a.fecha %>"></div>
-  <div class="end"><button class="btn">Aplicar</button><% if (f.buscar || f.grupo || f.empresa || f.fecha) { %> <a class="btn" href="/config/estructura">Limpiar</a><% } %></div>
+  <div class="end"><button class="btn">Aplicar</button><% if (f.buscar || f.grupo || f.empresa || f.fecha || f.division) { %> <a class="btn" href="/config/estructura">Limpiar</a><% } %></div>
 </form>
 <% if (!a.esHoy) { %><div class="flash" role="status"><%- ic('reloj') %> Estás viendo la estructura vigente al <b><%= fd(a.fecha) %></b>. Es solo lectura: para cambiarla vuelve a la fecha de hoy.</div><% } %>
 <% if (a.esHoy && (a.alertas.length || pendientes)) { %><div class="flash err" role="alert"><%- ic('alerta') %> <div>
 <% if (a.alertas.length) { %><b><%= a.alertas.length %> unidad<%= a.alertas.length > 1 ? 'es aprueban' : ' aprueba' %> requisiciones pero no tiene<%= a.alertas.length > 1 ? 'n' : '' %> director asignado:</b>
 <%- a.alertas.map(u => '<a href="/config/estructura/' + u.id + '" data-modal>' + u.nombre.replace(/[&<>"]/g, '') + '</a>').join(', ') %>. Asígnalo en <a href="/usuarios">Usuarios y roles</a>.<% } %>
 <% if (pendientes) { %><br><b><%= pendientes %> requisición<%= pendientes > 1 ? 'es esperan' : ' espera' %> aprobador.</b> Avanzarán solas en cuanto la unidad tenga director.<% } %></div></div><% } %>
-<p class="sub"><%= a.filas.filter(x => !x.ctx).length %> de <%= a.total %> unidades<% if (f.buscar || f.grupo || f.empresa) { %> · las atenuadas se muestran solo como contexto<% } %></p>
+<p class="sub"><%= a.filas.filter(x => !x.ctx).length %> de <%= a.total %> unidades<% if (f.buscar || f.grupo || f.empresa || f.division) { %> · las atenuadas se muestran solo como contexto<% } %></p>
 <% if (!a.filas.length) { %><div class="empty"><% if (a.total) { %>Ninguna unidad coincide con el filtro.<% } else { %>Aún no hay unidades. Crea la primera con «Nueva unidad» o carga toda la estructura con la plantilla de Excel.<% } %></div><% } else { %>
 <div class="tree" role="list">
 <% a.filas.forEach(({ u, nivel, ctx, nHijos }) => { %><div class="node<%= ctx ? ' ctx' : '' %><%= u.activa ? '' : ' off' %>" style="--n:<%= nivel %>" role="listitem">
@@ -25,7 +26,7 @@
   <% if (a.esHoy) { %><a href="/config/estructura/<%= u.id %>" data-modal><%= u.nombre %></a><% } else { %><b><%= u.nombre %></b><% } %>
   <small class="cod"><%= u.codigo %></small><% if (nHijos) { %><small class="mu"><%= nHijos %> dependiente<%= nHijos > 1 ? 's' : '' %></small><% } %></div>
   <div class="tags">
-    <span class="tag"><%- ic('empresa') %><%= u.emp_siglas || u.emp_nombre || 'Corporativa ' + u.grupo_siglas %></span>
+    <span class="tag"><%- ic('empresa') %><%= u.emp_siglas || u.emp_nombre || 'Corporativa' %></span>
     <% if (u.sirve.length) { %><span class="tag" title="Servicio compartido"><%- ic('compartida') %>Sirve a <%= u.sirve.map(s => s.siglas || s.nombre).join(', ') %></span><% } %>
     <% if (u.aprueba) { %><span class="tag <%= u.aprobadores.length ? 'ok' : 'warn' %>"><%- ic('aprueba') %><%= u.aprobadores.length ? 'Aprueba: ' + u.aprobadores.map(d => d.nombre).join(', ') : 'Aprueba · sin director' %></span><% } %>
     <% u.funcional.forEach(fn => { %><span class="tag dot" title="Dependencia funcional (línea punteada)"><%- ic('punteada') %><%= fn.nombre %></span><% }) %>

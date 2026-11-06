@@ -11,8 +11,8 @@ const rifNorm = s => { const m = RIF.exec(String(s || '').replace(/\s/g, '')); r
 const siNo = s => { const k = norm(s); if (!k || k === 'no' || k === 'n' || k === 'falso' || k === 'false' || k === '0') return false; if (k === 'si' || k === 's' || k === 'x' || k === 'verdadero' || k === 'true' || k === '1') return true; return null; };
 const COLS = {
   Grupos: [['Nombre *', 'nombre', 34], ['Siglas', 'siglas', 12]],
-  Empresas: [['Grupo *', 'grupo', 16], ['Nombre *', 'nombre', 30], ['Razón social', 'razon_social', 40], ['Siglas', 'siglas', 10], ['RIF', 'rif', 16], ['Estado', 'estado', 18], ['Ciudad', 'ciudad', 18]],
-  Unidades: [['Código *', 'codigo', 12], ['Nombre *', 'nombre', 38], ['Tipo *', 'tipo', 18], ['Grupo *', 'grupo', 12], ['Empresa', 'empresa', 14], ['Depende de', 'depende', 13],
+  Empresas: [['Grupo', 'grupo', 16], ['Nombre *', 'nombre', 30], ['Razón social', 'razon_social', 40], ['Siglas', 'siglas', 10], ['RIF', 'rif', 16], ['Estado', 'estado', 18], ['Ciudad', 'ciudad', 18]],
+  Unidades: [['Código *', 'codigo', 12], ['Nombre *', 'nombre', 38], ['Tipo *', 'tipo', 18], ['Grupo', 'grupo', 12], ['Empresa', 'empresa', 14], ['Depende de', 'depende', 13],
     ['Dependencia funcional', 'funcional', 22], ['Aprueba', 'aprueba', 9], ['Sirve a', 'sirve', 18]]
 };
 
@@ -95,12 +95,12 @@ async function procesar(c, data, usr, aplicar) {
     planG.push(g); grupoRef.set(key(g.nombre), g); if (g.siglas) grupoRef.set(key(g.siglas), g);
   }
   // --- Empresas ---
-  const empRef = new Map(); const regE = e => { empRef.set(key(e.nombre), e); if (e.siglas) empRef.set(key(e.siglas), e); if (e.rif) empRef.set(key(e.rif), e); };
+  const empRef = new Map(); const regE = e => { empRef.set(key(e.nombre), e); if (e.razon_social) empRef.set(key(e.razon_social), e); if (e.siglas) empRef.set(key(e.siglas), e); if (e.rif) empRef.set(key(e.rif), e); };
   eDB.forEach(regE);
   const planE = [], vistosE = new Set();
   for (const f of data.Empresas) {
     const fila = f.fila; if (!f.nombre) { err('Empresas', fila, 'Falta el nombre'); continue; }
-    const g = grupoRef.get(key(f.grupo)); if (!f.grupo || !g) { err('Empresas', fila, f.grupo ? `El grupo «${f.grupo}» no existe` : 'Falta el grupo'); continue; }
+    const g = grupoRef.get(key(f.grupo)) || (!f.grupo && gDB.length === 1 ? gDB[0] : null); if (!g) { err('Empresas', fila, f.grupo ? `El grupo «${f.grupo}» no existe` : 'Falta el grupo'); continue; }
     let rif = null; if (f.rif) { rif = rifNorm(f.rif); if (!rif) { err('Empresas', fila, `RIF «${f.rif}» inválido (formato J-12345678-9)`); continue; } }
     const ex = (rif && eDB.find(e => e.rif && rifNorm(e.rif) === rif)) || (f.siglas && eDB.find(e => e.siglas && key(e.siglas) === key(f.siglas))) || eDB.find(e => key(e.nombre) === key(f.nombre));
     const k = ex ? 'id' + ex.id : 'n' + key(f.nombre); if (vistosE.has(k)) { err('Empresas', fila, `«${f.nombre}» está repetida en el archivo`); continue; } vistosE.add(k);
@@ -126,7 +126,7 @@ async function procesar(c, data, usr, aplicar) {
     const n0 = errs.length, fila = f.fila;
     if (!f.nombre) err('Unidades', fila, 'Falta el nombre');
     const t = tipoRef.get(norm(f.tipo)); if (!t) err('Unidades', fila, f.tipo ? `El tipo «${f.tipo}» no existe (ver hoja Tipos)` : 'Falta el tipo');
-    const g = grupoRef.get(key(f.grupo)); if (!g) err('Unidades', fila, f.grupo ? `El grupo «${f.grupo}» no existe` : 'Falta el grupo');
+    const g = grupoRef.get(key(f.grupo)) || (!f.grupo && gDB.length === 1 ? gDB[0] : null); if (!g) err('Unidades', fila, f.grupo ? `El grupo «${f.grupo}» no existe` : 'Falta el grupo');
     const e = f.empresa ? empRef.get(key(f.empresa)) : null; if (f.empresa && !e) err('Unidades', fila, `La empresa «${f.empresa}» no existe`);
     const dep = key(f.depende); if (dep && !existeCod(dep)) err('Unidades', fila, `«Depende de»: el código «${f.depende}» no existe`); if (dep && dep === k) err('Unidades', fila, 'Una unidad no puede depender de sí misma');
     const fun = [...new Set(lista(f.funcional).map(key))]; fun.filter(x => !existeCod(x)).forEach(x => err('Unidades', fila, `«Dependencia funcional»: el código «${x}» no existe`)); if (fun.includes(k)) err('Unidades', fila, 'Una unidad no puede depender funcionalmente de sí misma');

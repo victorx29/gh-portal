@@ -31,8 +31,16 @@ const EMPRESAS = [['Changan Venezuela', 'Multinacional de Vehículos, C.A.', 'MD
       await rol(await mk('Gerente Demo', 'gerente@demo.local', pw), 'gerente', null, gtec);
       await rol(await mk('Director Demo', 'director@demo.local', pw), 'director', null, dtec);
       await rol(await mk('Presidencia Demo', 'presidencia@demo.local', pw), 'presidencia');
-      const p = (await c.query("insert into perfil(codigo,nombre) values('ANA-DAT','Analista de Datos') on conflict(codigo) do update set nombre=excluded.nombre returning id")).rows[0].id;
-      await c.query("insert into perfil_version(perfil_id,version,contenido,creado_por) values($1,1,$2,$3) on conflict do nothing", [p, { objetivo: 'Analizar datos del negocio', requisitos: 'Universitario; 2 años de experiencia', criterios: ['SQL', 'Excel avanzado', 'Reportes'] }, admin]);
+      // Perfil de prueba con código automático (idempotente por nombre)
+      let p = (await c.query("select id from perfil where nombre='Analista de Datos'")).rows[0];
+      if (!p) {
+        const n = (await c.query("select nextval('perfil_seq')::int n")).rows[0].n;
+        p = (await c.query("insert into perfil(codigo,correlativo,nombre,nivel,general) values($1,$2,'Analista de Datos','III',true) returning id", ['GH-PF-' + String(n).padStart(3, '0'), n])).rows[0];
+        const v = (await c.query('insert into perfil_version(perfil_id,version,contenido,creado_por) values($1,1,$2,$3) returning id', [p.id, { objetivo: 'Analizar datos del negocio', requisitos: 'Universitario; 2 años de experiencia', criterios: ['SQL', 'Excel avanzado', 'Reportes'] }, admin])).rows[0];
+        await c.query('update perfil set version_activa_id=$2 where id=$1', [p.id, v.id]);
+      }
+      const div = (await c.query("insert into division(nombre) values('Automotriz') on conflict(nombre) do update set nombre=excluded.nombre returning id")).rows[0].id;
+      await c.query('update empresa set division_id=$1 where id = any($2) and division_id is null', [div, Object.values(ids)]);
     }
   });
   console.log('Seed completado'); await pool.end();

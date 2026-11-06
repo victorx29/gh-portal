@@ -1,8 +1,8 @@
-const r = require('express').Router(), S = require('../services/requisiciones'), ES = require('../services/estructura'), C = require('../services/comunicacion'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash, modal } = require('../util');
+const r = require('express').Router(), S = require('../services/requisiciones'), ES = require('../services/estructura'), PF = require('../services/perfiles'), C = require('../services/comunicacion'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash, modal } = require('../util');
 const APROB = ['borrador', 'pend_director', 'pend_presidencia', 'rechazada', 'anulada'];
 // El formulario ofrece solo las unidades (y empresas) para las que el usuario puede solicitar
 async function datosForm(u) {
-  const [emp, per, gra, eqp, acc, unidades] = await Promise.all([q('select id,nombre from empresa where activa order by nombre'), q('select id,codigo,nombre from perfil where activo order by nombre'),
+  const [emp, per, gra, eqp, acc, unidades] = await Promise.all([q('select id,coalesce(razon_social,nombre) nombre,siglas from empresa where activa order by 2'), PF.paraFormulario().then(rows => ({ rows })),
     q('select id,nombre from grado_instruccion where activo order by orden,nombre'), q('select id,nombre,requiere_linea from catalogo_equipo where activo order by nombre'), q('select id,nombre from catalogo_acceso where activo order by nombre'), ES.alcanceSolicitud(u)]);
   const ids = new Set(unidades.flatMap(x => x.empresas));
   return { emps: emp.rows.filter(e => ids.has(e.id)), pers: per.rows, unidades, grados: gra.rows, equipos: eqp.rows, accesos: acc.rows };
@@ -27,13 +27,14 @@ r.post('/requisiciones/:id/editar', w(async (req, res) => {
 }));
 // Vista previa del perfil (segundo modal) y solicitud de un perfil nuevo a GH
 r.get('/perfiles/:id/vista', w(async (req, res) => {
-  const p = (await q(`select p.id,p.codigo,p.nombre,e.nombre empresa,pv.version,pv.contenido from perfil p left join empresa e on e.id=p.empresa_id join perfil_version pv on pv.perfil_id=p.id where p.id=$1 order by pv.version desc limit 1`, [+req.params.id])).rows[0];
+  const p = (await q(`select p.id,p.codigo,p.nombre,p.nivel,pv.version,pv.contenido from perfil p join perfil_version pv on pv.id=p.version_activa_id where p.id=$1 and p.activo`, [+req.params.id])).rows[0];
+  if (p) p.codigoV = PF.codigoV(p.codigo, p.version);
   if (!p) throw E(404, 'Perfil no encontrado'); modal(req, res, 'perfil_vista', { title: p.nombre, p });
 }));
 r.post('/perfiles/:id/solicitar', w(async (req, res) => {
-  const p = (await q('select nombre from perfil where id=$1', [+req.params.id])).rows[0]; if (!p) throw E(404, 'Perfil no encontrado');
+  const p = (await q('select nombre, codigo from perfil where id=$1', [+req.params.id])).rows[0]; if (!p) throw E(404, 'Perfil no encontrado');
   const nota = String(req.body.nota || '').trim(); if (!nota) { flash(req, 'err', 'Explica qué debe cambiar o crearse'); return res.redirect('/pipeline'); }
-  await q('insert into evento_outbox(tipo,payload) values($1,$2)', ['perfil.solicitado', { perfil_id: +req.params.id, perfil: p.nombre, solicitante: req.user.nombre, email: req.user.email, nota }]);
+  await q('insert into evento_outbox(tipo,payload) values($1,$2)', ['perfil.solicitado', { perfil_id: +req.params.id, perfil: p.nombre, perfil_codigo: p.codigo, solicitante: req.user.nombre, email: req.user.email, nota, url: process.env.PORTAL_URL ? String(process.env.PORTAL_URL).replace(/\/+$/, '') + '/perfiles?modal=' + encodeURIComponent('/perfiles/' + req.params.id) : null }]);
   await q('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [req.user.id, 'perfil', String(req.params.id), 'solicitar', { nota }]);
   flash(req, 'ok', 'Solicitud enviada a Gestión Humana'); res.redirect('/pipeline');
 }));

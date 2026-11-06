@@ -7,7 +7,7 @@ async function comentar(u, id, b) {
   const x = await RS.obtener(u, id), t = String(b.texto || '').trim(); if (!t) throw E(400, 'Escribe un comentario');
   const ambito = b.ambito === 'gh' && P.esGH(u) ? 'gh' : 'proceso';
   await q('insert into comentario(entidad,entidad_id,ambito,autor_id,texto) values($1,$2,$3,$4,$5)', ['requisicion', id, ambito, u.id, t]);
-  if (ambito === 'proceso') await q('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.comentario', { requisicion_id: id, codigo: x.codigo, empresa_id: x.empresa_id, autor: u.nombre, texto: t }]);
+  if (ambito === 'proceso') await q('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.comentario', { requisicion_id: id, codigo: x.codigo, empresa_id: x.empresa_id, autor: u.nombre, autor_email: u.email, texto: t, url: RS.urlReq(id), detalle: await RS.detalleEvento({ query: q }, id) }]);
 }
 const adjuntos = id => q("select a.*, us.nombre autor from adjunto a join usuario us on us.id=a.subido_por where a.entidad='requisicion' and a.entidad_id=$1 order by a.id", [id]).then(r => r.rows);
 async function adjuntar(u, id, files) {

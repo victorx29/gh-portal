@@ -1,9 +1,20 @@
-<%- include('partials/head') %><div class="top"><div><%- include('partials/crumb', { aqui: 'Gestión de cargos' }) %><h1>Perfiles y Cargos</h1><p class="sub">Catálogo usado por las requisiciones y por la comparación de CV. Guardar un código existente crea una nueva versión. En la próxima entrega: código automático GH-PF, versiones activables y perfiles por empresa y unidad.</p></div></div>
+<%- include('partials/head') %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Gestión de cargos' }) %><h1>Perfiles y Cargos</h1>
+<p class="sub">Cada perfil tiene un código fijo (GH-PF-NNN) y versiones (GH-PF-NNN-VV). Editar el contenido crea una versión nueva; la versión activa es la que usan las requisiciones nuevas.</p></div>
+<div class="row"><a class="btn" href="/perfiles/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/perfiles/carga"><%- ic('subir') %>Carga masiva</a><a class="btn p" href="/perfiles/nuevo" data-modal><%- ic('mas') %>Nuevo perfil</a></div></div>
 <%- include('partials/config_nav') %>
-<div class="tw"><table><tr><th>Código</th><th>Cargo</th><th>Empresa</th><th>Versión</th></tr><% ps.forEach(p => { %><tr><td><%= p.codigo %></td><td><%= p.nombre %></td><td><%= p.empresa || 'Grupo' %></td><td><%= p.version %></td></tr><% }) %></table></div>
-<h2 class="h2s">Crear perfil o nueva versión</h2><form method="post" action="/perfiles" class="form-max"><input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2">
-<div><label for="pc">Código</label><input id="pc" name="codigo" required></div><div><label for="pn">Nombre del cargo</label><input id="pn" name="nombre" required></div>
-<div><label for="pe">Empresa (vacío = grupo)</label><select id="pe" name="empresa_id"><option value="">Grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %></select></div></div>
-<label for="po">Objetivo del cargo</label><textarea id="po" name="objetivo" rows="2"></textarea><label for="pf">Funciones</label><textarea id="pf" name="funciones" rows="3"></textarea><label for="pc2">Competencias</label><textarea id="pc2" name="competencias" rows="2"></textarea><label for="pk2">Conocimientos</label><textarea id="pk2" name="conocimientos" rows="2"></textarea><label for="pr">Requisitos</label><textarea id="pr" name="requisitos" rows="3"></textarea>
-<label for="pk">Criterios de evaluación de CV (uno por línea)</label><textarea id="pk" name="criterios" rows="4"></textarea><p><button class="btn p">Guardar perfil</button></p></form>
+<form method="get" action="/perfiles" class="filtros">
+  <div><label for="pb">Buscar</label><input id="pb" name="buscar" value="<%= f.buscar %>" placeholder="Cargo o código"></div>
+  <div><label for="pe">Empresa</label><select id="pe" name="empresa"><option value="">Todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(f.empresa) ? ' selected' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.razon_social || e.nombre %></option><% }) %></select></div>
+  <div><label for="pn">Nivel</label><select id="pn" name="nivel"><option value="">Todos</option><% NIVELES.forEach(n => { %><option<%= n === f.nivel ? ' selected' : '' %>><%= n %></option><% }) %></select></div>
+  <div><label for="ps">Estado</label><select id="ps" name="estado"><% [['activos', 'Activos'], ['inactivos', 'Inactivos'], ['todos', 'Todos']].forEach(([v, t]) => { %><option value="<%= v %>"<%= v === f.estado ? ' selected' : '' %>><%= t %></option><% }) %></select></div>
+  <div class="end"><button class="btn">Aplicar</button></div>
+</form>
+<p class="sub"><%= ps.length %> perfil<%= ps.length === 1 ? '' : 'es' %></p>
+<div class="tw"><table class="mid"><tr><th>Código</th><th>Cargo</th><th>Nivel</th><th>Alcance</th><th>Versión activa</th><th></th></tr>
+<% ps.forEach(p => { const al = p.general ? 'General' : p.alcance.map(a => a.empresa || a.unidad).join(', '); %><tr<%- p.activo ? '' : ' class="off"' %>>
+<td class="cod"><%= p.codigo %></td><td><b><%= p.nombre %></b><% if (!p.activo) { %> <span class="chip r">inactivo</span><% } %><% if (p.codigo_anterior) { %><br><small class="mu">antes <%= p.codigo_anterior %></small><% } %></td>
+<td><%= p.nivel || '—' %></td><td><% if (al) { %><%= al %><% } else { %><span class="chip w" title="No es general ni tiene empresas o unidades">Nadie lo ve</span><% } %></td><td><%= p.v_activa ? codigoV(p.codigo, p.v_activa) : '—' %><% if (p.n_versiones > 1) { %> <small class="mu">de <%= p.n_versiones %></small><% } %></td>
+<td class="acts"><a class="btn" href="/perfiles/<%= p.id %>" data-modal>Ver</a></td></tr><% }) %>
+<% if (!ps.length) { %><tr><td colspan="6" class="empty">No hay perfiles con ese filtro.</td></tr><% } %></table></div>
 <%- include('partials/foot') %>

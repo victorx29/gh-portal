@@ -1,11 +1,11 @@
 <% const u = d.u, fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—', sel = (a, b) => String(a) === String(b) ? ' selected' : '', hid = '<input type="hidden" name="_csrf" value="' + csrf + '">'; %>
-<div class="mh"><div><h2><%= u.nombre %></h2><p class="sub"><%= u.codigo %> · <%= u.tipo %> · <%= u.emp_nombre || 'Corporativa del ' + u.grupo_nombre %><% if (!u.activa) { %> · <span class="chip r">inactiva</span><% } %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<div class="mh"><div><h2><%= u.nombre %></h2><p class="sub"><%= u.codigo %> · <%= u.tipo %> · <%= u.emp_nombre || 'Corporativa' %><% if (!u.activa) { %> · <span class="chip r">inactiva</span><% } %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 
 <section class="blk"><h3><%- ic('estructura') %> Depende de</h3>
 <% if (d.padre) { %><p><b><%= d.padre.padre_nombre %></b> <small class="mu">(<%= d.padre.padre_codigo %>) · vigente desde <%= fd(d.padre.desde) %></small></p><% } else { %><p class="mu">Sin superior: es una unidad raíz.</p><% } %>
 <details><summary>Cambiar dependencia</summary>
 <form method="post" action="/config/estructura/<%= u.id %>/dependencia"><%- hid %>
-<label for="dp">Nueva unidad superior</label><select id="dp" name="padre_id"><option value="">Sin superior (raíz)</option><% opciones.filter(o => o.id !== u.id).forEach(o => { %><option value="<%= o.id %>"<%= d.padre && d.padre.padre_id === o.id ? ' selected' : '' %>><%= '\u00a0\u00a0'.repeat(o.nivel) %><%= o.nombre %> (<%= o.codigo %>)</option><% }) %></select>
+<label for="dp">Nueva unidad superior</label><select id="dp" name="padre_id"><option value="">Sin superior (raíz)</option><% opciones.filter(o => o.id !== u.id).forEach(o => { %><option value="<%= o.id %>"<%= d.padre && d.padre.padre_id === o.id ? ' selected' : '' %>><%= o.etiqueta %></option><% }) %></select>
 <label for="dm">Motivo (queda en el historial)</label><input id="dm" name="motivo" required placeholder="Reorganización aprobada por Presidencia">
 <p class="sub">La dependencia actual se cierra con fecha de hoy y la nueva empieza hoy. Las aprobaciones ya hechas conservan la estructura con la que se decidieron.</p>
 <p class="act"><button class="btn p">Cambiar dependencia</button></p></form></details></section>
@@ -15,7 +15,7 @@
 <% d.funcionales.forEach(r => { %><div class="rowl"><span><b><%= r.padre_nombre %></b> <small class="mu">desde <%= fd(r.desde) %></small></span>
 <form method="post" action="/config/relaciones/<%= r.id %>/cerrar" class="inl"><%- hid %><button class="btn">Cerrar</button></form></div><% }) %>
 <details><summary>Agregar dependencia funcional</summary><form method="post" action="/config/estructura/<%= u.id %>/funcional"><%- hid %>
-<label for="fp">Responde funcionalmente a</label><select id="fp" name="padre_id" required><% opciones.filter(o => o.id !== u.id).forEach(o => { %><option value="<%= o.id %>"><%= '\u00a0\u00a0'.repeat(o.nivel) %><%= o.nombre %> (<%= o.codigo %>)</option><% }) %></select>
+<label for="fp">Responde funcionalmente a</label><select id="fp" name="padre_id" required><% opciones.filter(o => o.id !== u.id).forEach(o => { %><option value="<%= o.id %>"><%= o.etiqueta %></option><% }) %></select>
 <label for="fm">Motivo (opcional)</label><input id="fm" name="motivo"><p class="act"><button class="btn p">Agregar</button></p></form></details></section>
 
 <section class="blk"><h3><%- ic('aprueba') %> Aprobación de requisiciones</h3>
@@ -25,15 +25,17 @@
 
 <section class="blk"><h3><%- ic('compartida') %> Empresas que atiende</h3>
 <form method="post" action="/config/estructura/<%= u.id %>/sirve"><%- hid %><p class="sub">Para servicios compartidos. Define en qué empresas se puede solicitar personal para esta unidad.</p>
-<div class="eq"><% empresas.filter(e => e.activa).forEach(e => { %><label class="chk"><input type="checkbox" name="empresas" value="<%= e.id %>"<%= d.sirve.includes(e.id) ? ' checked' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.nombre %></label><% }) %></div>
+<% if (d.heredadas.length) { %><p class="flash" role="status">Sin empresas propias: hereda de su superior <b><%= d.heredadas.map(e => e.siglas || e.nombre).join(', ') %></b>. Marca empresas aquí solo si deben ser distintas.</p>
+<% } else if (!u.empresa_id && !d.sirve.length) { %><p class="flash err" role="alert">No atiende a ninguna empresa ni puede heredarla: nadie podrá solicitar personal para esta unidad hasta que marques al menos una.</p><% } %>
+<div class="eq"><% empresas.filter(e => e.activa).forEach(e => { %><label class="chk"><input type="checkbox" name="empresas" value="<%= e.id %>"<%= d.sirve.includes(e.id) ? ' checked' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></label><% }) %></div>
 <p class="act"><button class="btn">Guardar empresas</button></p></form></section>
 
 <details class="blk"><summary>Datos de la unidad</summary>
 <form method="post" action="/config/estructura/<%= u.id %>/editar"><%- hid %><div class="g2">
 <div><label for="en">Nombre</label><input id="en" name="nombre" value="<%= u.nombre %>" required></div>
 <div><label for="et">Tipo</label><select id="et" name="tipo_id"><% tipos.forEach(t => { %><option value="<%= t.id %>"<%= sel(t.id, u.tipo_id) %>><%= t.nombre %></option><% }) %></select></div>
-<div><label for="eg">Grupo</label><select id="eg" name="grupo_id"><% grupos.forEach(g => { %><option value="<%= g.id %>"<%= sel(g.id, u.grupo_id) %>><%= g.nombre %></option><% }) %></select></div>
-<div><label for="ee">Empresa dueña</label><select id="ee" name="empresa_id"><option value="">Ninguna: corporativa del grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= sel(e.id, u.empresa_id) %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.nombre %></option><% }) %></select></div></div>
+<% if (grupos.length > 1) { %><div><label for="eg">Grupo</label><select id="eg" name="grupo_id"><% grupos.forEach(g => { %><option value="<%= g.id %>"<%= sel(g.id, u.grupo_id) %>><%= g.nombre %></option><% }) %></select></div><% } else { %><input type="hidden" name="grupo_id" value="<%= u.grupo_id %>"><% } %>
+<div><label for="ee">Empresa dueña</label><select id="ee" name="empresa_id"><option value="">Ninguna: corporativa del grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= sel(e.id, u.empresa_id) %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></option><% }) %></select></div></div>
 <label class="chk"><input type="checkbox" name="aprueba"<%= u.aprueba ? ' checked' : '' %>>Las requisiciones de esta unidad y sus dependientes se aprueban aquí</label>
 <p class="act"><button class="btn p">Guardar datos</button></p></form>
 <form method="post" action="/config/estructura/<%= u.id %>/activa"><%- hid %><p class="sub"><%= u.activa ? 'Desactivarla la quita de los formularios. Solo se puede si no tiene dependientes activos.' : 'Está inactiva: no aparece en los formularios.' %></p><button class="btn<%= u.activa ? ' d' : '' %>"><%= u.activa ? 'Desactivar unidad' : 'Activar unidad' %></button></form></details>

@@ -1,0 +1,32 @@
+<% const act = p.versiones.find(v => v.id === p.version_activa_id), hid = '<input type="hidden" name="_csrf" value="' + csrf + '">';
+   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+   const bloque = (t, v) => v ? '<h3>' + t + '</h3><p style="white-space:pre-line">' + esc(v) + '</p>' : '';
+   const ver = c => bloque('Objetivo del cargo', c.objetivo) + bloque('Funciones', c.funciones) + bloque('Requisitos', c.requisitos) + bloque('Competencias', c.competencias) + bloque('Conocimientos', c.conocimientos)
+     + ((c.criterios || []).length ? '<h3>Criterios de evaluación</h3><ul>' + c.criterios.map(k => '<li>' + esc(k) + '</li>').join('') + '</ul>' : '');
+   const actual = { general: p.general, emps: p.alcance.filter(a => a.empresa_id).map(a => a.empresa_id), unis: p.alcance.filter(a => a.unidad_id).map(a => a.unidad_id) }; %>
+<div class="mh"><div><h2><%= p.nombre %></h2><p class="sub"><%= p.codigo %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %> · <%= p.general ? 'General' : (p.alcance.map(a => a.empresa || a.unidad).join(', ') || 'sin alcance: nadie lo ve') %>
+<% if (!p.activo) { %> · <span class="chip r">inactivo</span><% } %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+
+<section class="blk"><h3><%- ic('cargo') %> Versión activa: <%= act ? codigoV(p.codigo, act.version) : 'ninguna' %></h3>
+<% if (act) { %><p class="sub">Creada por <%= act.autor %> el <%= new Date(act.creado_en).toLocaleDateString('es-VE') %> · usada en <%= act.n_req %> requisición<%= act.n_req === 1 ? '' : 'es' %></p><%- ver(act.contenido || {}) %><% } %></section>
+
+<details class="blk"><summary>Editar contenido (crea la versión <%= codigoV(p.codigo, (p.versiones[0] ? p.versiones[0].version : 0) + 1) %>)</summary>
+<form method="post" action="/perfiles/<%= p.id %>/version"><%- hid %>
+<%- include('partials/perfil_contenido', { k: 'v' + p.id, cont: act ? act.contenido : null }) %>
+<label class="chk"><input type="checkbox" name="activar" checked>Activarla al guardar (las requisiciones ya creadas conservan su versión)</label>
+<p class="act"><button class="btn p">Guardar nueva versión</button></p></form></details>
+
+<details class="blk"><summary>Versiones (<%= p.versiones.length %>)</summary>
+<% p.versiones.forEach(v => { %><details><summary><%= codigoV(p.codigo, v.version) %><%= v.id === p.version_activa_id ? ' · activa' : '' %> <small class="mu">· <%= v.autor %> · <%= new Date(v.creado_en).toLocaleDateString('es-VE') %> · <%= v.n_req %> req.</small></summary>
+<%- ver(v.contenido || {}) %>
+<% if (v.id !== p.version_activa_id) { %><form method="post" action="/perfiles/<%= p.id %>/versiones/<%= v.id %>/activar"><%- hid %><p class="act"><button class="btn">Activar esta versión</button></p></form><% } %></details><% }) %></details>
+
+<details class="blk"><summary>Datos y alcance</summary>
+<form method="post" action="/perfiles/<%= p.id %>/editar"><%- hid %><div class="g2">
+<div><label for="pd-n">Nombre del cargo</label><input id="pd-n" name="nombre" value="<%= p.nombre %>" required></div>
+<div><label for="pd-l">Nivel</label><select id="pd-l" name="nivel"><option value="">—</option><% NIVELES.concat(p.nivel && !NIVELES.includes(p.nivel) ? [p.nivel] : []).forEach(n => { %><option<%= n === p.nivel ? ' selected' : '' %>><%= n %></option><% }) %></select></div></div>
+<%- include('partials/alcance', { actual, uid: p.id }) %>
+<p class="act"><button class="btn p">Guardar datos y alcance</button></p></form></details>
+
+<form method="post" action="/perfiles/<%= p.id %>/activo" class="blk"><%- hid %><p class="sub"><%= p.activo ? 'Desactivarlo lo quita del formulario de requisición. Las requisiciones existentes no cambian.' : 'Está inactivo: no aparece en el formulario de requisición.' %></p>
+<button class="btn<%= p.activo ? ' d' : '' %>"><%= p.activo ? 'Desactivar perfil' : 'Activar perfil' %></button></form>

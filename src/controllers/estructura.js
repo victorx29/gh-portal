@@ -18,10 +18,10 @@ r.get('/config', gh, (req, res) => res.render('config_inicio', { title: 'Configu
 
 // ---- Estructura organizativa (GH) ----
 r.get('/config/estructura', gh, w(async (req, res) => {
-  const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', empresa: req.query.empresa || '', grupo: req.query.grupo || '', buscar: req.query.buscar || '' };
-  const [a, empresas, grupos, pendientes] = await Promise.all([ES.arbol(f), ES.empresas(), ES.grupos(),
+  const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', empresa: req.query.empresa || '', grupo: req.query.grupo || '', buscar: req.query.buscar || '', division: req.query.division || '' };
+  const [a, empresas, grupos, divisiones, pendientes] = await Promise.all([ES.arbol(f), ES.empresas(), ES.grupos(), ES.divisiones(),
     q("select count(*)::int n from requisicion where estado='pend_director' and unidad_id is not null and unidad_aprobadora(unidad_id) is not null and unidad_aprobadora(unidad_id) not in (select ur.unidad_id from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id is not null and us.activo)").then(x => x.rows[0].n)]);
-  res.render('estructura', { title: 'Estructura organizativa', nav: 'config', sub: 'estructura', a, f, empresas, grupos, pendientes });
+  res.render('estructura', { title: 'Estructura organizativa', nav: 'config', sub: 'estructura', a, f, empresas, grupos, divisiones, pendientes });
 }));
 const datosModal = async () => ({ tipos: await ES.tipos(), grupos: await ES.grupos(), empresas: await ES.empresas(), opciones: await ES.opciones() });
 r.get('/config/estructura/nueva', gh, w(async (req, res) => modal(req, res, 'unidad_form', { title: 'Nueva unidad', nav: 'config', sub: 'estructura', v: { padre_id: +req.query.padre || null }, ...await datosModal() })));
@@ -59,27 +59,29 @@ r.post('/config/relaciones/:rid/cerrar', gh, hacer(async req => aUnidad(await ES
 // ---- Empresas y grupos (superadmin) ----
 r.get('/empresas', (req, res) => res.redirect('/config/empresas'));
 r.get('/config/empresas', sup, w(async (req, res) => {
-  const [es, gs, n] = await Promise.all([ES.empresas(), ES.grupos(), q('select empresa_id, count(*)::int n from unidad where empresa_id is not null group by empresa_id').then(x => x.rows)]);
+  const [es, gs, divs, n] = await Promise.all([ES.empresas(), ES.grupos(), ES.divisiones(), q('select empresa_id, count(*)::int n from unidad where empresa_id is not null group by empresa_id').then(x => x.rows)]);
   es.forEach(e => { e.unidades = (n.find(x => x.empresa_id === e.id) || {}).n || 0; });
-  res.render('empresas', { title: 'Empresas y grupos', nav: 'config', sub: 'empresas', es, gs });
+  res.render('empresas', { title: 'Empresas', nav: 'config', sub: 'empresas', es, gs });
 }));
-r.get('/config/empresas/nueva', sup, w(async (req, res) => modal(req, res, 'empresa_form', { title: 'Nueva empresa', nav: 'config', sub: 'empresas', v: {}, gs: await ES.grupos(), ESTADOS })));
+r.get('/config/empresas/nueva', sup, w(async (req, res) => modal(req, res, 'empresa_form', { title: 'Nueva empresa', nav: 'config', sub: 'empresas', v: { sirve_divisiones: [] }, gs: await ES.grupos(), divs: await ES.divisiones(), ESTADOS })));
 r.get('/config/empresas/:id', sup, w(async (req, res) => {
-  const v = (await q('select * from empresa where id=$1', [+req.params.id])).rows[0]; if (!v) throw E(404, 'Empresa no encontrada');
-  modal(req, res, 'empresa_form', { title: v.nombre, nav: 'config', sub: 'empresas', v, gs: await ES.grupos(), ESTADOS });
+  const v = (await ES.empresas()).find(e => e.id === +req.params.id); if (!v) throw E(404, 'Empresa no encontrada');
+  modal(req, res, 'empresa_form', { title: v.mostrar, nav: 'config', sub: 'empresas', v, gs: await ES.grupos(), divs: await ES.divisiones(), ESTADOS });
 }));
 const RIF = /^([VJGEPC])-?(\d{8})-?(\d)$/i;
 function datosEmpresa(b) {
   const t = s => String(s || '').trim() || null, nombre = t(b.nombre); if (!nombre) throw E(400, 'El nombre es obligatorio'); if (!b.grupo_id) throw E(400, 'Selecciona el grupo');
   let rif = t(b.rif); if (rif) { const m = RIF.exec(rif.replace(/\s/g, '')); if (!m) throw E(400, 'RIF inválido: usa el formato J-12345678-9'); rif = `${m[1].toUpperCase()}-${m[2]}-${m[3]}`; }
-  return [nombre, t(b.razon_social), t(b.siglas) && t(b.siglas).toUpperCase(), rif, t(b.estado), t(b.ciudad), +b.grupo_id];
+  return [nombre, t(b.razon_social), t(b.siglas) && t(b.siglas).toUpperCase(), rif, t(b.estado), t(b.ciudad), +b.grupo_id, t(b.direccion_fiscal), b.division_id ? +b.division_id : null];
 }
+// Empresa de servicios (p. ej. transporte) que atiende a otras divisiones además de la suya
+const sirveDiv = async (c, id, v) => { await c.query('delete from empresa_division_servicio where empresa_id=$1', [id]); for (const d of [...new Set([].concat(v || []).map(Number).filter(Boolean))]) await c.query('insert into empresa_division_servicio values($1,$2)', [id, d]); };
 const dup = e => { if (e.code === '23505') return E(400, /rif/.test(e.constraint) ? 'Ese RIF ya está registrado' : /siglas/.test(e.constraint) ? 'Esas siglas ya las usa otra empresa' : 'Ya existe una empresa con ese nombre'); return e; };
 r.post('/config/empresas', sup, hacer(async req => {
-  try { await q('insert into empresa(nombre,razon_social,siglas,rif,estado,ciudad,grupo_id) values($1,$2,$3,$4,$5,$6,$7)', datosEmpresa(req.body)); } catch (e) { throw dup(e); }
+  try { await tx(async c => { const id = (await c.query('insert into empresa(nombre,razon_social,siglas,rif,estado,ciudad,grupo_id,direccion_fiscal,division_id) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id', datosEmpresa(req.body))).rows[0].id; await sirveDiv(c, id, req.body.sirve_divisiones); }); } catch (e) { throw dup(e); }
 }, 'Empresa creada', '/config/empresas'));
 r.post('/config/empresas/:id/editar', sup, hacer(async req => {
-  try { await q('update empresa set nombre=$2,razon_social=$3,siglas=$4,rif=$5,estado=$6,ciudad=$7,grupo_id=$8 where id=$1', [+req.params.id, ...datosEmpresa(req.body)]); } catch (e) { throw dup(e); }
+  try { await tx(async c => { await c.query('update empresa set nombre=$2,razon_social=$3,siglas=$4,rif=$5,estado=$6,ciudad=$7,grupo_id=$8,direccion_fiscal=$9,division_id=$10 where id=$1', [+req.params.id, ...datosEmpresa(req.body)]); await sirveDiv(c, +req.params.id, req.body.sirve_divisiones); }); } catch (e) { throw dup(e); }
 }, 'Empresa actualizada', '/config/empresas'));
 r.post('/config/empresas/:id/activa', sup, hacer(req => q('update empresa set activa = not activa where id=$1', [+req.params.id]), 'Estado actualizado', '/config/empresas'));
 r.post('/config/grupos', sup, hacer(async req => {

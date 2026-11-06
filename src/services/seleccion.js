@@ -43,7 +43,7 @@ async function avanzar(u, id) {
     await c.query('update candidatura set etapa=$2, actualizada_en=now() where id=$1', [id, nxt.clave]);
     await histC(c, u, id, 'avanzar', { de: ca.etapa, a: nxt.clave });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
-    await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, candidato: cd.nombre, email: cd.email });
+    await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, etapa_anterior: ca.etapa, candidato: cd.nombre, email: cd.email, candidato_datos: cd, url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
     if (nxt.clase === 'exito') {   // ingreso: se crea la persona y su relación laboral pendiente de formalizar
       let t = cd.cedula ? (await c.query('select id from trabajador where cedula=$1', [cd.cedula])).rows[0] : null;
       if (!t) t = (await c.query('insert into trabajador(cedula,nombres,email,telefono) values($1,$2,$3,$4) returning id', [cd.cedula || null, cd.nombre, cd.email, cd.telefono])).rows[0];
@@ -63,7 +63,7 @@ async function rechazar(u, id, motivo) {
     await c.query('update candidatura set etapa=$2, motivo_rechazo=$3, actualizada_en=now() where id=$1', [id, pl.cierre.clave, motivo.trim()]);
     await histC(c, u, id, 'rechazar', { de: ca.etapa, motivo: motivo.trim() });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
-    await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, candidato: cd.nombre, email: cd.email });
+    await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa_anterior: ca.etapa, motivo: motivo.trim(), candidato: cd.nombre, email: cd.email, candidato_datos: cd, url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
   });
 }
 module.exports = { tablero, crearCandidato, detalle, registrar, avanzar, rechazar };

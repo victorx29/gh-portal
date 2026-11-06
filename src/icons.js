@@ -22,6 +22,7 @@ const P = {
   alerta: '<path d="m10.29 3.86-8.48 14.7A2 2 0 0 0 3.53 21.6h16.94a2 2 0 0 0 1.72-3.04L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/>',
   punteada: '<path d="M3 12h2M8 12h2M13 12h2M18 12h3"/><path d="m17 8 4 4-4 4"/>',
   compartida: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
+  division: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
   buscar: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>'
 };
 module.exports = (n, cls) => P[n] ? `<svg class="ico${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${P[n]}</svg>` : '';

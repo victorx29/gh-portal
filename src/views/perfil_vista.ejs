@@ -1,5 +1,5 @@
 <% const c = p.contenido || {}, bloque = (t, v) => v ? '<h3>' + t + '</h3><p style="white-space:pre-line">' + String(v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])) + '</p>' : ''; %>
-<div class="mh"><div><h2><%= p.nombre %></h2><p class="sub"><%= p.codigo %> · versión <%= p.version %> · <%= p.empresa || 'Grupo' %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<div class="mh"><div><h2><%= p.nombre %></h2><p class="sub"><%= p.codigoV %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 <%- bloque('Objetivo del cargo', c.objetivo) %><%- bloque('Funciones', c.funciones) %><%- bloque('Requisitos', c.requisitos) %><%- bloque('Competencias', c.competencias) %><%- bloque('Conocimientos', c.conocimientos) %>
 <% if ((c.criterios || []).length) { %><h3>Criterios de evaluación</h3><ul><% c.criterios.forEach(k => { %><li><%= k %></li><% }) %></ul><% } %>
 <details><summary>¿No se ajusta a lo que necesitas?</summary><form method="post" action="/perfiles/<%= p.id %>/solicitar"><input type="hidden" name="_csrf" value="<%= csrf %>">

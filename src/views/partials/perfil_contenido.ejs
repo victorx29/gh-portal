@@ -1,0 +1,7 @@
+<% const c = typeof cont !== 'undefined' && cont ? cont : {}; %>
+<label for="pc-o-<%= k %>">Objetivo del cargo</label><textarea id="pc-o-<%= k %>" name="objetivo" rows="2"><%= c.objetivo || '' %></textarea>
+<label for="pc-f-<%= k %>">Funciones</label><textarea id="pc-f-<%= k %>" name="funciones" rows="4"><%= c.funciones || '' %></textarea>
+<label for="pc-r-<%= k %>">Requisitos</label><textarea id="pc-r-<%= k %>" name="requisitos" rows="3"><%= c.requisitos || '' %></textarea>
+<div class="g2"><div><label for="pc-c-<%= k %>">Competencias</label><textarea id="pc-c-<%= k %>" name="competencias" rows="3"><%= c.competencias || '' %></textarea></div>
+<div><label for="pc-k-<%= k %>">Conocimientos</label><textarea id="pc-k-<%= k %>" name="conocimientos" rows="3"><%= c.conocimientos || '' %></textarea></div></div>
+<label for="pc-x-<%= k %>">Criterios de evaluación de CV (uno por línea)</label><textarea id="pc-x-<%= k %>" name="criterios" rows="4"><%= (c.criterios || []).join('\n') %></textarea>

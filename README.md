@@ -45,8 +45,12 @@ DATABASE_URL=postgres://gh:gh@localhost:5432/gh npm run dev
 6. Backups programados del servicio PostgreSQL y prueba de restauración antes de producción.
 
 ## Contrato con n8n
-La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Tipos actuales: `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
+La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
+
+## Perfiles y Cargos
+Código automático `GH-PF-NNN` y versiones inmutables `GH-PF-NNN-VV`; el perfil marca su versión activa (`perfil.version_activa_id`).
+Alcance en `perfil_alcance`: general, empresas, unidades (incluye dependientes) o ambas. La requisición guarda la versión activa al crearse.
 
 ## Pendiente (siguientes entregas)
-0.6 Perfiles y Cargos (código GH-PF-NN-VV, versiones activables, alcance por empresa y unidad) y posiciones con plazas. 0.7 Postulados con IA,
-rúbrica, persona/candidatura y formulario del candidato. 0.8 Notificaciones. Después: SSO Microsoft 365, maestro de empleados y organigrama visual.
+0.7 Puestos y plazas (reporte entre puestos, requisición ligada a la plaza). 0.8 Empleados (importación del Excel) y organigrama por división, empresa y unidad.
+0.9 Postulados con IA. 1.0 Notificaciones. SSO Microsoft 365 antes de abrir el portal a todos los gerentes.

@@ -1,0 +1,9 @@
+<% const sel = typeof actual !== 'undefined' ? actual : { general: false, emps: [], unis: [] }; %>
+<fieldset><legend>Quién puede usar este perfil</legend>
+<label class="chk"><input type="checkbox" name="general"<%= sel.general ? ' checked' : '' %>>General: lo ven todas las empresas y unidades</label>
+<div data-when="general=">
+<p class="sub">Elige empresas, unidades o ambas. Una unidad incluye a todas las que dependen de ella. Si eliges las dos, el perfil aparece solo en esas unidades de esas empresas.</p>
+<label>Empresas</label><div class="chklist"><% empresas.forEach(e => { %><label class="chk"><input type="checkbox" name="empresas" value="<%= e.id %>"<%= sel.emps.includes(e.id) ? ' checked' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.razon_social || e.nombre %></label><% }) %></div>
+<label for="fu-<%= typeof uid !== 'undefined' ? uid : 'n' %>">Unidades</label><input id="fu-<%= typeof uid !== 'undefined' ? uid : 'n' %>" data-filtra placeholder="Filtrar unidades por nombre o código">
+<div class="chklist alto"><% unidades.forEach(o => { %><label class="chk"><input type="checkbox" name="unidades" value="<%= o.id %>"<%= sel.unis.includes(o.id) ? ' checked' : '' %>><%= o.etiqueta %> <small class="mu"><%= o.codigo %></small></label><% }) %></div>
+</div></fieldset>

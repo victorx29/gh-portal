@@ -28,7 +28,7 @@ r.post('/config/etapas/:id/quitar', guardado(async req => { await puedePipeline(
 
 // Maestros configurables (superadmin): nada de listas fijas en el código. Una pestaña por catálogo.
 const MAESTROS = { grados: ['grado_instruccion', 'Grados de instrucción', 'orden, nombre'], equipos: ['catalogo_equipo', 'Equipos', 'nombre'],
-  accesos: ['catalogo_acceso', 'Accesos a sistemas', 'nombre'], tipos: ['tipo_unidad', 'Tipos de unidad', 'nivel, nombre'] };
+  accesos: ['catalogo_acceso', 'Accesos a sistemas', 'nombre'], tipos: ['tipo_unidad', 'Tipos de unidad', 'nivel, nombre'], divisiones: ['division', 'Divisiones', 'nombre'] };
 const volverM = m => '/config/maestros?m=' + (MAESTROS[m] ? m : 'grados');
 r.get('/config/maestros', sup, w(async (req, res) => {
   const m = MAESTROS[req.query.m] ? req.query.m : 'grados', [t, titulo, orden] = MAESTROS[m];

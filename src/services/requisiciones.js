@@ -1,5 +1,5 @@
-const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), ES = require('./estructura'), { E } = require('../util');
-const SEL = `select r.*, e.nombre empresa, un.nombre unidad, un.codigo unidad_codigo, unidad_aprobadora(r.unidad_id) aprob_uid, (select nombre from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_nombre, pf.id perfil_id, pf.nombre cargo, pv.version perfil_v, s.nombre solicitante, s.email solicitante_email, g.nombre grado
+const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), ES = require('./estructura'), PF = require('./perfiles'), { E } = require('../util');
+const SEL = `select r.*, coalesce(e.razon_social,e.nombre) empresa, e.siglas empresa_siglas, e.nombre empresa_comercial, pf.codigo perfil_codigo, un.nombre unidad, un.codigo unidad_codigo, unidad_aprobadora(r.unidad_id) aprob_uid, (select nombre from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_nombre, pf.id perfil_id, pf.nombre cargo, pv.version perfil_v, s.nombre solicitante, s.email solicitante_email, g.nombre grado
   from requisicion r join empresa e on e.id=r.empresa_id left join unidad un on un.id=r.unidad_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id join usuario s on s.id=r.solicitante_id
   left join grado_instruccion g on g.id=r.grado_id`;
@@ -15,20 +15,30 @@ const extras = async (c, id) => ({
   accesos: (await c.query('select ra.acceso_id, ra.nivel, ca.nombre from requisicion_acceso ra join catalogo_acceso ca on ca.id=ra.acceso_id where ra.requisicion_id=$1 order by ca.nombre', [id])).rows
 });
 // Contenido completo que recibe n8n al aprobarse (aviso a TI para planificar) y al ingresar (entrega)
+// Todo lo que se sabe de la requisición: viaja en CADA evento para que n8n decida qué hacer (PORTAL_URL = dirección pública del portal)
+const PORTAL = () => String(process.env.PORTAL_URL || '').replace(/\/+$/, '');
+const urlReq = id => PORTAL() ? PORTAL() + '/pipeline?abrir=' + id : null;
 async function detalleEvento(c, id) {
-  const r = (await c.query(SEL + ' where r.id=$1', [id])).rows[0], x = await extras(c, id);
-  return { empresa: r.empresa, unidad: r.unidad, unidad_codigo: r.unidad_codigo, cargo: r.cargo, tipo: r.tipo, sustituye_a: r.sustituye_a, plazas: r.plazas, contratacion: r.contratacion, desde: r.vigencia_desde, hasta: r.vigencia_hasta,
+  const r = (await c.query(SEL + ' where r.id=$1', [id])).rows[0]; if (!r) return null;
+  const [x, emp, cad, pv, aps] = await Promise.all([extras(c, id),
+    c.query('select e.razon_social, e.nombre nombre_comercial, e.siglas, e.rif, e.estado, e.ciudad, e.direccion_fiscal, d.nombre division from empresa e left join division d on d.id=e.division_id where e.id=$1', [r.empresa_id]).then(q => q.rows[0]),
+    r.unidad_id ? c.query('select unidad_cadena($1) j', [r.unidad_id]).then(q => q.rows[0].j) : [],
+    c.query('select p.codigo, p.nivel, v.version, v.contenido from perfil_version v join perfil p on p.id=v.perfil_id where v.id=$1', [r.perfil_version_id]).then(q => q.rows[0]),
+    c.query('select ap.paso, ap.decision, ap.comentario, ap.fecha, u.nombre autor, u.email from aprobacion ap join usuario u on u.id=ap.decidido_por where ap.requisicion_id=$1 order by ap.id', [id]).then(q => q.rows)]);
+  return { codigo: r.codigo, estado: r.estado, tipo: r.tipo, cargo: r.cargo, perfil: { codigo: PF.codigoV(pv.codigo, pv.version), nivel: pv.nivel, contenido: pv.contenido },
+    empresa: r.empresa, empresa_datos: emp, unidad: r.unidad, unidad_codigo: r.unidad_codigo, cadena: cad.map(u => u.nombre), aprobadora: r.aprob_nombre,
+    sustituye_a: r.sustituye_a, plazas: r.plazas, contratacion: r.contratacion, desde: r.vigencia_desde, hasta: r.vigencia_hasta, justificacion: r.justificacion,
     profesion: r.profesion, grado: r.grado, experiencia: r.experiencia, fecha_requerida: r.fecha_requerida, solicitante: r.solicitante, solicitante_email: r.solicitante_email,
-    correo_corporativo: r.correo_corporativo, equipos: x.equipos.map(e => ({ nombre: e.nombre, con_linea: e.requiere_linea })), equipos_otros: r.equipos_otros, accesos: x.accesos.map(a => ({ nombre: a.nombre, nivel: a.nivel })) };
+    correo_corporativo: r.correo_corporativo, equipos: x.equipos.map(e => ({ nombre: e.nombre, con_linea: e.requiere_linea })), equipos_otros: r.equipos_otros,
+    accesos: x.accesos.map(a => ({ nombre: a.nombre, nivel: a.nivel })), aprobaciones: aps, url: urlReq(id) };
 }
 async function cambiar(c, u, r, est, accion, extra) {
   await c.query('update requisicion set estado=$2, actualizada_en=now() where id=$1', [r.id, est]);
   await hist(c, u, r.id, accion, { de: r.estado, a: est, ...(extra || {}) });
   const pl = await PL.resolver(r.empresa_id, 'requisicion', c), base = { requisicion_id: r.id, codigo: r.codigo, estado: est, empresa_id: r.empresa_id, solicitante_id: r.solicitante_id };
-  const rico = est === 'aprobado' || (pl.exito && est === pl.exito.clave);
   if (est === 'pend_director') { const ap = await ES.aprobacion(c, r); base.aprobadora = ap.unidad && ap.unidad.nombre; base.aprobadores = ap.aprobadores.map(a => ({ nombre: a.nombre, email: a.email })); }
   if (est === 'pend_presidencia') base.aprobadores = (await c.query("select distinct us.nombre, us.email from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='presidencia' and ur.unidad_id is null and (ur.empresa_id is null or ur.empresa_id=$1) and us.activo", [r.empresa_id])).rows;
-  await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.' + est, rico ? { ...base, detalle: await detalleEvento(c, r.id) } : base]);
+  await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.' + est, { ...base, url: urlReq(r.id), detalle: await detalleEvento(c, r.id) }]);
 }
 const pasoDe = r => ({ pend_director: 'director', pend_presidencia: 'presidencia' })[r.estado];
 // Director: quien tenga el rol en la unidad aprobadora (subiendo por la línea sólida); sin unidad aprobadora en la cadena,
@@ -90,9 +100,9 @@ async function guardar(u, id, b) {
   const emp = +b.empresa_id, uid = +b.unidad_id;
   if (!uid) throw E(400, 'Selecciona la unidad que solicita');
   const op = (await ES.alcanceSolicitud(u)).find(o => o.id === uid);
-  if (!op) throw E(403, 'No puedes solicitar para esa unidad');
+  if (!op) throw E(403, 'Esa unidad no está en tu alcance, o no atiende a ninguna empresa (GH lo configura en Estructura › Empresas que atiende)');
   if (!op.empresas.includes(emp)) throw E(400, 'Esa unidad no pertenece ni presta servicio a la empresa elegida');
-  const pv = (await q('select id from perfil_version where perfil_id=$1 order by version desc limit 1', [+b.perfil_id])).rows[0]; if (!pv) throw E(400, 'Selecciona un perfil');
+  const pv = { id: await PF.validarParaRequisicion(+b.perfil_id, emp, uid) };   // versión activa del perfil, si corresponde a esa empresa y unidad
   const tipo = b.tipo === 'nuevo' ? 'nuevo' : 'reemplazo', temp = b.contratacion === 'Temporal', t = s => (s || '').trim() || null;
   if (temp && (!b.vigencia_desde || !b.vigencia_hasta || b.vigencia_hasta < b.vigencia_desde)) throw E(400, 'En contratación temporal indica fechas válidas: «hasta» no puede ser anterior a «desde»');
   const v = [emp, uid, pv.id, tipo, temp ? 'Temporal' : 'Permanente', Math.max(1, parseInt(b.plazas) || 1), t(b.justificacion), b.fecha_requerida || null,
@@ -146,7 +156,7 @@ async function enviar(u, id) {
     }
     await cambiar(c, u, r, est, 'enviar', { aprobadora: ap.unidad ? ap.unidad.nombre : null, regla: ap.regla });
     if (est === 'pend_director' && !ap.aprobadores.length)   // queda retenida hasta que GH complete la estructura; no se reasigna sola
-      await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.sin_aprobador', { requisicion_id: r.id, codigo: r.codigo, empresa_id: r.empresa_id, aprobadora: ap.unidad && ap.unidad.nombre, regla: ap.regla }]);
+      await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.sin_aprobador', { requisicion_id: r.id, codigo: r.codigo, empresa_id: r.empresa_id, aprobadora: ap.unidad && ap.unidad.nombre, regla: ap.regla, url: urlReq(r.id), detalle: await detalleEvento(c, r.id) }]);
   });
 }
 async function decidir(u, id, d, com) {
@@ -198,4 +208,4 @@ async function registrar(u, id, b) {
   const ck = [].concat(b.check || []).filter(i => ((et.reglas && et.reglas.checklist) || []).includes(i));
   await hist({ query: q }, u, id, 'registro', { etapa: et.nombre, resultado: ['apto', 'no_apto'].includes(b.resultado) ? b.resultado : 'pendiente', checklist: ck, nota: (b.nota || '').trim() || undefined });
 }
-module.exports = { listar, obtener, aprobaciones, acciones, guardar, eliminar, anular, enviar, decidir, mover, cancelar, registrar, lock, cambiar, hist };
+module.exports = { detalleEvento, urlReq, listar, obtener, aprobaciones, acciones, guardar, eliminar, anular, enviar, decidir, mover, cancelar, registrar, lock, cambiar, hist };

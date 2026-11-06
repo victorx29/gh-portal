@@ -5,7 +5,7 @@ const histU = (c, u, id, accion, detalle) => c.query('insert into historial(usua
 const fechaValida = f => /^\d{4}-\d{2}-\d{2}$/.test(String(f || '')) && !isNaN(new Date(f));
 
 // ---------- Lectura ----------
-const UN = `select u.*, t.nombre tipo, t.nivel, e.siglas emp_siglas, e.nombre emp_nombre, g.siglas grupo_siglas, g.nombre grupo_nombre
+const UN = `select u.*, t.nombre tipo, t.nivel, e.siglas emp_siglas, coalesce(e.razon_social,e.nombre) emp_nombre, g.siglas grupo_siglas, g.nombre grupo_nombre
   from unidad u join tipo_unidad t on t.id=u.tipo_id join grupo g on g.id=u.grupo_id left join empresa e on e.id=u.empresa_id`;
 
 // Relaciones vigentes en una fecha: [desde, hasta)
@@ -28,20 +28,31 @@ async function grafo(fecha) {
   for (const u of by.values()) { const p = by.get(u.padre_id); if (p) p.hijos.push(u); else u.padre_id = null; }
   for (const s of sirve) { const u = by.get(s.unidad_id); if (u) u.sirve.push(s); }
   for (const d of dirs) { const u = by.get(d.unidad_id); if (u && d.activo) u.aprobadores.push(d); }
+  // Empresas efectivas: las propias (dueña + «Sirve a»); una unidad corporativa sin ninguna hereda las de su superior
+  const efectivas = (u, n = 0) => {
+    if (u.efectivas) return u.efectivas;
+    const propias = [u.empresa_id ? { id: u.empresa_id, siglas: u.emp_siglas, nombre: u.emp_nombre } : null, ...u.sirve].filter(Boolean);
+    const p = by.get(u.padre_id);
+    u.hereda = !propias.length && !!p && n < 60;
+    return (u.efectivas = u.hereda ? efectivas(p, n + 1) : propias);
+  };
+  for (const u of by.values()) efectivas(u);
   return { fecha: f, by };
 }
-const empresasDe = u => [...new Set([u.empresa_id, ...u.sirve.map(s => s.id)].filter(Boolean))];
+const empresasDe = u => [...new Set((u.efectivas || [{ id: u.empresa_id }, ...u.sirve]).map(e => e.id).filter(Boolean))];
 function descendientes(by, id) {
   const out = new Set(), st = [id];
   while (st.length) { const x = st.pop(); if (out.has(x)) continue; out.add(x); const u = by.get(x); if (u) u.hijos.forEach(h => st.push(h.id)); }
   return out;
 }
 // Lista plana para pintar el árbol. Con filtros, se conservan los ancestros como contexto (atenuados).
-async function arbol({ fecha, empresa, grupo, buscar } = {}) {
+async function arbol({ fecha, empresa, grupo, buscar, division } = {}) {
   const g = await grafo(fechaValida(fecha) ? fecha : null), by = g.by, txt = String(buscar || '').trim().toLowerCase();
-  const coincide = u => (!empresa || empresasDe(u).includes(+empresa)) && (!grupo || u.grupo_id === +grupo)
+  // División: sus empresas y las empresas de servicio que la atienden; entran las unidades que atienden a cualquiera de ellas
+  const empDiv = division ? new Set((await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+division])).rows.map(x => x.id)) : null;
+  const coincide = u => (!empresa || empresasDe(u).includes(+empresa)) && (!grupo || u.grupo_id === +grupo) && (!empDiv || empresasDe(u).some(e => empDiv.has(e)))
     && (!txt || u.nombre.toLowerCase().includes(txt) || u.codigo.toLowerCase().includes(txt));
-  const filtrado = !!(empresa || grupo || txt), visibles = new Set(), match = new Set();
+  const filtrado = !!(empresa || grupo || txt || division), visibles = new Set(), match = new Set();
   for (const u of by.values()) if (!filtrado || coincide(u)) {
     match.add(u.id); let p = u, n = 0;
     while (p && n++ < 60) { visibles.add(p.id); p = by.get(p.padre_id); }
@@ -66,13 +77,26 @@ async function detalle(id) {
     q("select us.nombre, us.email, us.activo from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id=$1 order by us.nombre", [id]).then(r => r.rows),
     q(`select h.codigo, h.nombre from unidad_relacion r join unidad h on h.id=r.unidad_id where r.padre_id=$1 and r.tipo='solida' and r.hasta is null order by h.nombre`, [id]).then(r => r.rows),
     q("select count(*)::int n from requisicion where unidad_id=$1", [id]).then(r => r.rows[0].n)]);
-  return { u, rels, sirve, aprob, hijos, reqs, padre: rels.find(r => r.tipo === 'solida' && !r.hasta) || null, funcionales: rels.filter(r => r.tipo === 'funcional' && !r.hasta) };
+  const g = await grafo(), gu = g.by.get(id);
+  return { u, heredadas: gu && gu.hereda ? gu.efectivas : [], rels, sirve, aprob, hijos, reqs, padre: rels.find(r => r.tipo === 'solida' && !r.hasta) || null, funcionales: rels.filter(r => r.tipo === 'funcional' && !r.hasta) };
 }
 const tipos = (todos) => q(`select * from tipo_unidad ${todos ? '' : 'where activo'} order by nivel, nombre`).then(r => r.rows);
 const grupos = () => q('select * from grupo order by nombre').then(r => r.rows);
-const empresas = () => q('select e.*, g.siglas grupo_siglas, g.nombre grupo_nombre from empresa e join grupo g on g.id=e.grupo_id order by e.nombre').then(r => r.rows);
+const empresas = () => q(`select e.*, coalesce(e.razon_social,e.nombre) mostrar, g.siglas grupo_siglas, g.nombre grupo_nombre, d.nombre division,
+  coalesce((select array_agg(division_id) from empresa_division_servicio where empresa_id=e.id),'{}') sirve_divisiones
+  from empresa e join grupo g on g.id=e.grupo_id left join division d on d.id=e.division_id order by coalesce(e.razon_social,e.nombre)`).then(r => r.rows);
+const divisiones = () => q('select * from division order by nombre').then(r => r.rows);
 // Para selects: unidades activas con sangría según la línea sólida vigente
-async function opciones() { return (await arbol()).filas.filter(f => f.u.activa).map(f => ({ id: f.u.id, codigo: f.u.codigo, nombre: f.u.nombre, nivel: f.nivel, empresas: empresasDe(f.u) })); }
+// Etiqueta legible: «Gerencia de Repuestos · Dirección de Comercialización · MDV» (superior inmediato y empresa o «Corporativa»)
+async function opciones() {
+  const a = await arbol(), by = new Map(a.filas.map(f => [f.u.id, f.u]));
+  return a.filas.filter(f => f.u.activa).map(f => {
+    const u = f.u, p = by.get(u.padre_id), ef = (u.efectivas || []).map(e => e.siglas || e.nombre).join(', '), emp = u.emp_siglas || u.emp_nombre || (ef ? (u.hereda ? 'hereda ' : '') + ef : 'sin empresas');
+    const anc = []; for (let x = u, n = 0; x && n < 60; x = by.get(x.padre_id), n++) anc.push(x.id);
+    return { id: u.id, codigo: u.codigo, nombre: u.nombre, nivel: f.nivel, empresas: empresasDe(u), aprueba: u.aprueba, anc,
+      etiqueta: [u.nombre, p && p.nombre, emp].filter(Boolean).join(' · ') + (u.aprueba ? ' ✓ aprueba' : '') };
+  });
+}
 
 // ---------- Escritura ----------
 function datosUnidad(b) {
@@ -185,5 +209,5 @@ async function foto(c, r, ap) {
   const cadena = r.unidad_id ? (await c.query('select unidad_cadena($1) j', [r.unidad_id])).rows[0].j : [];
   return { fecha: new Date().toISOString(), regla: ap.regla, aprobadora: ap.unidad, cadena };
 }
-module.exports = { hoy, fechaValida, grafo, arbol, detalle, tipos, grupos, empresas, opciones, empresasDe, descendientes, crear, editar, activar,
+module.exports = { hoy, fechaValida, grafo, arbol, detalle, tipos, grupos, empresas, divisiones, opciones, empresasDe, descendientes, crear, editar, activar,
   cambiarPadre, cambiarPadreC, agregarFuncional, agregarFuncionalC, cerrarRelacion, sirveA, sirveAC, alcanceSolicitud, aprobacion, foto, histU, errPg };

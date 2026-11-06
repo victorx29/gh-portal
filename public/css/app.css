@@ -74,6 +74,7 @@ details.blk{border-width:1px 0 0;border-radius:0;padding:6px 0 0}
 .pasos{margin:0 0 16px;padding-left:20px;max-width:80ch}.pasos li{margin:8px 0}.pasos .btn{margin-left:8px;min-height:36px;padding:4px 12px}
 .cambios{margin:6px 0;padding-left:18px}.cambios li{margin:4px 0}.cambios .chip{margin:0 4px 0 0}
 .addrow{margin-top:12px}
+.chklist{border:1px solid var(--bd);border-radius:10px;padding:4px 12px;max-height:180px;overflow-y:auto}.chklist.alto{max-height:240px}.chklist .chk{margin:6px 0}
 @media (max-width:760px){
   .app{flex-direction:column}main{flex:1;padding:16px 16px 32px}
   .side,.side.c{width:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--bd);padding:6px;flex:none}

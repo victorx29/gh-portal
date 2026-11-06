@@ -1,18 +1,16 @@
 <%- include('partials/head') %>
-<div class="top"><div><%- include('partials/crumb', { aqui: 'Empresas y grupos' }) %><h1>Empresas y grupos</h1><p class="sub">Cada empresa pertenece a un grupo. Las siglas identifican a la empresa en la estructura y en la carga masiva.</p></div>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Empresas' }) %><h1>Empresas</h1><p class="sub">La razón social es el nombre principal en todo el portal. Las siglas se usan donde el espacio es corto y en la carga masiva.</p></div>
 <div class="row"><a class="btn p" href="/config/empresas/nueva" data-modal><%- ic('mas') %>Nueva empresa</a></div></div>
 <%- include('partials/config_nav') %>
-<h2 class="h2s">Empresas</h2>
-<div class="tw"><table class="mid"><tr><th>Empresa</th><th>Siglas</th><th>RIF</th><th>Ubicación</th><th>Grupo</th><th>Unidades</th><th></th></tr>
-<% es.forEach(e => { %><tr><td><b><%= e.nombre %></b><% if (!e.activa) { %> <span class="chip r">inactiva</span><% } %><% if (e.razon_social) { %><br><small class="mu"><%= e.razon_social %></small><% } %></td>
-<td><%= e.siglas || '—' %></td><td><%= e.rif || '—' %></td><td><%= [e.ciudad, e.estado].filter(Boolean).join(', ') || '—' %></td><td><%= e.grupo_siglas || e.grupo_nombre %></td><td><%= e.unidades %></td>
+<div class="tw"><table class="mid"><tr><th>Razón social</th><th>Siglas</th><th>RIF</th><th>División</th><th>Ubicación</th><th>Unidades</th><th></th></tr>
+<% es.forEach(e => { %><tr<%- e.activa ? '' : ' class="off"' %>><td><b><%= e.mostrar %></b><% if (!e.activa) { %> <span class="chip r">inactiva</span><% } %><% if (e.razon_social && e.nombre !== e.razon_social) { %><br><small class="mu"><%= e.nombre %></small><% } %></td>
+<td><%= e.siglas || '—' %></td><td><%= e.rif || '—' %></td><td><%= e.division || '—' %><% if (e.sirve_divisiones.length) { %><br><small class="mu">presta servicio a <%= e.sirve_divisiones.length %> división<%= e.sirve_divisiones.length > 1 ? 'es' : '' %></small><% } %></td>
+<td><%= [e.ciudad, e.estado].filter(Boolean).join(', ') || '—' %></td><td><%= e.unidades %></td>
 <td class="acts"><a class="btn" href="/config/empresas/<%= e.id %>" data-modal>Editar</a><form method="post" action="/config/empresas/<%= e.id %>/activa" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn"><%= e.activa ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %>
 <% if (!es.length) { %><tr><td colspan="7" class="empty">Aún no hay empresas.</td></tr><% } %></table></div>
-<h2 class="h2s">Grupos</h2>
-<div class="tw"><table class="mid"><tr><th>Nombre</th><th>Siglas</th><th></th></tr>
-<% gs.forEach(g => { %><tr><td colspan="3"><form method="post" action="/config/grupos/<%= g.id %>/editar" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<p class="sub">¿Falta una división? Créala en <a href="/config/maestros?m=divisiones">Divisiones</a>.</p>
+<details><summary>Grupo de esta instalación</summary><p class="sub">Cada grupo (APB, ARO) tiene su propia instalación del portal. Normalmente aquí hay un solo grupo.</p>
+<% gs.forEach(g => { %><form method="post" action="/config/grupos/<%= g.id %>/editar" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>">
 <label class="sr" for="gn<%= g.id %>">Nombre</label><input id="gn<%= g.id %>" name="nombre" value="<%= g.nombre %>" required style="max-width:320px">
-<label class="sr" for="gs<%= g.id %>">Siglas</label><input id="gs<%= g.id %>" name="siglas" value="<%= g.siglas || '' %>" style="max-width:120px" placeholder="Siglas"><button class="btn">Guardar</button></form></td></tr><% }) %></table></div>
-<form method="post" action="/config/grupos" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><label class="sr" for="ng">Nuevo grupo</label><input id="ng" name="nombre" placeholder="Nuevo grupo, por ejemplo Grupo ARO" required style="max-width:320px">
-<label class="sr" for="nsg">Siglas</label><input id="nsg" name="siglas" placeholder="Siglas" style="max-width:120px"><button class="btn p">Crear grupo</button></form>
+<label class="sr" for="gs<%= g.id %>">Siglas</label><input id="gs<%= g.id %>" name="siglas" value="<%= g.siglas || '' %>" style="max-width:120px" placeholder="Siglas"><button class="btn">Guardar</button></form><% }) %></details>
 <%- include('partials/foot') %>

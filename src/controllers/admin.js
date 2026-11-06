@@ -1,5 +1,5 @@
 const r = require('express').Router(), bcrypt = require('bcryptjs'), P = require('../services/perm'), ES = require('../services/estructura'), { q, tx } = require('../db'), { w, E, flash, modal } = require('../util');
-r.use(['/usuarios', '/perfiles'], (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana')));
+r.use('/usuarios', (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana')));
 const ROLES = ['gerente', 'director', 'presidencia', 'gh', 'superadmin'];
 
 r.get('/usuarios', w(async (req, res) => {
@@ -17,7 +17,7 @@ r.post('/usuarios', w(async (req, res) => {
 r.get('/usuarios/:id/rol', w(async (req, res) => {
   const u = (await q('select id,nombre,email from usuario where id=$1', [+req.params.id])).rows[0]; if (!u) throw E(404, 'Usuario no encontrado');
   modal(req, res, 'usuario_rol', { title: 'Asignar rol', nav: 'config', sub: 'usuarios', u, ROLES: ROLES.filter(x => x !== 'superadmin' || P.esSuper(req.user)),
-    empresas: (await q('select id,nombre,siglas from empresa where activa order by nombre')).rows, unidades: await ES.opciones() });
+    empresas: (await q('select id,coalesce(razon_social,nombre) nombre,siglas from empresa where activa order by 2')).rows, unidades: await ES.opciones() });
 }));
 // Alcance del rol: gerente y director por UNIDAD (recomendado) o por empresa (transición 0.4); presidencia por empresa; GH y superadmin, globales
 r.post('/usuarios/:id/rol', w(async (req, res) => {
@@ -37,22 +37,6 @@ r.post('/usuarios/:id/activo', w(async (req, res) => {
   await q('update usuario set activo = not activo where id=$1', [+req.params.id]); res.redirect('/usuarios');
 }));
 
-r.get('/perfiles', w(async (req, res) => {
-  const ps = (await q(`select p.*, e.nombre empresa, (select max(version) from perfil_version where perfil_id=p.id) version from perfil p left join empresa e on e.id=p.empresa_id order by p.nombre`)).rows;
-  res.render('perfiles', { title: 'Perfiles y Cargos', nav: 'config', sub: 'cargos', ps, empresas: (await q('select id,nombre from empresa order by nombre')).rows });
-}));
-// Mismo código = nueva versión (las versiones son inmutables)
-r.post('/perfiles', w(async (req, res) => {
-  const b = req.body; if (!b.codigo || !b.nombre) throw E(400, 'Código y nombre son obligatorios');
-  const contenido = { objetivo: b.objetivo || '', funciones: b.funciones || '', requisitos: b.requisitos || '', competencias: b.competencias || '', conocimientos: b.conocimientos || '', criterios: String(b.criterios || '').split('\n').map(s => s.trim()).filter(Boolean) };
-  await tx(async c => {
-    let p = (await c.query('select id from perfil where codigo=$1', [b.codigo.trim()])).rows[0];
-    if (!p) p = (await c.query('insert into perfil(codigo,nombre,empresa_id) values($1,$2,$3) returning id', [b.codigo.trim(), b.nombre.trim(), b.empresa_id || null])).rows[0];
-    const v = (await c.query('select coalesce(max(version),0)+1 v from perfil_version where perfil_id=$1', [p.id])).rows[0].v;
-    await c.query('insert into perfil_version(perfil_id,version,contenido,creado_por) values($1,$2,$3,$4)', [p.id, v, contenido, req.user.id]);
-  });
-  flash(req, 'ok', 'Perfil guardado'); res.redirect('/perfiles');
-}));
 // Eliminar (solo superadmin): se borra si no tiene actividad; si la tiene, se anonimiza y el historial se conserva
 r.get('/usuarios/:id/eliminar', w(async (req, res) => {
   if (!P.esSuper(req.user)) throw E(403, 'Solo el superadmin elimina usuarios');

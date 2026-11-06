@@ -6,11 +6,24 @@
     const em = scope.querySelector('#f-empresa'), un = scope.querySelector('#f-unidad'); if (!em || !un) return;
     [...un.options].forEach(o => { if (o.dataset.e !== undefined) o.hidden = !o.dataset.e.split(',').includes(em.value); });
     if (un.selectedOptions[0] && un.selectedOptions[0].hidden) un.value = '';
+    perfiles(scope);
+  }
+  // Perfiles del formulario: generales, o los de esa empresa y esa unidad (o una superior)
+  function perfiles(scope) {
+    const em = scope.querySelector('#f-empresa'), un = scope.querySelector('#f-unidad'), pf = scope.querySelector('#f-perfil'); if (!em || !un || !pf) return;
+    const E = em.value, o = un.selectedOptions[0], A = o && o.dataset.a ? o.dataset.a.split(',') : [];
+    [...pf.options].forEach(op => {
+      if (op.dataset.g === undefined) return;
+      const pe = op.dataset.pe ? op.dataset.pe.split(',') : [], pu = op.dataset.pu ? op.dataset.pu.split(',') : [];
+      op.hidden = !(op.dataset.g === '1' || ((pe.length || pu.length) && E && A.length && (!pe.length || pe.includes(E)) && (!pu.length || pu.some(x => A.includes(x)))));
+    });
+    if (pf.selectedOptions[0] && pf.selectedOptions[0].hidden) pf.value = '';
   }
   // Campos condicionales: data-when="campo=valor" o "campo=a|b"; el campo se busca en el mismo formulario
   const cond = scope => scope.querySelectorAll('[data-when]').forEach(el => {
     const [n, v] = el.dataset.when.split('='), f = (el.closest('form') || scope).querySelector('[name="' + n + '"]');
-    el.hidden = !f || !v.split('|').includes(f.value);
+    const val = f && f.type === 'checkbox' ? (f.checked ? f.value : '') : f && f.value;
+    el.hidden = !f || !v.split('|').includes(val);
   });
   async function abrir(url, target) {
     const r = await fetch(url, { headers: { 'X-Modal': '1' }, credentials: 'same-origin' });
@@ -29,7 +42,14 @@
   d.addEventListener('change', e => {
     if (e.target.matches('[data-autosubmit]')) e.target.form.submit();
     if (e.target.matches('#f-empresa')) unidades(e.target.closest('form'));
+    if (e.target.matches('#f-unidad')) perfiles(e.target.closest('form'));
     const f = e.target.closest('form'); if (f) cond(f);
+  });
+  // Filtro de listas de casillas: <input data-filtra> seguido de .chklist
+  d.addEventListener('input', e => {
+    if (!e.target.matches('[data-filtra]')) return;
+    const t = e.target.value.trim().toLowerCase(), l = e.target.nextElementSibling;
+    if (l) [...l.querySelectorAll('label')].forEach(x => { x.hidden = !!t && !x.textContent.toLowerCase().includes(t); });
   });
   cond(d);
   // Volver a abrir el modal tras guardar: ?abrir=<id requisición> o ?modal=/ruta/interna
