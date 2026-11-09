@@ -74,6 +74,7 @@ details.blk{border-width:1px 0 0;border-radius:0;padding:6px 0 0}
 .pasos{margin:0 0 16px;padding-left:20px;max-width:80ch}.pasos li{margin:8px 0}.pasos .btn{margin-left:8px;min-height:36px;padding:4px 12px}
 .cambios{margin:6px 0;padding-left:18px}.cambios li{margin:4px 0}.cambios .chip{margin:0 4px 0 0}
 .addrow{margin-top:12px}
+.buscar-sel{margin-bottom:6px}
 .chklist{border:1px solid var(--bd);border-radius:10px;padding:4px 12px;max-height:180px;overflow-y:auto}.chklist.alto{max-height:240px}.chklist .chk{margin:6px 0}
 /* Diagrama de estructura: hoja blanca con zoom y desplazamiento */
 .dg-f{grid-template-columns:2fr 1fr 1fr auto}.dg-emp{grid-column:1/-1;margin-top:10px}

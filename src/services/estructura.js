@@ -113,13 +113,16 @@ const empresas = () => q(`select e.*, coalesce(e.razon_social,e.nombre) mostrar,
   from empresa e join grupo g on g.id=e.grupo_id left join division d on d.id=e.division_id order by coalesce(e.razon_social,e.nombre)`).then(r => r.rows);
 const divisiones = () => q('select * from division order by nombre').then(r => r.rows);
 // Para selects: unidades activas con sangría según la línea sólida vigente
+// Escalera para las listas: sangría por nivel y «└», sin repetir al superior (ya se ve por la posición). base = nivel que queda pegado a la izquierda.
+const escalon = (o, base) => { const k = Math.max(0, o.nivel - base); return '\u00a0'.repeat(5 * k) + (k ? '└ ' : '') + o.nombre + ' · ' + o.empTxt + (o.aprueba ? ' · ✓ aprueba' : ''); };
 // Etiqueta legible: «Gerencia de Repuestos · Dirección de Comercialización · MDV» (superior inmediato y empresa o «Corporativa»)
 async function opciones() {
   const a = await arbol(), by = new Map(a.filas.map(f => [f.u.id, f.u]));
   return a.filas.filter(f => f.u.activa).map(f => {
     const u = f.u, p = by.get(u.padre_id), ef = (u.efectivas || []).map(e => e.siglas || e.nombre).join(', '), emp = u.emp_siglas || u.emp_nombre || (ef ? (u.hereda ? 'hereda ' : '') + ef : 'sin empresas');
     const anc = []; for (let x = u, n = 0; x && n < 60; x = by.get(x.padre_id), n++) anc.push(x.id);
-    return { id: u.id, codigo: u.codigo, nombre: u.nombre, nivel: f.nivel, empresas: empresasDe(u), aprueba: u.aprueba, anc,
+    const sig = (u.efectivas || []).map(e => e.siglas || e.nombre), empTxt = sig.length ? (u.hereda ? 'hereda ' : '') + sig.slice(0, 2).join(', ') + (sig.length > 2 ? ' +' + (sig.length - 2) : '') : 'sin empresas';
+    return { id: u.id, codigo: u.codigo, nombre: u.nombre, nivel: f.nivel, empresas: empresasDe(u), aprueba: u.aprueba, anc, empTxt, escalera: escalon({ nivel: f.nivel, nombre: u.nombre, empTxt, aprueba: u.aprueba }, 0),
       etiqueta: [u.nombre, p && p.nombre, emp].filter(Boolean).join(' · ') + (u.aprueba ? ' ✓ aprueba' : '') };
   });
 }
@@ -215,7 +218,9 @@ async function alcanceSolicitud(usr) {
     if (r.unidad_id) descendientes(g.by, r.unidad_id).forEach(x => { const u = g.by.get(x); if (u) dar(x, empresasDe(u)); });
     else for (const u of g.by.values()) { const es = empresasDe(u); if (r.empresa_id == null) dar(u.id, es); else if (es.includes(r.empresa_id)) dar(u.id, [r.empresa_id]); }
   }
-  return (await opciones()).filter(o => perm.has(o.id)).map(o => ({ ...o, empresas: [...perm.get(o.id)].filter(e => o.empresas.includes(e)) })).filter(o => o.empresas.length);
+  const ops = (await opciones()).filter(o => perm.has(o.id)).map(o => ({ ...o, empresas: [...perm.get(o.id)].filter(e => o.empresas.includes(e)) })).filter(o => o.empresas.length);
+  const base = Math.min(...ops.map(o => o.nivel));   // la escalera del gerente empieza en su propia unidad
+  return ops.map(o => ({ ...o, escalera: escalon(o, base) }));
 }
 // Quién aprueba (paso Director): la unidad «aprueba» más cercana subiendo por la línea sólida.
 // Si ninguna unidad de la cadena aprueba, regla de transición 0.4: director con alcance de empresa.
@@ -235,5 +240,5 @@ async function foto(c, r, ap) {
   const cadena = r.unidad_id ? (await c.query('select unidad_cadena($1) j', [r.unidad_id])).rows[0].j : [];
   return { fecha: new Date().toISOString(), regla: ap.regla, aprobadora: ap.unidad, cadena };
 }
-module.exports = { diagrama, hoy, fechaValida, grafo, arbol, detalle, tipos, grupos, empresas, divisiones, opciones, empresasDe, descendientes, crear, editar, activar,
+module.exports = { escalon, diagrama, hoy, fechaValida, grafo, arbol, detalle, tipos, grupos, empresas, divisiones, opciones, empresasDe, descendientes, crear, editar, activar,
   cambiarPadre, cambiarPadreC, agregarFuncional, agregarFuncionalC, cerrarRelacion, sirveA, sirveAC, alcanceSolicitud, aprobacion, foto, histU, errPg };

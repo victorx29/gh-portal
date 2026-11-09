@@ -6,7 +6,7 @@
 <div class="row"><a class="btn" href="/config/estructura"><%- ic('estructura') %>Volver al árbol</a><button class="btn" type="button" id="dg-png"><%- ic('bajar') %>Imagen</button><button class="btn p" type="button" id="dg-print">Imprimir o PDF</button></div></div>
 <div class="noprint"><%- include('partials/config_nav') %></div>
 <form method="get" action="/config/estructura/diagrama" class="filtros dg-f noprint">
-  <div><label for="dr">Desde la unidad</label><select id="dr" name="raiz"><option value="">Toda la estructura</option><% opciones.forEach(o => { %><option value="<%= o.id %>"<%= String(o.id) === String(f.raiz) ? ' selected' : '' %>><%= o.etiqueta %></option><% }) %></select></div>
+  <div><label for="dr">Desde la unidad</label><select id="dr" name="raiz" data-buscar><option value="">Toda la estructura</option><% opciones.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= String(o.id) === String(f.raiz) ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select></div>
   <div><label for="dd">División</label><select id="dd" name="division"><option value="">Todas</option><% divisiones.forEach(d => { %><option value="<%= d.id %>"<%= String(d.id) === String(f.division) ? ' selected' : '' %>><%= d.nombre %></option><% }) %></select></div>
   <div><label for="df">Estructura al</label><input id="df" name="fecha" type="date" value="<%= f.fecha || dg.fecha %>"></div>
   <div class="end"><button class="btn">Aplicar</button><% if (f.raiz || f.division || f.empresas.length || f.fecha) { %> <a class="btn" href="/config/estructura/diagrama">Limpiar</a><% } %></div>
