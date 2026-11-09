@@ -75,6 +75,19 @@ details.blk{border-width:1px 0 0;border-radius:0;padding:6px 0 0}
 .cambios{margin:6px 0;padding-left:18px}.cambios li{margin:4px 0}.cambios .chip{margin:0 4px 0 0}
 .addrow{margin-top:12px}
 .chklist{border:1px solid var(--bd);border-radius:10px;padding:4px 12px;max-height:180px;overflow-y:auto}.chklist.alto{max-height:240px}.chklist .chk{margin:6px 0}
+/* Diagrama de estructura: hoja blanca con zoom y desplazamiento */
+.dg-f{grid-template-columns:2fr 1fr 1fr auto}.dg-emp{grid-column:1/-1;margin-top:10px}
+.dg-h{margin:4px 0 10px}.dg-h .sub{margin:2px 0 0}
+.dg-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}.dg-bar .btn{min-width:44px;padding:6px 12px}.dg-bar .chk{margin:0 8px}.dg-bar .mu{font-size:12px}
+.dg{height:68vh;min-height:360px;border:1px solid var(--bd);border-radius:12px;background:#fff;overflow:hidden;cursor:grab;touch-action:none}.dg:active{cursor:grabbing}
+.dg svg{width:100%;height:100%;display:block;user-select:none}.dg-n{cursor:pointer}
+.dg-ley{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--mu);margin:10px 0}.dg-ley span{display:inline-flex;align-items:center;gap:6px}.dg-sig{flex-basis:100%}
+@media print{
+  @page{size:landscape;margin:10mm}
+  body.in{overflow:visible}.app{display:block;height:auto;padding:0}main{overflow:visible;padding:0}
+  .side,.noprint,.flash,.dg-bar{display:none!important}
+  .dg{height:165mm;border:0;border-radius:0}.dg-h h1{font-size:18pt}body{background:#fff;color:#000}
+}
 @media (max-width:760px){
   .app{flex-direction:column}main{flex:1;padding:16px 16px 32px}
   .side,.side.c{width:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--bd);padding:6px;flex:none}

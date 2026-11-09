@@ -18,7 +18,7 @@ async function grafo(fecha) {
   const f = fecha || await hoy();
   const [us, rels, sirve, dirs] = await Promise.all([
     q(UN + ' where u.creada_en::date <= $1 order by t.nivel, u.nombre', [f]).then(r => r.rows), relacionesEn(f),
-    q('select ue.unidad_id, e.id, e.siglas, e.nombre from unidad_empresa ue join empresa e on e.id=ue.empresa_id').then(r => r.rows),
+    q('select ue.unidad_id, e.id, e.siglas, coalesce(e.razon_social,e.nombre) nombre from unidad_empresa ue join empresa e on e.id=ue.empresa_id').then(r => r.rows),
     q("select ur.unidad_id, us.id, us.nombre, us.activo from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id is not null").then(r => r.rows)]);
   const by = new Map(us.map(u => [u.id, Object.assign(u, { hijos: [], funcional: [], sirve: [], aprobadores: [], padre_id: null })]));
   for (const r of rels) {
@@ -79,6 +79,32 @@ async function detalle(id) {
     q("select count(*)::int n from requisicion where unidad_id=$1", [id]).then(r => r.rows[0].n)]);
   const g = await grafo(), gu = g.by.get(id);
   return { u, heredadas: gu && gu.hereda ? gu.efectivas : [], rels, sirve, aprob, hijos, reqs, padre: rels.find(r => r.tipo === 'solida' && !r.hasta) || null, funcionales: rels.filter(r => r.tipo === 'funcional' && !r.hasta) };
+}
+// Datos para el diagrama visual. Filtros: raíz (esa unidad hacia abajo), empresas (una o varias) y división (suma sus empresas).
+// Las unidades que coinciden se muestran completas; sus superiores aparecen atenuados como contexto, hasta la raíz elegida.
+async function diagrama({ fecha, raiz, empresas, division } = {}) {
+  const g = await grafo(fechaValida(fecha) ? fecha : null), by = g.by;
+  const sel = new Set([].concat(empresas || []).map(Number).filter(Boolean));
+  if (division) (await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+division])).rows.forEach(r => sel.add(r.id));
+  const filtraEmp = sel.size > 0 || !!division;
+  const base = raiz && by.has(+raiz) ? descendientes(by, +raiz) : new Set(by.keys());
+  const match = new Set([...base].filter(id => { const u = by.get(id); return u.activa && (!filtraEmp || empresasDe(u).some(e => sel.has(e))); }));
+  const vis = new Set(match);
+  for (const id of match) { let p = by.get(by.get(id).padre_id), n = 0; while (p && n++ < 60 && base.has(p.id) && p.activa) { vis.add(p.id); p = by.get(p.padre_id); } }
+  // Con una raíz elegida, también entran las unidades de fuera que dependen FUNCIONALMENTE de ella (líneas punteadas hacia la vista)
+  const externas = new Set();
+  if (raiz && by.has(+raiz)) for (const u of by.values()) if (!vis.has(u.id) && u.activa && u.funcional.some(f => vis.has(f.padre_id)) && (!filtraEmp || empresasDe(u).some(e => sel.has(e)))) { vis.add(u.id); externas.add(u.id); }
+  const emp = new Map((await q('select id, siglas, coalesce(razon_social,nombre) razon from empresa')).rows.map(e => [e.id, e]));
+  const ref = e => { const x = emp.get(e.id) || {}; return { s: x.siglas || '', r: x.razon || e.nombre || '' }; };
+  const usadas = new Map();
+  const nodes = [...vis].map(id => {
+    const u = by.get(id), efs = (u.efectivas || []).map(ref); efs.forEach(e => usadas.set(e.s || e.r, e.r));
+    return { id, padre: vis.has(u.padre_id) ? u.padre_id : null, nombre: u.nombre, tipo: u.tipo, nivel: u.nivel, codigo: u.codigo, aprueba: u.aprueba,
+      aprobadores: u.aprobadores.map(d => d.nombre), ctx: !match.has(id) && !externas.has(id), externa: externas.has(id), propia: !!u.empresa_id, hereda: !!u.hereda, comparte: u.sirve.length > 0, empresas: efs,
+      funcionalFuera: u.funcional.filter(f => !vis.has(f.padre_id)).map(f => f.nombre) };
+  });
+  const links = []; for (const id of vis) for (const f of by.get(id).funcional) if (vis.has(f.padre_id)) links.push({ de: id, a: f.padre_id });
+  return { fecha: g.fecha, esHoy: g.fecha === await hoy(), nodes, links, leyenda: [...usadas].filter(([s]) => s).sort().map(([s, r]) => ({ s, r })), total: by.size };
 }
 const tipos = (todos) => q(`select * from tipo_unidad ${todos ? '' : 'where activo'} order by nivel, nombre`).then(r => r.rows);
 const grupos = () => q('select * from grupo order by nombre').then(r => r.rows);
@@ -209,5 +235,5 @@ async function foto(c, r, ap) {
   const cadena = r.unidad_id ? (await c.query('select unidad_cadena($1) j', [r.unidad_id])).rows[0].j : [];
   return { fecha: new Date().toISOString(), regla: ap.regla, aprobadora: ap.unidad, cadena };
 }
-module.exports = { hoy, fechaValida, grafo, arbol, detalle, tipos, grupos, empresas, divisiones, opciones, empresasDe, descendientes, crear, editar, activar,
+module.exports = { diagrama, hoy, fechaValida, grafo, arbol, detalle, tipos, grupos, empresas, divisiones, opciones, empresasDe, descendientes, crear, editar, activar,
   cambiarPadre, cambiarPadreC, agregarFuncional, agregarFuncionalC, cerrarRelacion, sirveA, sirveAC, alcanceSolicitud, aprobacion, foto, histU, errPg };

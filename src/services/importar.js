@@ -39,7 +39,7 @@ async function plantilla() {
     filas.forEach(f => ws.addRow(f)); return ws;
   };
   const gs = id => { const x = grupos.find(y => y.id === id); return x ? (x.siglas || x.nombre) : ''; };
-  const es = id => { const x = empresas.find(y => y.id === id); return x ? (x.siglas || x.nombre) : ''; };
+  const es = id => { const x = empresas.find(y => y.id === id); return x ? (x.siglas || x.razon_social || x.nombre) : ''; };
   hoja('Grupos', grupos.map(x => ({ nombre: x.nombre, siglas: x.siglas || '' })));
   hoja('Empresas', empresas.map(x => ({ grupo: gs(x.grupo_id), nombre: x.nombre, razon_social: x.razon_social || '', siglas: x.siglas || '', rif: x.rif || '', estado: x.estado || '', ciudad: x.ciudad || '' })));
   const us = [...g.by.values()].sort((a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, 'es'));

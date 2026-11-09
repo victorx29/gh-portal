@@ -38,7 +38,7 @@ async function clonar(empresaId, tipo) {
   return tx(async c => {
     const ex = (await c.query('select id from pipeline where tipo=$1 and empresa_id=$2', [tipo, empresaId])).rows[0]; if (ex) return ex.id;
     const base = (await c.query('select id from pipeline where tipo=$1 and empresa_id is null', [tipo])).rows[0];
-    const emp = (await c.query('select nombre from empresa where id=$1', [empresaId])).rows[0]; if (!emp) throw E(404, 'Empresa no encontrada');
+    const emp = (await c.query('select coalesce(razon_social,nombre) nombre from empresa where id=$1', [empresaId])).rows[0]; if (!emp) throw E(404, 'Empresa no encontrada');
     const p = (await c.query('insert into pipeline(tipo,empresa_id,nombre) values($1,$2,$3) returning id', [tipo, empresaId, 'Pipeline de ' + emp.nombre])).rows[0];
     await c.query('insert into etapa(pipeline_id,clave,nombre,orden,clase,reglas) select $1,clave,nombre,orden,clase,reglas from etapa where pipeline_id=$2 and activa', [p.id, base.id]);
     return p.id;

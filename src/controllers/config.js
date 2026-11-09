@@ -15,7 +15,7 @@ const deEtapa = async id => { const e = (await q('select pipeline_id from etapa 
 
 r.get('/config/pipelines', w(async (req, res) => {
   const tipo = TIPOS.includes(req.query.tipo) ? req.query.tipo : 'requisicion', emp = req.query.empresa ? +req.query.empresa : null;
-  const empresas = (await q('select id,nombre from empresa where activa order by nombre')).rows;
+  const empresas = (await q('select id,coalesce(razon_social,nombre) nombre,siglas from empresa where activa order by 2')).rows;
   const p = (await q('select * from pipeline where tipo=$1 and empresa_id is not distinct from $2', [tipo, emp])).rows[0] || null;
   const etapas = p ? (await q('select * from etapa where pipeline_id=$1 and activa order by orden', [p.id])).rows : [];
   res.render('config_pipelines', { title: 'Pipelines', nav: 'config', sub: 'pipelines', tipo, emp, empresas, p, etapas, editable: !!p && (p.empresa_id != null || P.esSuper(req.user)) });

@@ -24,6 +24,12 @@ r.get('/config/estructura', gh, w(async (req, res) => {
   res.render('estructura', { title: 'Estructura organizativa', nav: 'config', sub: 'estructura', a, f, empresas, grupos, divisiones, pendientes });
 }));
 const datosModal = async () => ({ tipos: await ES.tipos(), grupos: await ES.grupos(), empresas: await ES.empresas(), opciones: await ES.opciones() });
+r.get('/config/estructura/diagrama', gh, w(async (req, res) => {
+  const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', raiz: req.query.raiz || '', division: req.query.division || '',
+    empresas: [].concat(req.query.empresas || []).map(Number).filter(Boolean), punteadas: req.query.punteadas !== '0' };
+  const [dg, empresas, divisiones, opciones] = await Promise.all([ES.diagrama(f), ES.empresas(), ES.divisiones(), ES.opciones()]);
+  res.render('estructura_diagrama', { title: 'Diagrama de estructura', nav: 'config', sub: 'estructura', dg, f, empresas, divisiones, opciones });
+}));
 r.get('/config/estructura/nueva', gh, w(async (req, res) => modal(req, res, 'unidad_form', { title: 'Nueva unidad', nav: 'config', sub: 'estructura', v: { padre_id: +req.query.padre || null }, ...await datosModal() })));
 r.post('/config/estructura', gh, hacer(async req => aUnidad(await ES.crear(req.user, req.body)), 'Unidad creada', '/config/estructura'));
 r.get('/config/estructura/plantilla.xlsx', gh, w(async (req, res) => {

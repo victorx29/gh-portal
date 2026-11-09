@@ -30,6 +30,7 @@
     if (!r.ok) { if (target === dlg) location.href = url; return; }
     target.innerHTML = await r.text(); unidades(target); cond(target); if (!target.open) target.showModal();
   }
+  window.ghAbrir = url => abrir(url, dlg);   // lo usa el diagrama de estructura
   d.addEventListener('click', e => {
     const a = e.target.closest('[data-modal],[data-modal2]');
     if (a) { e.preventDefault(); abrir(a.getAttribute('href'), a.hasAttribute('data-modal2') ? dlg2 : dlg); return; }

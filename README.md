@@ -47,6 +47,9 @@ DATABASE_URL=postgres://gh:gh@localhost:5432/gh npm run dev
 ## Contrato con n8n
 La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
 
+## Diagrama de estructura
+`/config/estructura/diagrama` (solo GH): vista de cajas con filtros por unidad, empresas, división y fecha; impresión o PDF e imagen. Sin librerías externas (`public/js/diagrama.js`).
+
 ## Perfiles y Cargos
 Código automático `GH-PF-NNN` y versiones inmutables `GH-PF-NNN-VV`; el perfil marca su versión activa (`perfil.version_activa_id`).
 Alcance en `perfil_alcance`: general, empresas, unidades (incluye dependientes) o ambas. La requisición guarda la versión activa al crearse.

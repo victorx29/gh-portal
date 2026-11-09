@@ -2,7 +2,7 @@
 <% const fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—'; %>
 <div class="top"><div><%- include('partials/crumb', { aqui: 'Estructura organizativa' }) %><h1>Estructura organizativa</h1>
 <p class="sub">Una sola estructura para todos los grupos y empresas. Cambiar una dependencia cierra la anterior con fecha y abre la nueva, así que puedes consultar cómo estaba en cualquier fecha.</p></div>
-<div class="row"><a class="btn" href="/config/estructura/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/config/estructura/importar"><%- ic('subir') %>Carga masiva</a>
+<div class="row"><a class="btn" href="/config/estructura/diagrama"><%- ic('estructura') %>Ver diagrama</a><a class="btn" href="/config/estructura/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/config/estructura/importar"><%- ic('subir') %>Carga masiva</a>
 <% if (a.esHoy) { %><a class="btn p" href="/config/estructura/nueva" data-modal><%- ic('mas') %>Nueva unidad</a><% } %></div></div>
 <%- include('partials/config_nav') %>
 <form method="get" action="/config/estructura" class="filtros">
@@ -26,7 +26,7 @@
   <% if (a.esHoy) { %><a href="/config/estructura/<%= u.id %>" data-modal><%= u.nombre %></a><% } else { %><b><%= u.nombre %></b><% } %>
   <small class="cod"><%= u.codigo %></small><% if (nHijos) { %><small class="mu"><%= nHijos %> dependiente<%= nHijos > 1 ? 's' : '' %></small><% } %></div>
   <div class="tags">
-    <span class="tag"><%- ic('empresa') %><%= u.emp_siglas || u.emp_nombre || 'Corporativa' %></span>
+    <span class="tag"<%- !u.empresa_id && u.hereda ? ' title="Sin empresas propias: las hereda de su superior"' : '' %>><%- ic('empresa') %><%= u.emp_siglas || u.emp_nombre || (u.hereda && u.efectivas.length ? 'Hereda ' + u.efectivas.map(e => e.siglas || e.nombre).join(', ') : 'Corporativa') %></span>
     <% if (u.sirve.length) { %><span class="tag" title="Servicio compartido"><%- ic('compartida') %>Sirve a <%= u.sirve.map(s => s.siglas || s.nombre).join(', ') %></span><% } %>
     <% if (u.aprueba) { %><span class="tag <%= u.aprobadores.length ? 'ok' : 'warn' %>"><%- ic('aprueba') %><%= u.aprobadores.length ? 'Aprueba: ' + u.aprobadores.map(d => d.nombre).join(', ') : 'Aprueba · sin director' %></span><% } %>
     <% u.funcional.forEach(fn => { %><span class="tag dot" title="Dependencia funcional (línea punteada)"><%- ic('punteada') %><%= fn.nombre %></span><% }) %>

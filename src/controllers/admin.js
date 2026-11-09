@@ -3,10 +3,10 @@ r.use('/usuarios', (req, res, next) => P.esGH(req.user) ? next() : next(E(403, '
 const ROLES = ['gerente', 'director', 'presidencia', 'gh', 'superadmin'];
 
 r.get('/usuarios', w(async (req, res) => {
-  const us = (await q(`select u.id,u.nombre,u.email,u.activo, coalesce(json_agg(json_build_object('id',ur.id,'rol',ur.rol,'empresa',coalesce(e.siglas,e.nombre),'unidad',un.nombre,'aprueba',un.aprueba) order by ur.rol) filter (where ur.id is not null),'[]') roles
+  const us = (await q(`select u.id,u.nombre,u.email,u.activo, coalesce(json_agg(json_build_object('id',ur.id,'rol',ur.rol,'empresa',coalesce(e.siglas,e.razon_social,e.nombre),'unidad',un.nombre,'aprueba',un.aprueba) order by ur.rol) filter (where ur.id is not null),'[]') roles
     from usuario u left join usuario_rol ur on ur.usuario_id=u.id left join empresa e on e.id=ur.empresa_id left join unidad un on un.id=ur.unidad_id group by u.id order by u.nombre`)).rows;
   res.render('usuarios', { title: 'Usuarios y roles', nav: 'config', sub: 'usuarios', us, isSuper: P.esSuper(req.user), ROLES: ROLES.filter(x => x !== 'superadmin' || P.esSuper(req.user)),
-    empresas: (await q('select id,nombre,siglas from empresa where activa order by nombre')).rows, unidades: await ES.opciones() });
+    empresas: (await q('select id,coalesce(razon_social,nombre) nombre,siglas from empresa where activa order by 2')).rows, unidades: await ES.opciones() });
 }));
 r.post('/usuarios', w(async (req, res) => {
   const { nombre, email, password } = req.body;
