@@ -27,7 +27,7 @@ const datosModal = async () => ({ tipos: await ES.tipos(), grupos: await ES.grup
 r.get('/config/estructura/diagrama', gh, w(async (req, res) => {
   const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', raiz: req.query.raiz || '', division: req.query.division || '',
     empresas: [].concat(req.query.empresas || []).map(Number).filter(Boolean), punteadas: req.query.punteadas !== '0',
-    tipos: [].concat(req.query.tipos || []).map(Number).filter(Boolean), disp: req.query.disp === 'c' ? 'c' : 'h' };
+    tipos: [].concat(req.query.tipos || []).map(Number).filter(Boolean), disp: ['c', 'k'].includes(req.query.disp) ? req.query.disp : 'h' };
   const [dg, empresas, divisiones, opciones, tipos] = await Promise.all([ES.diagrama(f), ES.empresas(), ES.divisiones(), ES.opciones(), ES.tipos()]);
   res.render('estructura_diagrama', { title: 'Diagrama de estructura', nav: 'config', sub: 'estructura', dg, f, empresas, divisiones, opciones, tipos });
 }));

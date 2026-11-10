@@ -1,8 +1,14 @@
-<%- include('partials/head') %>
+<% title = 'Diagrama de estructura' %><%- include('partials/head') %>
 <% const fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
    const emSel = empresas.filter(e => f.empresas.includes(e.id)), raiz = opciones.find(o => String(o.id) === String(f.raiz)), div = divisiones.find(d => String(d.id) === String(f.division));
-   const tpSel = tipos.filter(t => f.tipos.includes(t.id));
-   const alcance = [raiz && 'Desde ' + raiz.nombre, div && 'División ' + div.nombre, emSel.length && emSel.map(e => e.siglas || e.mostrar).join(' + '), tpSel.length && tpSel.length < tipos.length && 'Solo ' + tpSel.map(t => t.nombre).join(', ')].filter(Boolean).join(' · ') || 'Vista general'; %>
+   const tpSel = tipos.filter(t => f.tipos.includes(t.id)), parcial = tpSel.length && tpSel.length < tipos.length;
+   // Título = lo que se está viendo: unidad, división, empresas (razón social; siglas si son más de dos) y tipos en plural
+   const plural = n => n === 'Presidencia' ? n : n.split(' ').map((w, i) => i && n.split(' ').length > 1 && /general$/.test(w) ? 'generales' : /ón$/.test(w) ? w.replace(/ón$/, 'ones') : /[aeiouáéíóú]$/i.test(w) ? w + 's' : i ? w : w + 'es').join(' ');
+   const y = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1] : l[0];
+   const partes = [raiz && raiz.nombre, div && 'División ' + div.nombre, emSel.length && (emSel.length > 2 ? emSel.map(e => e.siglas || e.mostrar).join(' + ') : emSel.map(e => e.mostrar).join(' + ')), parcial && y(tpSel.map(t => plural(t.nombre)))].filter(Boolean);
+   const titulo = 'Estructura organizativa' + (partes.length ? ' · ' + partes.join(' · ') : '');
+   const DISP = { h: 'Horizontal', c: 'Compacta', k: 'Cascada por columnas' };
+   const alcance = partes.length ? '' : 'Vista general'; %>
 <div class="top noprint"><div><%- include('partials/crumb', { aqui: 'Diagrama de estructura' }) %></div>
 <div class="row"><a class="btn" href="/config/estructura"><%- ic('estructura') %>Volver al árbol</a><button class="btn" type="button" id="dg-png"><%- ic('bajar') %>Imagen</button><button class="btn p" type="button" id="dg-print">Imprimir o PDF</button></div></div>
 <div class="noprint"><%- include('partials/config_nav') %></div>
@@ -10,8 +16,8 @@
   <div><label for="dr">Desde la unidad</label><select id="dr" name="raiz" data-buscar><option value="">Toda la estructura</option><% opciones.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= String(o.id) === String(f.raiz) ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select></div>
   <div><label for="dd">División</label><select id="dd" name="division"><option value="">Todas</option><% divisiones.forEach(d => { %><option value="<%= d.id %>"<%= String(d.id) === String(f.division) ? ' selected' : '' %>><%= d.nombre %></option><% }) %></select></div>
   <div><label for="df">Estructura al</label><input id="df" name="fecha" type="date" value="<%= f.fecha || dg.fecha %>"></div>
-  <div><label for="dx">Disposición</label><select id="dx" name="disp"><option value="h"<%= f.disp === 'h' ? ' selected' : '' %>>Horizontal (norma)</option><option value="c"<%= f.disp === 'c' ? ' selected' : '' %>>Compacta (apilada)</option></select></div>
-  <div class="end"><button class="btn">Aplicar</button><% if (f.raiz || f.division || f.empresas.length || f.fecha || f.tipos.length || f.disp === 'c') { %> <a class="btn" href="/config/estructura/diagrama">Limpiar</a><% } %></div>
+  <div><label for="dx">Disposición</label><select id="dx" name="disp"><option value="h"<%= f.disp === 'h' ? ' selected' : '' %>>Horizontal (norma)</option><option value="c"<%= f.disp === 'c' ? ' selected' : '' %>>Compacta (apilada)</option><option value="k"<%= f.disp === 'k' ? ' selected' : '' %>>Cascada por columnas (cabe en una hoja)</option></select></div>
+  <div class="end"><button class="btn">Aplicar</button><% if (f.raiz || f.division || f.empresas.length || f.fecha || f.tipos.length || f.disp !== 'h') { %> <a class="btn" href="/config/estructura/diagrama">Limpiar</a><% } %></div>
   <details class="dg-emp"><summary>Empresas<%= emSel.length ? ': ' + emSel.map(e => e.siglas || e.mostrar).join(', ') : ' (todas)' %></summary>
   <div class="eq"><% empresas.filter(e => e.activa).forEach(e => { %><label class="chk"><input type="checkbox" name="empresas" value="<%= e.id %>"<%= f.empresas.includes(e.id) ? ' checked' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></label><% }) %></div>
   <p class="sub">Marca varias para verlas juntas (por ejemplo CIM y MDV): los servicios compartidos aparecen una sola vez.</p></details>
@@ -19,7 +25,7 @@
   <div class="eq"><% tipos.forEach(t => { %><label class="chk"><input type="checkbox" name="tipos" value="<%= t.id %>"<%= !f.tipos.length || f.tipos.includes(t.id) ? ' checked' : '' %>><%= t.nombre %></label><% }) %></div>
   <p class="sub">Desmarca, por ejemplo, Jefatura y Coordinación para presentar solo direcciones y gerencias. Lo que dependa de un tipo oculto se conecta a su superior visible con línea discontinua corta.</p></details>
 </form>
-<header class="dg-h"><h1>Estructura organizativa</h1><p class="sub">Vigente al <b><%= fd(dg.fecha) %></b> · <%= alcance %> · <%= dg.nodes.filter(n => !n.ctx).length %> unidades</p></header>
+<header class="dg-h"><h1><%= titulo %></h1><p class="sub">Vigente al <b><%= fd(dg.fecha) %></b><%= alcance ? ' · ' + alcance : '' %> · <%= dg.nodes.filter(n => !n.ctx).length %> unidades · Disposición: <%= DISP[f.disp] %></p></header>
 <% if (!dg.nodes.length) { %><div class="empty">Ninguna unidad coincide con estos filtros.</div><% } else { %>
 <div id="dg-wrap"><div class="dg-bar noprint"><button class="btn" type="button" id="dg-fs" aria-pressed="false">Pantalla completa</button><button class="btn" type="button" data-z="1.2" aria-label="Acercar">+</button><button class="btn" type="button" data-z="0.83" aria-label="Alejar">−</button><button class="btn" type="button" data-z="fit">Ajustar</button>
 <label class="chk"><input type="checkbox" id="dg-dot"<%= f.punteadas ? ' checked' : '' %>>Líneas punteadas (funcionales)</label><span class="mu">Arrastra para moverte · rueda o botones para el zoom<%= dg.esHoy ? ' · clic en una caja para abrir la unidad' : '' %></span></div>

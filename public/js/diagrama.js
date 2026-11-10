@@ -2,8 +2,7 @@
 (() => {
   const dataEl = document.getElementById('dg-data'); if (!dataEl) return;
   const data = JSON.parse(dataEl.textContent), svg = document.getElementById('dg-svg'), cont = document.getElementById('dg'), NS = 'http://www.w3.org/2000/svg';
-  const W = 214, H = 88, GX = 22, GY = 54, PAD = 36, APILAR = data.disp === 'c' ? 4 : Infinity,   // horizontal (norma) por defecto
-    FF = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
+  const W = 214, H = 88, GX = 22, GY = 54, PAD = 36, APILAR = 4, FF = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
   // Colores fijos de «papel»: el diagrama se ve, imprime y exporta igual en tema claro u oscuro
   const C = { bg: '#ffffff', bd: '#c9d3e0', tx: '#111827', mu: '#5b6573', ok: '#0f7a5c', wa: '#b36b00', ln: '#7b8794' };
   const banda = n => n <= 10 ? '#0d2a5c' : n <= 25 ? '#1d5fd1' : n <= 40 ? '#3b82f6' : n <= 60 ? '#6366f1' : '#94a3b8';
@@ -27,15 +26,28 @@
     return { t: corta(pre + sig.slice(0, k).join(', ') + (k < sig.length ? ' +' + (sig.length - k) : ''), FE, MAX), full };
   };
   // ---- Disposición ----
-  const by = new Map(data.nodes.map(n => [n.id, { ...n, hijos: [] }]));
+  // h = horizontal (norma) · c = compacta (apila hojas) · k = cascada por columnas (2 niveles en horizontal y el resto en cascada)
+  const MODO = data.disp === 'c' ? 'c' : data.disp === 'k' ? 'k' : 'h', HC = 54, IND = 22, GK = 8;
+  const by = new Map(data.nodes.map(n => [n.id, { ...n, hijos: [], h: H }]));
   for (const n of by.values()) { const p = by.get(n.padre); if (p) p.hijos.push(n); }
   const ord = (a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, 'es');
-  for (const n of by.values()) { n.hijos.sort(ord); n.apila = n.hijos.length >= APILAR && n.hijos.every(h => !h.hijos.length); }
+  for (const n of by.values()) { n.hijos.sort(ord); n.apila = MODO === 'c' && n.hijos.length >= APILAR && n.hijos.every(h => !h.hijos.length); }
   const raices = [...by.values()].filter(n => !by.has(n.padre)).sort(ord);
-  const ancho = n => n._w != null ? n._w : (n._w = !n.hijos.length ? W : n.apila ? W + 30 : Math.max(W, n.hijos.reduce((s, h) => s + ancho(h), 0) + GX * (n.hijos.length - 1)));
   let altoMax = 0;
+  // Cascada: el subárbol baja con sangría; cajas bajas (nombre y empresa)
+  const prof = (n, d) => n.hijos.reduce((m, h) => Math.max(m, prof(h, d + 1)), d);
+  const cascada = (n, x, y) => { n.hijos.forEach(h => { h.mini = true; h.h = HC; h.x = x + IND; h.y = y; altoMax = Math.max(altoMax, y + HC); y = cascada(h, x + IND, y + HC + GK); }); return y; };
+  const ancho = n => {
+    if (n._w != null) return n._w;
+    if (n.columna) return (n._w = W + IND * prof(n, 0));
+    if (!n.hijos.length) return (n._w = W);
+    if (n.apila) return (n._w = W + 30);
+    return (n._w = Math.max(W, n.hijos.reduce((s, h) => s + ancho(h), 0) + GX * (n.hijos.length - 1)));
+  };
+  if (MODO === 'k') raices.forEach(r => r.hijos.forEach(c => { c.columna = true; }));
   const ubica = (n, izq, arriba) => {
-    const w = ancho(n); n.y = arriba; altoMax = Math.max(altoMax, arriba + H);
+    const w = ancho(n); n.y = arriba; altoMax = Math.max(altoMax, arriba + n.h);
+    if (n.columna) { n.x = izq; cascada(n, izq, arriba + H + 14); return; }
     if (n.apila) { n.x = izq; let y = arriba + H + 18; n.hijos.forEach(h => { h.x = izq + 30; h.y = y; altoMax = Math.max(altoMax, y + H); y += H + 14; }); return; }
     n.x = izq + (w - W) / 2; if (!n.hijos.length) return;
     const tot = n.hijos.reduce((s, h) => s + ancho(h), 0) + GX * (n.hijos.length - 1); let x = izq + (w - tot) / 2;
@@ -49,23 +61,34 @@
   const defs = el('defs', {}, svg), mk = el('marker', { id: 'dg-fl', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
   el('path', { d: 'M0 0L10 5L0 10z', fill: C.wa }, mk);
   const gL = el('g', {}, svg), gF = el('g', { id: 'dg-fun' }, svg), gN = el('g', {}, svg);
+  const linea = (d, salta) => { const p = el('path', { d, fill: 'none', stroke: C.ln, 'stroke-width': 1.4 }, gL); if (salta) p.setAttribute('stroke-dasharray', '2 3'); };
   for (const n of by.values()) {
     if (!n.hijos.length) continue;
-    const linea = d => el('path', { d, fill: 'none', stroke: C.ln, 'stroke-width': 1.4 }, gL);
-    if (n.apila) { const sx = n.x + 15, ult = n.hijos[n.hijos.length - 1]; linea(`M${sx} ${n.y + H}V${ult.y + H / 2}`); n.hijos.forEach(h => { const p = linea(`M${sx} ${h.y + H / 2}H${h.x}`); if (h.salta) p.setAttribute('stroke-dasharray', '2 3'); }); continue; }
-    const px = n.x + W / 2, py = n.y + H, my = py + GY / 2;
-    n.hijos.forEach(h => { const p = linea(`M${px} ${py}V${my}H${h.x + W / 2}V${h.y}`); if (h.salta) p.setAttribute('stroke-dasharray', '2 3'); });
+    if (n.columna || n.mini || n.apila) {   // espina vertical a la izquierda y ramas horizontales
+      const sx = n.x + (n.apila ? 15 : 11), ult = n.hijos[n.hijos.length - 1];
+      linea(`M${sx} ${n.y + n.h}V${ult.y + ult.h / 2}`); n.hijos.forEach(h => linea(`M${sx} ${h.y + h.h / 2}H${h.x}`, h.salta)); continue;
+    }
+    const px = n.x + W / 2, py = n.y + n.h, my = py + GY / 2;
+    n.hijos.forEach(h => linea(`M${px} ${py}V${my}H${h.x + W / 2}V${h.y}`, h.salta));
   }
   for (const l of data.links) {
     const a = by.get(l.de), b = by.get(l.a); if (!a || !b) continue;
-    const der = b.x + W / 2 >= a.x + W / 2, x1 = der ? a.x + W : a.x, x2 = der ? b.x : b.x + W, y1 = a.y + H / 2, y2 = b.y + H / 2, dx = Math.max(50, Math.abs(x2 - x1) / 2) * (der ? 1 : -1);
+    const der = b.x + W / 2 >= a.x + W / 2, x1 = der ? a.x + W : a.x, x2 = der ? b.x : b.x + W, y1 = a.y + a.h / 2, y2 = b.y + b.h / 2, dx = Math.max(50, Math.abs(x2 - x1) / 2) * (der ? 1 : -1);
     el('path', { d: `M${x1} ${y1}C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`, fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
   }
   for (const n of by.values()) {
     const e = empresa(n), g = el('g', { transform: `translate(${n.x},${n.y})`, 'data-id': n.id, class: 'dg-n', opacity: n.ctx ? 0.45 : 1 }, gN);
-    el('title', {}, g).textContent = [n.externa ? '(Depende funcionalmente de esta vista; su superior jerárquico está fuera)' : '', n.nombre, n.tipo + ' · ' + n.codigo, e.full, n.aprueba ? 'Aprueba: ' + (n.aprobadores.join(', ') || 'sin director asignado') : '',
-      n.funcionalFuera.length ? 'Dependencia funcional: ' + n.funcionalFuera.join(', ') : ''].filter(Boolean).join('\n');
-    el('rect', Object.assign({ width: W, height: H, rx: 9, fill: C.bg, stroke: n.aprueba ? (n.aprobadores.length ? C.ok : C.wa) : C.bd, 'stroke-width': n.aprueba ? 1.8 : 1 }, n.externa ? { 'stroke-dasharray': '5 4', stroke: C.wa } : {}), g);
+    el('title', {}, g).textContent = [n.externa ? '(Depende funcionalmente de esta vista; su superior jerárquico está fuera)' : '', n.nombre, n.tipo + ' · ' + n.codigo, e.full,
+      n.aprueba ? 'Aprueba: ' + (n.aprobadores.join(', ') || 'sin director asignado') : '', n.funcionalFuera.length ? 'Dependencia funcional: ' + n.funcionalFuera.join(', ') : ''].filter(Boolean).join('\n');
+    el('rect', Object.assign({ width: W, height: n.h, rx: n.mini ? 7 : 9, fill: C.bg, stroke: n.aprueba ? (n.aprobadores.length ? C.ok : C.wa) : C.bd, 'stroke-width': n.aprueba ? 1.8 : 1 },
+      n.externa ? { 'stroke-dasharray': '5 4', stroke: C.wa } : {}), g);
+    if (n.mini) {   // caja de cascada: franja lateral de color, nombre (2 líneas) y empresa
+      el('rect', { x: 1, y: 1, width: 4, height: n.h - 2, rx: 2, fill: banda(n.nivel) }, g);
+      const FM = '600 12px ' + FF; envuelve(n.nombre, FM, MAX, 2).forEach((l, i) => txt(g, 12, 18 + i * 14, l, FM, C.tx));
+      txt(g, 12, n.h - 8, e.t, '11px ' + FF, C.mu);
+      if (n.aprueba) txt(g, W - 10, 18, '✓', '700 12px ' + FF, n.aprobadores.length ? C.ok : C.wa, { 'text-anchor': 'end' });
+      continue;
+    }
     el('rect', { x: 1, y: 1, width: W - 2, height: 5, rx: 3, fill: banda(n.nivel) }, g);
     txt(g, 12, 22, corta(n.tipo, FT, n.aprueba ? 86 : MAX), FT, C.mu);
     if (n.aprueba) txt(g, W - 12, 22, corta('✓ ' + (n.aprobadores[0] || 'sin director'), FT, 110), '600 ' + FT, n.aprobadores.length ? C.ok : C.wa, { 'text-anchor': 'end' });
@@ -106,8 +129,12 @@
     document.addEventListener('fullscreenchange', cambio); document.addEventListener('webkitfullscreenchange', cambio);
   } else if (fs) fs.hidden = true;
   // ---- Imprimir / PDF y exportar imagen ----
+  // La hoja se orienta según la forma del diagrama: ancho → horizontal; alto (cascada larga) → vertical
+  const hoja = document.createElement('style'); document.head.appendChild(hoja);
+  const orienta = () => { hoja.textContent = '@page{size:' + (base.w >= base.h ? 'landscape' : 'portrait') + ';margin:10mm}' + (base.w < base.h ? '@media print{.dg{height:215mm!important}}' : ''); };
+  orienta();
   const pr = document.getElementById('dg-print'); if (pr) pr.addEventListener('click', () => { ajustar(); window.print(); });
-  window.addEventListener('beforeprint', ajustar);
+  window.addEventListener('beforeprint', () => { orienta(); ajustar(); });
   const png = document.getElementById('dg-png');
   if (png) png.addEventListener('click', () => {
     const titulo = (document.querySelector('.dg-h h1') || {}).textContent || 'Estructura organizativa', sub = ((document.querySelector('.dg-h .sub') || {}).textContent || '').trim();
