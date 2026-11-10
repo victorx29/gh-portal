@@ -82,7 +82,7 @@ async function detalle(id) {
 }
 // Datos para el diagrama visual. Filtros: raíz (esa unidad hacia abajo), empresas (una o varias) y división (suma sus empresas).
 // Las unidades que coinciden se muestran completas; sus superiores aparecen atenuados como contexto, hasta la raíz elegida.
-async function diagrama({ fecha, raiz, empresas, division } = {}) {
+async function diagrama({ fecha, raiz, empresas, division, tipos } = {}) {
   const g = await grafo(fechaValida(fecha) ? fecha : null), by = g.by;
   const sel = new Set([].concat(empresas || []).map(Number).filter(Boolean));
   if (division) (await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+division])).rows.forEach(r => sel.add(r.id));
@@ -94,12 +94,16 @@ async function diagrama({ fecha, raiz, empresas, division } = {}) {
   // Con una raíz elegida, también entran las unidades de fuera que dependen FUNCIONALMENTE de ella (líneas punteadas hacia la vista)
   const externas = new Set();
   if (raiz && by.has(+raiz)) for (const u of by.values()) if (!vis.has(u.id) && u.activa && u.funcional.some(f => vis.has(f.padre_id)) && (!filtraEmp || empresasDe(u).some(e => sel.has(e)))) { vis.add(u.id); externas.add(u.id); }
+  // Tipos a mostrar: los ocultos se quitan y sus dependientes se conectan al superior visible más cercano
+  const tiposSel = new Set([].concat(tipos || []).map(Number).filter(Boolean));
+  if (tiposSel.size) for (const id of [...vis]) if (!tiposSel.has(by.get(id).tipo_id)) vis.delete(id);
+  const superiorVisible = u => { let p = by.get(u.padre_id), n = 0; while (p && n++ < 60) { if (vis.has(p.id)) return p.id; p = by.get(p.padre_id); } return null; };
   const emp = new Map((await q('select id, siglas, coalesce(razon_social,nombre) razon from empresa')).rows.map(e => [e.id, e]));
   const ref = e => { const x = emp.get(e.id) || {}; return { s: x.siglas || '', r: x.razon || e.nombre || '' }; };
   const usadas = new Map();
   const nodes = [...vis].map(id => {
     const u = by.get(id), efs = (u.efectivas || []).map(ref); efs.forEach(e => usadas.set(e.s || e.r, e.r));
-    return { id, padre: vis.has(u.padre_id) ? u.padre_id : null, nombre: u.nombre, tipo: u.tipo, nivel: u.nivel, codigo: u.codigo, aprueba: u.aprueba,
+    return { id, padre: superiorVisible(u), salta: !!u.padre_id && !vis.has(u.padre_id) && !!superiorVisible(u), nombre: u.nombre, tipo: u.tipo, nivel: u.nivel, codigo: u.codigo, aprueba: u.aprueba,
       aprobadores: u.aprobadores.map(d => d.nombre), ctx: !match.has(id) && !externas.has(id), externa: externas.has(id), propia: !!u.empresa_id, hereda: !!u.hereda, comparte: u.sirve.length > 0, empresas: efs,
       funcionalFuera: u.funcional.filter(f => !vis.has(f.padre_id)).map(f => f.nombre) };
   });

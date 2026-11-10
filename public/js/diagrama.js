@@ -2,7 +2,8 @@
 (() => {
   const dataEl = document.getElementById('dg-data'); if (!dataEl) return;
   const data = JSON.parse(dataEl.textContent), svg = document.getElementById('dg-svg'), cont = document.getElementById('dg'), NS = 'http://www.w3.org/2000/svg';
-  const W = 214, H = 88, GX = 22, GY = 54, PAD = 36, APILAR = 4, FF = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
+  const W = 214, H = 88, GX = 22, GY = 54, PAD = 36, APILAR = data.disp === 'c' ? 4 : Infinity,   // horizontal (norma) por defecto
+    FF = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
   // Colores fijos de «papel»: el diagrama se ve, imprime y exporta igual en tema claro u oscuro
   const C = { bg: '#ffffff', bd: '#c9d3e0', tx: '#111827', mu: '#5b6573', ok: '#0f7a5c', wa: '#b36b00', ln: '#7b8794' };
   const banda = n => n <= 10 ? '#0d2a5c' : n <= 25 ? '#1d5fd1' : n <= 40 ? '#3b82f6' : n <= 60 ? '#6366f1' : '#94a3b8';
@@ -51,9 +52,9 @@
   for (const n of by.values()) {
     if (!n.hijos.length) continue;
     const linea = d => el('path', { d, fill: 'none', stroke: C.ln, 'stroke-width': 1.4 }, gL);
-    if (n.apila) { const sx = n.x + 15, ult = n.hijos[n.hijos.length - 1]; linea(`M${sx} ${n.y + H}V${ult.y + H / 2}`); n.hijos.forEach(h => linea(`M${sx} ${h.y + H / 2}H${h.x}`)); continue; }
+    if (n.apila) { const sx = n.x + 15, ult = n.hijos[n.hijos.length - 1]; linea(`M${sx} ${n.y + H}V${ult.y + H / 2}`); n.hijos.forEach(h => { const p = linea(`M${sx} ${h.y + H / 2}H${h.x}`); if (h.salta) p.setAttribute('stroke-dasharray', '2 3'); }); continue; }
     const px = n.x + W / 2, py = n.y + H, my = py + GY / 2;
-    n.hijos.forEach(h => linea(`M${px} ${py}V${my}H${h.x + W / 2}V${h.y}`));
+    n.hijos.forEach(h => { const p = linea(`M${px} ${py}V${my}H${h.x + W / 2}V${h.y}`); if (h.salta) p.setAttribute('stroke-dasharray', '2 3'); });
   }
   for (const l of data.links) {
     const a = by.get(l.de), b = by.get(l.a); if (!a || !b) continue;
@@ -96,6 +97,14 @@
     if (m) { e.preventDefault(); vb.x += m[0]; vb.y += m[1]; aplica(); } else if (e.key === '+' || e.key === '=') zoom(1.2); else if (e.key === '-') zoom(0.83); else if (e.key === '0') ajustar();
   });
   const dot = document.getElementById('dg-dot'); const verDot = () => { gF.style.display = dot && !dot.checked ? 'none' : ''; }; if (dot) { dot.addEventListener('change', verDot); verDot(); }
+  // ---- Pantalla completa (con el respaldo webkit de Safari) ----
+  const wrap = document.getElementById('dg-wrap'), fs = document.getElementById('dg-fs');
+  const enFs = () => document.fullscreenElement || document.webkitFullscreenElement;
+  if (fs && wrap && (wrap.requestFullscreen || wrap.webkitRequestFullscreen)) {
+    fs.addEventListener('click', () => { if (enFs()) (document.exitFullscreen || document.webkitExitFullscreen).call(document); else (wrap.requestFullscreen || wrap.webkitRequestFullscreen).call(wrap); });
+    const cambio = () => { const on = !!enFs(); fs.textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; fs.setAttribute('aria-pressed', on); ajustar(); cont.focus(); };
+    document.addEventListener('fullscreenchange', cambio); document.addEventListener('webkitfullscreenchange', cambio);
+  } else if (fs) fs.hidden = true;
   // ---- Imprimir / PDF y exportar imagen ----
   const pr = document.getElementById('dg-print'); if (pr) pr.addEventListener('click', () => { ajustar(); window.print(); });
   window.addEventListener('beforeprint', ajustar);

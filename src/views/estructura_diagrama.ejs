@@ -1,7 +1,8 @@
 <%- include('partials/head') %>
 <% const fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
    const emSel = empresas.filter(e => f.empresas.includes(e.id)), raiz = opciones.find(o => String(o.id) === String(f.raiz)), div = divisiones.find(d => String(d.id) === String(f.division));
-   const alcance = [raiz && 'Desde ' + raiz.nombre, div && 'División ' + div.nombre, emSel.length && emSel.map(e => e.siglas || e.mostrar).join(' + ')].filter(Boolean).join(' · ') || 'Vista general'; %>
+   const tpSel = tipos.filter(t => f.tipos.includes(t.id));
+   const alcance = [raiz && 'Desde ' + raiz.nombre, div && 'División ' + div.nombre, emSel.length && emSel.map(e => e.siglas || e.mostrar).join(' + '), tpSel.length && tpSel.length < tipos.length && 'Solo ' + tpSel.map(t => t.nombre).join(', ')].filter(Boolean).join(' · ') || 'Vista general'; %>
 <div class="top noprint"><div><%- include('partials/crumb', { aqui: 'Diagrama de estructura' }) %></div>
 <div class="row"><a class="btn" href="/config/estructura"><%- ic('estructura') %>Volver al árbol</a><button class="btn" type="button" id="dg-png"><%- ic('bajar') %>Imagen</button><button class="btn p" type="button" id="dg-print">Imprimir o PDF</button></div></div>
 <div class="noprint"><%- include('partials/config_nav') %></div>
@@ -9,20 +10,24 @@
   <div><label for="dr">Desde la unidad</label><select id="dr" name="raiz" data-buscar><option value="">Toda la estructura</option><% opciones.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= String(o.id) === String(f.raiz) ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select></div>
   <div><label for="dd">División</label><select id="dd" name="division"><option value="">Todas</option><% divisiones.forEach(d => { %><option value="<%= d.id %>"<%= String(d.id) === String(f.division) ? ' selected' : '' %>><%= d.nombre %></option><% }) %></select></div>
   <div><label for="df">Estructura al</label><input id="df" name="fecha" type="date" value="<%= f.fecha || dg.fecha %>"></div>
-  <div class="end"><button class="btn">Aplicar</button><% if (f.raiz || f.division || f.empresas.length || f.fecha) { %> <a class="btn" href="/config/estructura/diagrama">Limpiar</a><% } %></div>
+  <div><label for="dx">Disposición</label><select id="dx" name="disp"><option value="h"<%= f.disp === 'h' ? ' selected' : '' %>>Horizontal (norma)</option><option value="c"<%= f.disp === 'c' ? ' selected' : '' %>>Compacta (apilada)</option></select></div>
+  <div class="end"><button class="btn">Aplicar</button><% if (f.raiz || f.division || f.empresas.length || f.fecha || f.tipos.length || f.disp === 'c') { %> <a class="btn" href="/config/estructura/diagrama">Limpiar</a><% } %></div>
   <details class="dg-emp"><summary>Empresas<%= emSel.length ? ': ' + emSel.map(e => e.siglas || e.mostrar).join(', ') : ' (todas)' %></summary>
   <div class="eq"><% empresas.filter(e => e.activa).forEach(e => { %><label class="chk"><input type="checkbox" name="empresas" value="<%= e.id %>"<%= f.empresas.includes(e.id) ? ' checked' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></label><% }) %></div>
   <p class="sub">Marca varias para verlas juntas (por ejemplo CIM y MDV): los servicios compartidos aparecen una sola vez.</p></details>
+  <details class="dg-emp"><summary>Tipos a mostrar<%= tpSel.length && tpSel.length < tipos.length ? ': ' + tpSel.map(t => t.nombre).join(', ') : ' (todos)' %></summary>
+  <div class="eq"><% tipos.forEach(t => { %><label class="chk"><input type="checkbox" name="tipos" value="<%= t.id %>"<%= !f.tipos.length || f.tipos.includes(t.id) ? ' checked' : '' %>><%= t.nombre %></label><% }) %></div>
+  <p class="sub">Desmarca, por ejemplo, Jefatura y Coordinación para presentar solo direcciones y gerencias. Lo que dependa de un tipo oculto se conecta a su superior visible con línea discontinua corta.</p></details>
 </form>
 <header class="dg-h"><h1>Estructura organizativa</h1><p class="sub">Vigente al <b><%= fd(dg.fecha) %></b> · <%= alcance %> · <%= dg.nodes.filter(n => !n.ctx).length %> unidades</p></header>
 <% if (!dg.nodes.length) { %><div class="empty">Ninguna unidad coincide con estos filtros.</div><% } else { %>
-<div class="dg-bar noprint"><button class="btn" type="button" data-z="1.2" aria-label="Acercar">+</button><button class="btn" type="button" data-z="0.83" aria-label="Alejar">−</button><button class="btn" type="button" data-z="fit">Ajustar</button>
+<div id="dg-wrap"><div class="dg-bar noprint"><button class="btn" type="button" id="dg-fs" aria-pressed="false">Pantalla completa</button><button class="btn" type="button" data-z="1.2" aria-label="Acercar">+</button><button class="btn" type="button" data-z="0.83" aria-label="Alejar">−</button><button class="btn" type="button" data-z="fit">Ajustar</button>
 <label class="chk"><input type="checkbox" id="dg-dot"<%= f.punteadas ? ' checked' : '' %>>Líneas punteadas (funcionales)</label><span class="mu">Arrastra para moverte · rueda o botones para el zoom<%= dg.esHoy ? ' · clic en una caja para abrir la unidad' : '' %></span></div>
-<div class="dg" id="dg" tabindex="0" aria-label="Diagrama de la estructura organizativa"><svg id="dg-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de unidades"></svg></div>
+<div class="dg" id="dg" tabindex="0" aria-label="Diagrama de la estructura organizativa"><svg id="dg-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de unidades"></svg></div></div>
 <div class="dg-ley"><span><svg width="34" height="10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="#5b6573" stroke-width="1.6"/></svg> Dependencia jerárquica</span>
 <span><svg width="34" height="10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="#b36b00" stroke-width="1.6" stroke-dasharray="5 4"/></svg> Dependencia funcional</span>
-<span><b style="color:#0f7a5c">✓</b> Aprueba requisiciones</span><span class="mu">Atenuadas: superiores mostrados como contexto</span>
+<span><b style="color:#0f7a5c">✓</b> Aprueba requisiciones</span><% if (f.tipos.length) { %><span><svg width="34" height="10" aria-hidden="true"><line x1="0" y1="5" x2="34" y2="5" stroke="#7b8794" stroke-width="1.4" stroke-dasharray="2 3"/></svg> Hay niveles ocultos entre ambas cajas</span><% } %><span class="mu">Atenuadas: superiores mostrados como contexto</span>
 <% if (dg.leyenda.length) { %><span class="dg-sig"><%= dg.leyenda.map(l => l.s + ': ' + l.r).join(' · ') %></span><% } %></div>
-<script type="application/json" id="dg-data"><%- JSON.stringify({ nodes: dg.nodes, links: dg.links, esHoy: dg.esHoy, fecha: dg.fecha }).replace(/</g, '\\u003c') %></script>
+<script type="application/json" id="dg-data"><%- JSON.stringify({ nodes: dg.nodes, links: dg.links, esHoy: dg.esHoy, fecha: dg.fecha, disp: f.disp }).replace(/</g, '\\u003c') %></script>
 <script src="/js/diagrama.js" defer></script><% } %>
 <%- include('partials/foot') %>
