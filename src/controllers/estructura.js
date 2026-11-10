@@ -1,16 +1,9 @@
-const r = require('express').Router(), multer = require('multer'), path = require('path'), ES = require('../services/estructura'), IM = require('../services/importar'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash, modal } = require('../util');
+const r = require('express').Router(), ES = require('../services/estructura'), PL = require('../services/plantilla'), IM = require('../services/importar'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS } = require('../util');
 const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
 const sup = (req, res, next) => P.esSuper(req.user) ? next() : next(E(403, 'Solo el superadmin'));
-const subida = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 },
-  fileFilter: (req, f, cb) => path.extname(f.originalname).toLowerCase() === '.xlsx' ? cb(null, true) : cb(E(400, 'Sube la plantilla en formato .xlsx')) });
 const ESTADOS = ['Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes', 'Delta Amacuro', 'Distrito Capital', 'Falcón', 'Guárico', 'La Guaira', 'Lara', 'Mérida', 'Miranda',
   'Monagas', 'Nueva Esparta', 'Portuguesa', 'Sucre', 'Táchira', 'Trujillo', 'Yaracuy', 'Zulia'];
 // Ejecuta la acción, deja el mensaje y vuelve a donde corresponde (errores de negocio = aviso, no página de error)
-const hacer = (fn, ok, volver) => w(async (req, res) => {
-  let dest = typeof volver === 'function' ? volver(req) : volver;
-  try { const x = await fn(req); if (typeof x === 'string') dest = x; flash(req, 'ok', ok); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
-  res.redirect(dest);
-});
 const aUnidad = id => '/config/estructura?modal=' + encodeURIComponent('/config/estructura/' + id);
 
 // ---- Inicio de Configuración ----
@@ -19,16 +12,20 @@ r.get('/config', gh, (req, res) => res.render('config_inicio', { title: 'Configu
 // ---- Estructura organizativa (GH) ----
 r.get('/config/estructura', gh, w(async (req, res) => {
   const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', empresa: req.query.empresa || '', grupo: req.query.grupo || '', buscar: req.query.buscar || '', division: req.query.division || '' };
-  const [a, empresas, grupos, divisiones, pendientes] = await Promise.all([ES.arbol(f), ES.empresas(), ES.grupos(), ES.divisiones(),
+  const [a, empresas, grupos, divisiones, hc, pendientes] = await Promise.all([ES.arbol(f), ES.empresas(), ES.grupos(), ES.divisiones(), PL.resumenUnidades(f.fecha, f.empresa ? [f.empresa] : null),
     q("select count(*)::int n from requisicion where estado='pend_director' and unidad_id is not null and unidad_aprobadora(unidad_id) is not null and unidad_aprobadora(unidad_id) not in (select ur.unidad_id from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id is not null and us.activo)").then(x => x.rows[0].n)]);
-  res.render('estructura', { title: 'Estructura organizativa', nav: 'config', sub: 'estructura', a, f, empresas, grupos, divisiones, pendientes });
+  res.render('estructura', { title: 'Estructura organizativa', nav: 'config', sub: 'estructura', a, f, empresas, grupos, divisiones, hc, pendientes });
 }));
 const datosModal = async () => ({ tipos: await ES.tipos(), grupos: await ES.grupos(), empresas: await ES.empresas(), opciones: await ES.opciones() });
 r.get('/config/estructura/diagrama', gh, w(async (req, res) => {
   const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', raiz: req.query.raiz || '', division: req.query.division || '',
     empresas: [].concat(req.query.empresas || []).map(Number).filter(Boolean), punteadas: req.query.punteadas !== '0',
-    tipos: [].concat(req.query.tipos || []).map(Number).filter(Boolean), disp: ['c', 'k'].includes(req.query.disp) ? req.query.disp : 'h' };
-  const [dg, empresas, divisiones, opciones, tipos] = await Promise.all([ES.diagrama(f), ES.empresas(), ES.divisiones(), ES.opciones(), ES.tipos()]);
+    tipos: [].concat(req.query.tipos || []).map(Number).filter(Boolean), disp: ['c', 'k'].includes(req.query.disp) ? req.query.disp : 'h', ver: req.query.ver === 'puestos' ? 'puestos' : 'unidades' };
+  // El HC respeta el filtro de empresas (y las empresas de la división elegida): se cuenta por la empresa de cada plaza
+  const empHC = f.empresas.concat(f.division ? (await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+f.division])).rows.map(x => x.id) : []);
+  const extra = f.ver === 'unidades' ? await PL.unidadesConPlazas(empHC, f.fecha) : null;
+  const [dg, empresas, divisiones, opciones, tipos] = await Promise.all([f.ver === 'puestos' ? PL.diagramaPuestos(f) : ES.diagrama({ ...f, extra }), ES.empresas(), ES.divisiones(), ES.opciones(), ES.tipos()]);
+  if (f.ver === 'unidades') { const hc = await PL.resumenUnidades(f.fecha, empHC); dg.nodes.forEach(n => { const k = hc.get(n.id); if (k && k.txt) n.hcTxt = k.txt; }); }
   res.render('estructura_diagrama', { title: 'Diagrama de estructura', nav: 'config', sub: 'estructura', dg, f, empresas, divisiones, opciones, tipos });
 }));
 r.get('/config/estructura/nueva', gh, w(async (req, res) => modal(req, res, 'unidad_form', { title: 'Nueva unidad', nav: 'config', sub: 'estructura', v: { padre_id: +req.query.padre || null }, ...await datosModal() })));
@@ -38,9 +35,7 @@ r.get('/config/estructura/plantilla.xlsx', gh, w(async (req, res) => {
   res.set('Content-Disposition', 'attachment; filename="estructura-gh-' + await ES.hoy() + '.xlsx"'); res.send(Buffer.from(await IM.plantilla()));
 }));
 r.get('/config/estructura/importar', gh, (req, res) => res.render('importar', { title: 'Carga masiva', nav: 'config', sub: 'estructura', res: null }));
-r.post('/config/estructura/importar', gh, (req, res, next) => subida.single('archivo')(req, res, e => {
-  if (e) { flash(req, 'err', e.code === 'LIMIT_FILE_SIZE' ? 'El archivo supera 5 MB' : e.message); return res.redirect('/config/estructura/importar'); } next();
-}), w(async (req, res) => {
+r.post('/config/estructura/importar', gh, subidaXlsx('/config/estructura/importar'), w(async (req, res) => {
   try {
     if (!req.file) throw E(400, 'Selecciona el archivo');
     const data = await IM.leer(req.file.buffer), out = await IM.analizar(data);
@@ -49,10 +44,10 @@ r.post('/config/estructura/importar', gh, (req, res, next) => subida.single('arc
   } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect('/config/estructura/importar'); }
 }));
 r.post('/config/estructura/importar/aplicar', gh, hacer(async req => {
-  const c = req.session.carga; if (!c || Date.now() - c.en > 30 * 60e3) throw E(400, 'La vista previa expiró. Sube el archivo de nuevo');
+  const c = req.session.carga; if (!c || Date.now() - c.en > VISTA_PREVIA_MS) throw E(400, 'La vista previa expiró. Sube el archivo de nuevo');
   delete req.session.carga; await IM.aplicar(c.data, req.user);
 }, 'Carga aplicada. Los cambios de dependencia quedaron con fecha de hoy', '/config/estructura'));
-r.get('/config/estructura/:id', gh, w(async (req, res) => modal(req, res, 'unidad_detalle', { title: 'Unidad', nav: 'config', sub: 'estructura', d: await ES.detalle(+req.params.id), ...await datosModal() })));
+r.get('/config/estructura/:id', gh, w(async (req, res) => modal(req, res, 'unidad_detalle', { title: 'Unidad', nav: 'config', sub: 'estructura', d: await ES.detalle(+req.params.id), hc: (await PL.resumenUnidades()).get(+req.params.id) || null, ...await datosModal() })));
 r.post('/config/estructura/:id/editar', gh, hacer(req => ES.editar(req.user, +req.params.id, req.body), 'Unidad actualizada', req => aUnidad(req.params.id)));
 r.post('/config/estructura/:id/activa', gh, hacer(req => ES.activar(req.user, +req.params.id), 'Estado actualizado', req => aUnidad(req.params.id)));
 r.post('/config/estructura/:id/dependencia', gh, hacer(async req => {

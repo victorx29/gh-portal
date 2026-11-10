@@ -82,13 +82,14 @@ async function detalle(id) {
 }
 // Datos para el diagrama visual. Filtros: raíz (esa unidad hacia abajo), empresas (una o varias) y división (suma sus empresas).
 // Las unidades que coinciden se muestran completas; sus superiores aparecen atenuados como contexto, hasta la raíz elegida.
-async function diagrama({ fecha, raiz, empresas, division, tipos } = {}) {
+async function diagrama({ fecha, raiz, empresas, division, tipos, extra } = {}) {
+  // extra = unidades que entran aunque no atiendan a la empresa filtrada (tienen plazas de nómina de esa empresa)
   const g = await grafo(fechaValida(fecha) ? fecha : null), by = g.by;
   const sel = new Set([].concat(empresas || []).map(Number).filter(Boolean));
   if (division) (await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+division])).rows.forEach(r => sel.add(r.id));
   const filtraEmp = sel.size > 0 || !!division;
   const base = raiz && by.has(+raiz) ? descendientes(by, +raiz) : new Set(by.keys());
-  const match = new Set([...base].filter(id => { const u = by.get(id); return u.activa && (!filtraEmp || empresasDe(u).some(e => sel.has(e))); }));
+  const match = new Set([...base].filter(id => { const u = by.get(id); return u.activa && (!filtraEmp || empresasDe(u).some(e => sel.has(e)) || (extra && extra.has(id))); }));
   const vis = new Set(match);
   for (const id of match) { let p = by.get(by.get(id).padre_id), n = 0; while (p && n++ < 60 && base.has(p.id) && p.activa) { vis.add(p.id); p = by.get(p.padre_id); } }
   // Con una raíz elegida, también entran las unidades de fuera que dependen FUNCIONALMENTE de ella (líneas punteadas hacia la vista)

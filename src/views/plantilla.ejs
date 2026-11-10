@@ -1,0 +1,28 @@
+<%- include('partials/head') %>
+<% const t = L.tot, fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—'; %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Plantilla de puestos' }) %><h1>Plantilla de puestos</h1>
+<p class="sub">Cada puesto es un perfil dentro de una unidad, con sus plazas autorizadas. La empresa de cada plaza es la que paga la nómina, aunque la unidad sea corporativa.</p></div>
+<div class="row"><a class="btn" href="/config/plantilla/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/config/plantilla/carga"><%- ic('subir') %>Carga masiva</a><% if (esHoy) { %><a class="btn p" href="/config/plantilla/puesto/nuevo<%= f.unidad ? '?unidad=' + f.unidad : '' %>" data-modal><%- ic('mas') %>Nuevo puesto</a><% } %></div></div>
+<%- include('partials/config_nav') %>
+<form method="get" action="/config/plantilla" class="filtros pl-f">
+  <div><label for="pb">Buscar</label><input id="pb" name="buscar" value="<%= f.buscar %>" placeholder="Cargo, perfil o unidad"></div>
+  <div><label for="pu">Unidad (y sus dependientes)</label><select id="pu" name="unidad" data-buscar><option value="">Todas</option><% unidades.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= String(o.id) === String(f.unidad) ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select></div>
+  <div><label for="pe">Empresa de nómina</label><select id="pe" name="empresa"><option value="">Todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(f.empresa) ? ' selected' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></option><% }) %></select></div>
+  <div><label for="pm">Modalidad</label><select id="pm" name="modalidad"><option value="">Todas</option><% Object.entries(MODALIDADES).forEach(([v, x]) => { %><option value="<%= v %>"<%= v === f.modalidad ? ' selected' : '' %>><%= x %></option><% }) %></select></div>
+  <div><label for="pf">Plantilla al</label><input id="pf" name="fecha" type="date" value="<%= f.fecha || L.f %>"></div>
+  <div class="end"><button class="btn">Aplicar</button><% if (f.buscar || f.unidad || f.empresa || f.modalidad || f.fecha) { %> <a class="btn" href="/config/plantilla">Limpiar</a><% } %></div>
+</form>
+<% if (!esHoy) { %><div class="flash" role="status"><%- ic('reloj') %> Plantilla al <b><%= fd(L.f) %></b>: las plazas que empiezan después de esa fecha se ven como proyectadas. Solo lectura.</div><% } %>
+<div class="kpi"><div><small>HC de nómina</small><strong><%= t.hc %></strong></div><div><small>Congeladas</small><strong><%= t.cong %></strong></div><div><small>Proyectadas</small><strong><%= t.proy %></strong></div>
+<div><small>Outsourcing</small><strong><%= t.ext.outsourcing %></strong></div><div><small>Pasantes · becarios · aprendices</small><strong><%= t.ext.pasante %> · <%= t.ext.becario %> · <%= t.ext.aprendiz %></strong></div><div><small>Puestos</small><strong><%= L.rows.length %></strong></div></div>
+<p class="sub">Ocupadas y vacantes aparecerán cuando se carguen los empleados (0.8).</p>
+<% if (!L.rows.length) { %><div class="empty">No hay puestos con este filtro. Crea uno con «Nuevo puesto» o carga la plantilla con el Excel.</div><% } else { %>
+<div class="tw"><table class="mid"><tr><th>Unidad</th><th>Puesto</th><th>Reporta a</th><th title="Nómina propia vigente">HC</th><th>Congel.</th><th>Proyect.</th><th>Externas</th><th>Por empresa</th><th></th></tr>
+<% let ult = null; L.rows.forEach(p => { const nueva = p.unidad_id !== ult; ult = p.unidad_id; %><tr<%- nueva ? ' class="pl-u"' : '' %>>
+<td><% if (nueva) { %><span style="padding-left:<%= p.ord[1] * 14 %>px"><b><%= p.unidad %></b><br><small class="mu" style="padding-left:<%= p.ord[1] * 14 %>px"><%= p.unidad_codigo %></small></span><% } %></td>
+<td><% if (p.jefe) { %><span class="chip" title="Puesto jefe de la unidad">★ Jefe</span> <% } %><b><%= p.perfil %></b><br><small class="mu"><%= p.perfil_codigo %><%= p.perfil_nivel ? ' · Nivel ' + p.perfil_nivel : '' %></small></td>
+<td><% if (p.reporta) { %><%= p.reporta.perfil %><br><small class="mu"><%= p.reporta.unidad %><%= p.regla === 'excepcion' ? ' · excepción' : '' %></small><% } else { %><span class="mu">—</span><% } %></td>
+<td><b><%= p.k.hc %></b></td><td><%= p.k.cong || '—' %></td><td><%= p.k.proy || '—' %></td><td><%= p.k.externas || '—' %></td>
+<td><small><%= Object.entries(p.k.porEmp).map(([s, n]) => s + ' ' + n).join(' · ') || '—' %></small></td>
+<td class="acts"><a class="btn" href="/config/plantilla/puesto/<%= p.id %>" data-modal>Ver</a></td></tr><% }) %></table></div><% } %>
+<%- include('partials/foot') %>

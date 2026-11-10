@@ -1,0 +1,11 @@
+<%# Componente: vista previa de una carga masiva. Variables: res {archivo, errs, avisos, cambios, kpis:[[texto, valor]]}, aplicar (ruta), descartar (ruta) %>
+<h2 class="h2s">Vista previa de «<%= res.archivo %>»</h2>
+<div class="kpi"><% res.kpis.forEach(([t, v]) => { %><div><small><%= t %></small><strong><%= v %></strong></div><% }) %></div>
+<% if (res.errs.length) { %><div class="flash err" role="alert"><%- ic('alerta') %> <span><b><%= res.errs.length %> error<%= res.errs.length > 1 ? 'es' : '' %>.</b> Corrige el archivo y vuelve a subirlo: no se aplica nada mientras haya errores.</span></div>
+<div class="tw"><table><tr><th>Fila</th><th>Qué corregir</th></tr><% res.errs.slice(0, 300).forEach(e => { %><tr><td><%= e.fila || '—' %></td><td><%= e.msg %></td></tr><% }) %></table></div>
+<% if (res.errs.length > 300) { %><p class="sub">Y <%= res.errs.length - 300 %> más.</p><% } %><% } %>
+<% if ((res.avisos || []).length) { %><details open><summary>Advertencias (<%= res.avisos.length %>) · no impiden aplicar</summary><div class="tw"><table><tr><th>Fila</th><th>Revisa</th></tr><% res.avisos.slice(0, 300).forEach(e => { %><tr><td><%= e.fila %></td><td><%= e.msg %></td></tr><% }) %></table></div></details><% } %>
+<% if (!res.errs.length && !res.cambios.length) { %><div class="flash" role="status">El archivo coincide con lo que ya está cargado. No hay nada que aplicar.</div>
+<% } else if (!res.errs.length) { %><details<%= res.cambios.length <= 60 ? ' open' : '' %>><summary>Cambios (<%= res.cambios.length %>)</summary><ul class="cambios">
+<% res.cambios.forEach(c => { %><li><span class="chip<%= c.accion === 'nuevo' ? '' : ' w' %>"><%= c.accion === 'nuevo' ? 'Nuevo' : 'Cambia' %></span> <%= c.txt %><% if (c.detalle) { %> <small class="mu">· <%= c.detalle %></small><% } %></li><% }) %></ul></details>
+<form method="post" action="<%= aplicar %>" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Aplicar cambios</button> <a class="btn" href="<%= descartar %>">Descartar</a></form><% } %>

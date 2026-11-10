@@ -1,0 +1,11 @@
+<%- include('partials/head') %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Carga masiva de plantilla' }) %><h1>Carga masiva de plantilla</h1><p class="sub">Puestos y plazas desde Excel. Nada se aplica hasta que revises la vista previa.</p></div></div>
+<%- include('partials/config_nav') %>
+<ol class="pasos">
+  <li><b>Descarga el Excel.</b> Trae la plantilla actual y las instrucciones. <a class="btn" href="/config/plantilla/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a></li>
+  <li><b>Edítalo.</b> Una fila por puesto y grupo de plazas (empresa y modalidad). Los puestos que no estén en el archivo no se tocan.</li>
+  <li><b>Súbelo y revisa</b> los errores, las advertencias y los cambios antes de aplicar.</li></ol>
+<form method="post" action="/config/plantilla/carga?_csrf=<%= csrf %>" enctype="multipart/form-data" class="row form-max"><label class="sr" for="ar">Archivo .xlsx</label>
+<input id="ar" type="file" name="archivo" accept=".xlsx" required style="max-width:420px"><button class="btn p"><%- ic('subir') %>Revisar archivo</button></form>
+<% if (res) { const s = res.resumen; %><%- include('partials/carga_preview', { res: { ...res, kpis: [['Puestos nuevos', s.puestos], ['Puestos con cambios', s.cambian], ['Plazas que se abren', s.altas], ['Plazas que se cierran', s.cierres], ['Congelamientos', s.cong]] }, aplicar: '/config/plantilla/carga/aplicar', descartar: '/config/plantilla/carga' }) %><% } %>
+<%- include('partials/foot') %>

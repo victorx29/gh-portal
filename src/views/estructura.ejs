@@ -30,6 +30,7 @@
     <% if (u.sirve.length) { %><span class="tag" title="Servicio compartido"><%- ic('compartida') %>Sirve a <%= u.sirve.map(s => s.siglas || s.nombre).join(', ') %></span><% } %>
     <% if (u.aprueba) { %><span class="tag <%= u.aprobadores.length ? 'ok' : 'warn' %>"><%- ic('aprueba') %><%= u.aprobadores.length ? 'Aprueba: ' + u.aprobadores.map(d => d.nombre).join(', ') : 'Aprueba · sin director' %></span><% } %>
     <% u.funcional.forEach(fn => { %><span class="tag dot" title="Dependencia funcional (línea punteada)"><%- ic('punteada') %><%= fn.nombre %></span><% }) %>
+    <% const k = hc.get(u.id); if (k && k.txt) { %><span class="tag" title="Plantilla: HC de nómina vigente · ❄ congeladas · ⏳ proyectadas · externas (outsourcing, pasantes, becarios, aprendices)"><%- ic('plantilla') %><%= k.txt %></span><% } %>
     <% if (!u.activa) { %><span class="tag warn">Inactiva</span><% } %>
   </div></div><% }) %>
 </div><% } %>

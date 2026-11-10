@@ -16,14 +16,15 @@
   };
   const FE = '12px ' + FF, FN = '600 13px ' + FF, FT = '11px ' + FF, MAX = W - 24;
   // Empresa: la razón social si cabe en la caja; si no, las siglas (la razón social completa queda en el tooltip y en la leyenda)
-  const empresa = n => {
-    if (!n.empresas.length) return { t: 'Corporativa', full: 'Corporativa' };
+  const empresa = (n, max = MAX) => {
+    if (n.pie) return { t: corta(n.pie, FE, max), full: n.pie + (n.empresas.length ? '\n' + n.empresas.map(e => e.r).join(', ') : '') };
+    if (!n.empresas.length) return { t: n.unidad_id ? '—' : 'Corporativa', full: 'Corporativa' };
     const pre = n.hereda ? 'Hereda ' : (!n.propia && n.comparte ? 'Sirve a ' : ''), full = n.empresas.map(e => e.r).join(', ');
-    if (mide(pre + full, FE) <= MAX) return { t: pre + full, full };
+    if (mide(pre + full, FE) <= max) return { t: pre + full, full };
     // Siglas una por una; si no caben todas, «+N» para no perder la cuenta
     const sig = n.empresas.map(e => e.s || e.r); let k = sig.length;
-    while (k > 1 && mide(pre + sig.slice(0, k).join(', ') + (k < sig.length ? ' +' + (sig.length - k) : ''), FE) > MAX) k--;
-    return { t: corta(pre + sig.slice(0, k).join(', ') + (k < sig.length ? ' +' + (sig.length - k) : ''), FE, MAX), full };
+    while (k > 1 && mide(pre + sig.slice(0, k).join(', ') + (k < sig.length ? ' +' + (sig.length - k) : ''), FE) > max) k--;
+    return { t: corta(pre + sig.slice(0, k).join(', ') + (k < sig.length ? ' +' + (sig.length - k) : ''), FE, max), full };
   };
   // ---- Disposición ----
   // h = horizontal (norma) · c = compacta (apila hojas) · k = cascada por columnas (2 niveles en horizontal y el resto en cascada)
@@ -77,24 +78,24 @@
     el('path', { d: `M${x1} ${y1}C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`, fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
   }
   for (const n of by.values()) {
-    const e = empresa(n), g = el('g', { transform: `translate(${n.x},${n.y})`, 'data-id': n.id, class: 'dg-n', opacity: n.ctx ? 0.45 : 1 }, gN);
+    const hcW = n.hcTxt ? mide(n.hcTxt, '600 ' + FE) + 10 : 0, e = empresa(n, MAX - hcW), g = el('g', { transform: `translate(${n.x},${n.y})`, 'data-id': n.id, class: 'dg-n', opacity: n.ctx ? 0.45 : 1 }, gN);
     el('title', {}, g).textContent = [n.externa ? '(Depende funcionalmente de esta vista; su superior jerárquico está fuera)' : '', n.nombre, n.tipo + ' · ' + n.codigo, e.full,
-      n.aprueba ? 'Aprueba: ' + (n.aprobadores.join(', ') || 'sin director asignado') : '', n.funcionalFuera.length ? 'Dependencia funcional: ' + n.funcionalFuera.join(', ') : ''].filter(Boolean).join('\n');
+      n.aprueba ? 'Aprueba: ' + (n.aprobadores.join(', ') || 'sin director asignado') : '', n.hcTxt ? 'Plantilla: ' + n.hcTxt : '', n.funcionalFuera.length ? 'Dependencia funcional: ' + n.funcionalFuera.join(', ') : ''].filter(Boolean).join('\n');
     el('rect', Object.assign({ width: W, height: n.h, rx: n.mini ? 7 : 9, fill: C.bg, stroke: n.aprueba ? (n.aprobadores.length ? C.ok : C.wa) : C.bd, 'stroke-width': n.aprueba ? 1.8 : 1 },
       n.externa ? { 'stroke-dasharray': '5 4', stroke: C.wa } : {}), g);
     if (n.mini) {   // caja de cascada: franja lateral de color, nombre (2 líneas) y empresa
-      el('rect', { x: 1, y: 1, width: 4, height: n.h - 2, rx: 2, fill: banda(n.nivel) }, g);
+      el('rect', { x: 1, y: 1, width: 4, height: n.h - 2, rx: 2, fill: banda(n.nivelBanda != null ? n.nivelBanda : n.nivel) }, g);
       const FM = '600 12px ' + FF; envuelve(n.nombre, FM, MAX, 2).forEach((l, i) => txt(g, 12, 18 + i * 14, l, FM, C.tx));
-      txt(g, 12, n.h - 8, e.t, '11px ' + FF, C.mu);
+      txt(g, 12, n.h - 8, e.t, '11px ' + FF, C.mu); if (n.hcTxt) txt(g, W - 10, n.h - 8, n.hcTxt, '600 11px ' + FF, C.tx, { 'text-anchor': 'end' });
       if (n.aprueba) txt(g, W - 10, 18, '✓', '700 12px ' + FF, n.aprobadores.length ? C.ok : C.wa, { 'text-anchor': 'end' });
       continue;
     }
-    el('rect', { x: 1, y: 1, width: W - 2, height: 5, rx: 3, fill: banda(n.nivel) }, g);
+    el('rect', { x: 1, y: 1, width: W - 2, height: 5, rx: 3, fill: banda(n.nivelBanda != null ? n.nivelBanda : n.nivel) }, g);
     txt(g, 12, 22, corta(n.tipo, FT, n.aprueba ? 86 : MAX), FT, C.mu);
     if (n.aprueba) txt(g, W - 12, 22, corta('✓ ' + (n.aprobadores[0] || 'sin director'), FT, 110), '600 ' + FT, n.aprobadores.length ? C.ok : C.wa, { 'text-anchor': 'end' });
     envuelve(n.nombre, FN, MAX, 2).forEach((l, i) => txt(g, 12, 41 + i * 16, l, FN, C.tx));
-    txt(g, 12, H - 12, e.t, FE, C.mu);
-    if (n.funcionalFuera.length) txt(g, W - 12, H - 12, '⇢', '600 13px ' + FF, C.wa, { 'text-anchor': 'end' });
+    txt(g, 12, H - 12, e.t, FE, C.mu); if (n.hcTxt) txt(g, W - 12, H - 12, n.hcTxt, '600 ' + FE, C.tx, { 'text-anchor': 'end' });
+    if (!n.hcTxt && n.funcionalFuera.length) txt(g, W - 12, H - 12, '⇢', '600 13px ' + FF, C.wa, { 'text-anchor': 'end' });
   }
   // ---- Vista: zoom y desplazamiento sobre el viewBox ----
   const base = { x: -PAD, y: -PAD, w: total.w + PAD * 2, h: total.h + PAD * 2 }; let vb = { ...base };

@@ -2,6 +2,7 @@
 module.exports = [
   { sec: 'Organización', items: [
     ['estructura', '/config/estructura', 'Estructura organizativa', 'estructura', 'Unidades, dependencias sólidas y funcionales, y dónde se aprueba', 'gh'],
+    ['plantilla', '/config/plantilla', 'Plantilla de puestos', 'plantilla', 'Puestos y plazas autorizadas, congeladas y proyectadas por unidad', 'gh'],
     ['empresas', '/config/empresas', 'Empresas', 'empresa', 'Razón social, siglas, RIF, dirección fiscal y división', 'super'],
     ['divisiones', '/config/maestros?m=divisiones', 'Divisiones', 'division', 'Automotriz, Agroindustrial… y a cuál pertenece cada empresa', 'super']] },
   { sec: 'Personas y acceso', items: [

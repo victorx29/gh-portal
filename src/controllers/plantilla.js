@@ -1,0 +1,42 @@
+const r = require('express').Router(), PL = require('../services/plantilla'), ES = require('../services/estructura'), P = require('../services/perm'), { q } = require('../db'),
+  { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS } = require('../util');
+// Plantilla de puestos: solo Gestión Humana (todo se valida aquí, en el servidor)
+const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
+r.use(['/config/plantilla', '/config/plazas'], gh);
+const aPuesto = id => '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + id);
+const datosForm = async () => ({
+  unidades: await ES.opciones(), empresas: (await q('select id, siglas, coalesce(razon_social,nombre) mostrar from empresa where activa order by 3')).rows,
+  perfiles: (await q("select id, codigo, nombre from perfil where activo and version_activa_id is not null order by nombre")).rows, puestos: await PL.opcionesPuestos(), MODALIDADES: PL.MODALIDADES });
+
+r.get('/config/plantilla', w(async (req, res) => {
+  const f = { buscar: req.query.buscar || '', unidad: req.query.unidad || '', empresa: req.query.empresa || '', modalidad: PL.MODALIDADES[req.query.modalidad] ? req.query.modalidad : '', fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '' };
+  const [L, d] = await Promise.all([PL.listar(f), datosForm()]);
+  res.render('plantilla', { title: 'Plantilla de puestos', nav: 'config', sub: 'plantilla', f, L, ...d, esHoy: L.f === await ES.hoy() });
+}));
+r.get('/config/plantilla/puesto/nuevo', w(async (req, res) => modal(req, res, 'puesto_form', { title: 'Nuevo puesto', nav: 'config', sub: 'plantilla', v: { unidad_id: +req.query.unidad || null }, ...await datosForm() })));
+r.post('/config/plantilla/puesto', hacer(async req => aPuesto(await PL.crearPuesto(req.user, req.body)), 'Puesto creado', '/config/plantilla'));
+r.get('/config/plantilla/puesto/:id', w(async (req, res) => modal(req, res, 'puesto_detalle', { title: 'Puesto', nav: 'config', sub: 'plantilla', d: await PL.detalle(+req.params.id), ...await datosForm() })));
+r.post('/config/plantilla/puesto/:id/editar', hacer(req => PL.editarPuesto(req.user, +req.params.id, req.body), 'Puesto actualizado', req => aPuesto(req.params.id)));
+r.post('/config/plantilla/puesto/:id/plazas', hacer(async req => { const c = await PL.agregarPlazas(req.user, +req.params.id, req.body); return aPuesto(req.params.id); }, 'Plazas agregadas', req => aPuesto(req.params.id)));
+r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id), 'Puesto desactivado', req => aPuesto(req.params.id)));
+r.post('/config/plazas/:id/congelar', hacer(async req => aPuesto(await PL.congelar(req.user, +req.params.id, req.body.on === '1', req.body.motivo)), 'Plaza actualizada', '/config/plantilla'));
+r.post('/config/plazas/:id/cerrar', hacer(async req => aPuesto(await PL.cerrarPlaza(req.user, +req.params.id, req.body.motivo)), 'Plaza cerrada con fecha de hoy', '/config/plantilla'));
+// Carga masiva
+r.get('/config/plantilla/plantilla.xlsx', w(async (req, res) => {
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.set('Content-Disposition', 'attachment; filename="plantilla-puestos-' + await ES.hoy() + '.xlsx"');
+  res.send(Buffer.from(await PL.plantilla()));
+}));
+r.get('/config/plantilla/carga', (req, res) => res.render('plantilla_carga', { title: 'Carga masiva de plantilla', nav: 'config', sub: 'plantilla', res: null }));
+r.post('/config/plantilla/carga', subidaXlsx('/config/plantilla/carga'), w(async (req, res) => {
+  try {
+    if (!req.file) throw E(400, 'Selecciona el archivo');
+    const filas = await PL.leer(req.file.buffer), out = await PL.analizar(filas);
+    req.session.cargaPlantilla = out.errs.length ? null : { filas, en: Date.now() };
+    res.render('plantilla_carga', { title: 'Carga masiva de plantilla', nav: 'config', sub: 'plantilla', res: { ...out, archivo: req.file.originalname } });
+  } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect('/config/plantilla/carga'); }
+}));
+r.post('/config/plantilla/carga/aplicar', hacer(async req => {
+  const c = req.session.cargaPlantilla; if (!c || Date.now() - c.en > VISTA_PREVIA_MS) throw E(400, 'La vista previa expiró. Sube el archivo de nuevo');
+  delete req.session.cargaPlantilla; await PL.aplicarCarga(c.filas, req.user);
+}, 'Plantilla aplicada', '/config/plantilla'));
+module.exports = r;

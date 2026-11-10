@@ -1,0 +1,10 @@
+<%# Componente: alta de plazas. Variables: k (sufijo de ids), empresas, MODALIDADES, opcional: requerido (cantidad obligatoria) %>
+<div class="g2">
+<div><label for="pz-n-<%= k %>">Cantidad de plazas</label><input id="pz-n-<%= k %>" name="cantidad" type="number" min="<%= typeof requerido !== 'undefined' && requerido ? 1 : 0 %>" max="200" value="<%= typeof requerido !== 'undefined' && requerido ? 1 : 0 %>"></div>
+<div><label for="pz-e-<%= k %>">Empresa de nómina</label><select id="pz-e-<%= k %>" name="empresa_id"><option value="">La empresa propia de la unidad</option><% empresas.forEach(e => { %><option value="<%= e.id %>"><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></option><% }) %></select></div>
+<div><label for="pz-m-<%= k %>">Modalidad</label><select id="pz-m-<%= k %>" name="modalidad"><% Object.entries(MODALIDADES).forEach(([v, t]) => { %><option value="<%= v %>"><%= t %></option><% }) %></select></div>
+<div><label for="pz-d-<%= k %>">Vigente desde</label><input id="pz-d-<%= k %>" name="desde" type="date" title="Una fecha futura deja las plazas como proyectadas"></div>
+</div>
+<label class="chk"><input type="checkbox" name="congelada">Crearlas congeladas (autorizadas, pero no se cubren por ahora)</label>
+<label for="pz-mo-<%= k %>">Motivo (queda en el historial)</label><input id="pz-mo-<%= k %>" name="motivo" placeholder="Plantilla aprobada 2026 / Aprobado por Presidencia" <%= typeof requerido !== 'undefined' && requerido ? 'required' : '' %>>
+<p class="sub">Vacío en «Vigente desde» = hoy. Con una fecha futura quedan <b>proyectadas</b> y pasan solas a vigentes ese día. Outsourcing, pasantes, becarios y aprendices se cuentan aparte del HC de nómina.</p>

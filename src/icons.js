@@ -23,6 +23,7 @@ const P = {
   punteada: '<path d="M3 12h2M8 12h2M13 12h2M18 12h3"/><path d="m17 8 4 4-4 4"/>',
   compartida: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/>',
   division: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  plantilla: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 9h3M15 13h3M6 16c.6-1.6 1.8-2.4 3-2.4s2.4.8 3 2.4"/>',
   buscar: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>'
 };
 module.exports = (n, cls) => P[n] ? `<svg class="ico${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${P[n]}</svg>` : '';

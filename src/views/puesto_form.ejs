@@ -1,0 +1,8 @@
+<div class="mh"><div><h2>Nuevo puesto</h2><p class="sub">Un puesto es un perfil dentro de una unidad. Sus plazas indican cuántas personas autoriza la plantilla.</p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<form method="post" action="/config/plantilla/puesto"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<label for="pu-u">Unidad</label><select id="pu-u" name="unidad_id" required data-buscar><option value="">Selecciona la unidad</option><% unidades.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= v.unidad_id === o.id ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select>
+<label for="pu-p">Perfil (cargo)</label><select id="pu-p" name="perfil_id" required data-buscar><option value="">Selecciona el perfil</option><% perfiles.forEach(p => { %><option value="<%= p.id %>" data-a="<%= p.id %>" data-t="<%= p.codigo %>"><%= p.nombre %> (<%= p.codigo %>)</option><% }) %></select>
+<label class="chk"><input type="checkbox" name="jefe">Es el puesto jefe de la unidad (los demás puestos le reportan por defecto)</label>
+<label for="pu-r">Reporta a (solo si es una excepción)</label><select id="pu-r" name="reporta_a" data-buscar><option value="">Regla por defecto: el jefe de la unidad</option><% puestos.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.id %>"><%= o.etiqueta %></option><% }) %></select>
+<fieldset><legend>Plazas iniciales (opcional)</legend><%- include('partials/plazas_form', { k: 'n' }) %></fieldset>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p">Crear puesto</button></p></form>

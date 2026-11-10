@@ -7,15 +7,5 @@
   <li><b>Súbelo y revisa</b> los errores y las advertencias antes de aplicar.</li></ol>
 <form method="post" action="/perfiles/carga?_csrf=<%= csrf %>" enctype="multipart/form-data" class="row form-max"><label class="sr" for="ar">Archivo .xlsx</label>
 <input id="ar" type="file" name="archivo" accept=".xlsx" required style="max-width:420px"><button class="btn p"><%- ic('subir') %>Revisar archivo</button></form>
-<% if (res) { const s = res.resumen; %>
-<h2 class="h2s">Vista previa de «<%= res.archivo %>»</h2>
-<div class="kpi"><div><small>Perfiles nuevos</small><strong><%= s.nuevos %></strong></div><div><small>Con cambios</small><strong><%= s.cambian %></strong></div><div><small>Sin cambios</small><strong><%= Math.max(0, s.sinCambio) %></strong></div><div><small>Advertencias</small><strong><%= res.avisos.length %></strong></div></div>
-<% if (res.errs.length) { %><div class="flash err" role="alert"><%- ic('alerta') %> <span><b><%= res.errs.length %> error<%= res.errs.length > 1 ? 'es' : '' %>.</b> Corrige el archivo y vuelve a subirlo: no se aplica nada mientras haya errores.</span></div>
-<div class="tw"><table><tr><th>Fila</th><th>Qué corregir</th></tr><% res.errs.slice(0, 300).forEach(e => { %><tr><td><%= e.fila %></td><td><%= e.msg %></td></tr><% }) %></table></div><% } %>
-<% if (res.avisos.length) { %><details open><summary>Advertencias (<%= res.avisos.length %>) · no impiden aplicar</summary><div class="tw"><table><tr><th>Fila</th><th>Revisa</th></tr><% res.avisos.slice(0, 300).forEach(e => { %><tr><td><%= e.fila %></td><td><%= e.msg %></td></tr><% }) %></table></div></details><% } %>
-<% if (!res.errs.length && !res.cambios.length) { %><div class="flash" role="status">El archivo coincide con los perfiles actuales. No hay nada que aplicar.</div>
-<% } else if (!res.errs.length) { %><details<%= res.cambios.length <= 60 ? ' open' : '' %>><summary>Cambios (<%= res.cambios.length %>)</summary><ul class="cambios">
-<% res.cambios.forEach(c => { %><li><span class="chip<%= c.accion === 'nuevo' ? '' : ' w' %>"><%= c.accion === 'nuevo' ? 'Nuevo' : 'Cambia' %></span> <%= c.txt %><% if (c.detalle) { %> <small class="mu">· <%= c.detalle %></small><% } %></li><% }) %></ul></details>
-<form method="post" action="/perfiles/carga/aplicar" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Aplicar cambios</button> <a class="btn" href="/perfiles/carga">Descartar</a></form><% } %>
-<% } %>
+<% if (res) { const s = res.resumen; %><%- include('partials/carga_preview', { res: { ...res, kpis: [['Perfiles nuevos', s.nuevos], ['Con cambios', s.cambian], ['Sin cambios', Math.max(0, s.sinCambio)], ['Advertencias', res.avisos.length]] }, aplicar: '/perfiles/carga/aplicar', descartar: '/perfiles/carga' }) %><% } %>
 <%- include('partials/foot') %>
