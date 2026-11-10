@@ -17,6 +17,8 @@ const subidaXlsx = volver => {
     fileFilter: (req, f, cb) => path.extname(f.originalname).toLowerCase() === '.xlsx' ? cb(null, true) : cb(E(400, 'Sube la plantilla en formato .xlsx')) });
   return (req, res, next) => m.single('archivo')(req, res, e => { if (e) { flash(req, 'err', e.code === 'LIMIT_FILE_SIZE' ? 'El archivo supera 5 MB' : e.message); return res.redirect(volver); } next(); });
 };
+// Multer entrega el nombre del archivo como latin1: «Tecnología» llega como «TecnologÃ­a». Se recupera el UTF-8 si es válido.
+const nombreArchivo = f => { const n = (f && f.originalname) || '', u = Buffer.from(n, 'latin1').toString('utf8'); return u.includes('\uFFFD') ? n : u; };
 // Una vista previa de carga vive 30 minutos en la sesión
 const VISTA_PREVIA_MS = 30 * 60e3;
-module.exports = { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS };
+module.exports = { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo };

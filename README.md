@@ -56,9 +56,13 @@ Estado de plan calculado a cualquier fecha (vigente, congelada, proyectada, cerr
 Puestos y plazas no se borran (disparadores en la base). Ver `UPDATE_0.7.md`.
 
 ## Perfiles y Cargos
+Contenido con el formato de la descripción de cargo de GH: objetivo, funciones, educación, experiencia (con años mín./máx.), conocimientos, certificaciones, idiomas,
+competencias conductuales y organizacionales, y responsabilidades. «Departamento», «Reporta a» y «Trabajador ocupante» no se guardan en el perfil:
+salen de la plantilla y de los empleados. Importación de .docx (`/perfiles/importar-docx`), descripción imprimible (`/perfiles/:id/descripcion`)
+y control documental ISO simple por versión (`perfil_version_control`).
 Código automático `GH-PF-NNN` y versiones inmutables `GH-PF-NNN-VV`; el perfil marca su versión activa (`perfil.version_activa_id`).
 Alcance en `perfil_alcance`: general, empresas, unidades (incluye dependientes) o ambas. La requisición guarda la versión activa al crearse.
 
 ## Pendiente (siguientes entregas)
-0.7.1 Requisición ligada a la plaza. 0.8 Empleados (importación del Excel) y organigrama por división, empresa y unidad.
+0.7.2 Requisición ligada a la plaza. 0.8 Empleados (importación del Excel) y organigrama por división, empresa y unidad.
 0.9 Postulados con IA. 1.0 Notificaciones. SSO Microsoft 365 antes de abrir el portal a todos los gerentes.

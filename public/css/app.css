@@ -75,6 +75,18 @@ details.blk{border-width:1px 0 0;border-radius:0;padding:6px 0 0}
 .cambios{margin:6px 0;padding-left:18px}.cambios li{margin:4px 0}.cambios .chip{margin:0 4px 0 0}
 .addrow{margin-top:12px}
 .buscar-sel{margin-bottom:6px}
+/* Perfil: presentación y control documental */
+.pv h3{margin:16px 0 6px}.pv ul{margin:0 0 0 18px;padding:0}.pv li{margin:3px 0}.pre{white-space:pre-line}
+.pv-dl{display:grid;grid-template-columns:minmax(140px,max-content) 1fr;gap:6px 14px;margin:0}.pv-dl dt{color:var(--mu)}.pv-dl dd{margin:0}
+.err-row td{background:var(--wl)}.err-txt{color:var(--rd);font-size:13px}.docx-t input{min-width:220px}
+/* Descripción de cargo para imprimir (formato de GH): hoja blanca siempre */
+.desc-body{background:#fff;color:#111;padding:20px}.desc-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 auto 14px;max-width:960px}.desc-bar .row select{width:auto}
+.desc{max-width:960px;margin:0 auto;color:#111;font-size:12.5px;line-height:1.45}.desc-t{width:100%;border-collapse:collapse;margin-bottom:10px}.desc-t td{border:1px solid #333;padding:8px 10px;vertical-align:top;color:#111}
+.desc-logo{width:16%;text-align:center;vertical-align:middle!important;font-weight:700;font-size:15px}.desc-tit{text-align:center;font-weight:700;font-size:15px}.desc-cargo{text-align:center;font-weight:700;font-size:14px}
+.desc-col{width:50%}.desc ul{margin:6px 0 0 16px;padding:0}.desc li{margin:2px 0}.desc-kv{list-style:none;margin-left:0!important}.desc-ctl td{width:33%}.desc p{margin:4px 0 0}
+.desc-s{border:1px solid #333;padding:8px 10px;margin:-1px 0 0}.desc-s h4{margin:0 0 4px;font-size:inherit}.desc-g{display:grid;grid-template-columns:1fr 1fr}.desc-g .desc-s+.desc-s{margin-left:-1px}.desc-ctl{margin-top:10px}
+@media print{.desc-body{padding:0}.desc{max-width:none;font-size:10.5pt}.desc-g{display:block}.desc-g .desc-s+.desc-s{margin-left:0}.desc-ctl,.desc li{break-inside:avoid}}
+.ctl{font-size:13px;color:var(--mu);border:1px dashed var(--bd);border-radius:8px;padding:8px 10px;margin:10px 0}.ctl b{color:var(--tx)}
 /* Plantilla de puestos */
 .pl-f{grid-template-columns:1.4fr 2fr 1.4fr 1fr 1fr auto}.pl-u td{border-top:2px solid var(--bd)}
 details.inl-d{display:inline-block;border:0;padding:0;margin:0;position:relative}details.inl-d>summary{list-style:none;min-height:44px}details.inl-d>summary::-webkit-details-marker{display:none}

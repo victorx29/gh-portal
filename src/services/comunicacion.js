@@ -1,4 +1,4 @@
-const { q } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), { E } = require('../util');
+const { q } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), { E, nombreArchivo } = require('../util');
 // Comentarios del proceso: visibles para todos los involucrados. Notas internas (ambito gh): solo GH.
 async function comentarios(u, id) {
   return (await q(`select c.*, us.nombre autor from comentario c join usuario us on us.id=c.autor_id where c.entidad='requisicion' and c.entidad_id=$1 ${P.esGH(u) ? '' : "and c.ambito='proceso'"} order by c.id`, [id])).rows;
@@ -12,8 +12,8 @@ async function comentar(u, id, b) {
 const adjuntos = id => q("select a.*, us.nombre autor from adjunto a join usuario us on us.id=a.subido_por where a.entidad='requisicion' and a.entidad_id=$1 order by a.id", [id]).then(r => r.rows);
 async function adjuntar(u, id, files) {
   await RS.obtener(u, id); if (!files || !files.length) throw E(400, 'Selecciona al menos un archivo');
-  for (const f of files) await q('insert into adjunto(entidad,entidad_id,nombre_original,ruta,mime,tamano,subido_por) values($1,$2,$3,$4,$5,$6,$7)', ['requisicion', id, f.originalname, f.filename, f.mimetype, f.size, u.id]);
-  await RS.hist({ query: q }, u, id, 'adjuntar', { archivos: files.map(f => f.originalname) });
+  for (const f of files) await q('insert into adjunto(entidad,entidad_id,nombre_original,ruta,mime,tamano,subido_por) values($1,$2,$3,$4,$5,$6,$7)', ['requisicion', id, nombreArchivo(f), f.filename, f.mimetype, f.size, u.id]);
+  await RS.hist({ query: q }, u, id, 'adjuntar', { archivos: files.map(f => nombreArchivo(f)) });
 }
 async function descargar(u, adjId) {
   const a = (await q('select * from adjunto where id=$1', [adjId])).rows[0]; if (!a) throw E(404, 'Archivo no encontrado');

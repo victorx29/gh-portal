@@ -1,0 +1,13 @@
+<%# Componente: presentación del contenido de un perfil. Variables: c (contenido), RESP %>
+<% const R = c.responsabilidades || {}, fun = Array.isArray(c.funciones) ? c.funciones : String(c.funciones || '').split('\n').filter(Boolean);
+   const anios = c.experiencia_min != null ? (c.experiencia_max != null ? c.experiencia_min + '–' + c.experiencia_max : 'mín. ' + c.experiencia_min) + ' años' : ''; %>
+<div class="pv">
+<% if (c.objetivo) { %><h3>Objetivo</h3><p class="pre"><%= c.objetivo %></p><% } %>
+<% if (fun.length) { %><h3>Funciones</h3><ul><% fun.forEach(f => { %><li><%= f %></li><% }) %></ul><% } %>
+<h3>Perfil del cargo</h3><dl class="pv-dl">
+<% [['Educación', c.educacion || c.requisitos], ['Experiencia', [c.experiencia, anios && '(' + anios + ')'].filter(Boolean).join(' ')], ['Conocimientos', c.conocimientos], ['Certificaciones', c.certificaciones], ['Idiomas', c.idiomas],
+    ['Competencias conductuales', (c.competencias_conductuales || []).join(', ')]].filter(x => x[1]).forEach(([t, x]) => { %><dt><%= t %></dt><dd class="pre"><%= x %></dd><% }) %></dl>
+<% if ((c.competencias || []).length) { %><h3>Competencias</h3><ul><% c.competencias.forEach(x => { %><li><% if (typeof x === 'object') { %><b><%= x.nombre %></b><%= x.descripcion ? ': ' + x.descripcion : '' %><% } else { %><%= x %><% } %></li><% }) %></ul><% } %>
+<% if (Object.values(R).some(Boolean)) { %><h3>Responsabilidades</h3><dl class="pv-dl"><% Object.entries(RESP).forEach(([k, t]) => { if (R[k]) { %><dt><%= t %></dt><dd class="pre"><%= R[k] %></dd><% } }) %></dl><% } %>
+<% if ((c.criterios || []).length) { %><h3>Criterios de evaluación de CV</h3><ul><% c.criterios.forEach(x => { %><li><%= x %></li><% }) %></ul><% } %>
+</div>

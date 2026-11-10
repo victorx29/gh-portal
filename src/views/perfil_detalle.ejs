@@ -1,14 +1,11 @@
 <% const act = p.versiones.find(v => v.id === p.version_activa_id), hid = '<input type="hidden" name="_csrf" value="' + csrf + '">';
-   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-   const bloque = (t, v) => v ? '<h3>' + t + '</h3><p style="white-space:pre-line">' + esc(v) + '</p>' : '';
-   const ver = c => bloque('Objetivo del cargo', c.objetivo) + bloque('Funciones', c.funciones) + bloque('Requisitos', c.requisitos) + bloque('Competencias', c.competencias) + bloque('Conocimientos', c.conocimientos)
-     + ((c.criterios || []).length ? '<h3>Criterios de evaluación</h3><ul>' + c.criterios.map(k => '<li>' + esc(k) + '</li>').join('') + '</ul>' : '');
    const actual = { general: p.general, emps: p.alcance.filter(a => a.empresa_id).map(a => a.empresa_id), unis: p.alcance.filter(a => a.unidad_id).map(a => a.unidad_id) }; %>
 <div class="mh"><div><h2><%= p.nombre %></h2><p class="sub"><%= p.codigo %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %> · <%= p.general ? 'General' : (p.alcance.map(a => a.empresa || a.unidad).join(', ') || 'sin alcance: nadie lo ve') %>
 <% if (!p.activo) { %> · <span class="chip r">inactivo</span><% } %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 
 <section class="blk"><h3><%- ic('cargo') %> Versión activa: <%= act ? codigoV(p.codigo, act.version) : 'ninguna' %></h3>
-<% if (act) { %><p class="sub">Creada por <%= act.autor %> el <%= new Date(act.creado_en).toLocaleDateString('es-VE') %> · usada en <%= act.n_req %> requisición<%= act.n_req === 1 ? '' : 'es' %></p><%- ver(act.contenido || {}) %><% } %></section>
+<% if (act) { %><p class="sub">Creada por <%= act.autor %> el <%= new Date(act.creado_en).toLocaleDateString('es-VE') %> · usada en <%= act.n_req %> requisición<%= act.n_req === 1 ? '' : 'es' %></p><%- include('partials/perfil_ver', { c: act.contenido || {}, RESP }) %>
+<p class="act"><a class="btn" href="/perfiles/<%= p.id %>/descripcion" target="_blank" rel="noopener">Imprimir descripción de cargo</a></p><% } %></section>
 
 <details class="blk"><summary>Editar contenido (crea la versión <%= codigoV(p.codigo, (p.versiones[0] ? p.versiones[0].version : 0) + 1) %>)</summary>
 <form method="post" action="/perfiles/<%= p.id %>/version"><%- hid %>
@@ -18,7 +15,16 @@
 
 <details class="blk"><summary>Versiones (<%= p.versiones.length %>)</summary>
 <% p.versiones.forEach(v => { %><details><summary><%= codigoV(p.codigo, v.version) %><%= v.id === p.version_activa_id ? ' · activa' : '' %> <small class="mu">· <%= v.autor %> · <%= new Date(v.creado_en).toLocaleDateString('es-VE') %> · <%= v.n_req %> req.</small></summary>
-<%- ver(v.contenido || {}) %>
+<%- include('partials/perfil_ver', { c: v.contenido || {}, RESP }) %>
+<% const k = ctl.get(v.id) || {}, fd = x => x ? String(x).slice(0, 10).split('-').reverse().join('/') : '—'; %>
+<div class="ctl"><b>Control documental</b> · actualizado <%= fd(k.fecha_actualizacion) %> · revisado por <%= k.revisado_por || '—' %> (<%= fd(k.fecha_revision) %>) · aprobado por <%= k.aprobado_por || '—' %> (<%= fd(k.fecha_aprobacion) %>)<%= k.origen && k.origen !== 'manual' ? ' · ' + k.origen : '' %></div>
+<details><summary>Registrar revisión y aprobación</summary><form method="post" action="/perfiles/<%= p.id %>/versiones/<%= v.id %>/control"><%- hid %><div class="g2">
+<div><label for="fa-<%= v.id %>">Fecha de actualización del documento</label><input id="fa-<%= v.id %>" type="date" name="fecha_actualizacion" value="<%= k.fecha_actualizacion ? String(k.fecha_actualizacion).slice(0, 10) : '' %>"></div><div></div>
+<div><label for="rp-<%= v.id %>">Revisado por</label><input id="rp-<%= v.id %>" name="revisado_por" value="<%= k.revisado_por || '' %>"></div>
+<div><label for="fr-<%= v.id %>">Fecha de revisión</label><input id="fr-<%= v.id %>" type="date" name="fecha_revision" value="<%= k.fecha_revision ? String(k.fecha_revision).slice(0, 10) : '' %>"></div>
+<div><label for="ap-<%= v.id %>">Aprobado por</label><input id="ap-<%= v.id %>" name="aprobado_por" value="<%= k.aprobado_por || '' %>"></div>
+<div><label for="fp-<%= v.id %>">Fecha de aprobación</label><input id="fp-<%= v.id %>" type="date" name="fecha_aprobacion" value="<%= k.fecha_aprobacion ? String(k.fecha_aprobacion).slice(0, 10) : '' %>"></div></div>
+<p class="act"><button class="btn">Guardar control</button> <a class="btn" href="/perfiles/<%= p.id %>/descripcion?v=<%= v.version %>" target="_blank" rel="noopener">Imprimir esta versión</a></p></form></details>
 <% if (v.id !== p.version_activa_id) { %><form method="post" action="/perfiles/<%= p.id %>/versiones/<%= v.id %>/activar"><%- hid %><p class="act"><button class="btn">Activar esta versión</button></p></form><% } %></details><% }) %></details>
 
 <details class="blk"><summary>Datos y alcance</summary>

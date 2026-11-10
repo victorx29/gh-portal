@@ -29,6 +29,7 @@ r.post('/requisiciones/:id/editar', w(async (req, res) => {
 r.get('/perfiles/:id/vista', w(async (req, res) => {
   const p = (await q(`select p.id,p.codigo,p.nombre,p.nivel,pv.version,pv.contenido from perfil p join perfil_version pv on pv.id=p.version_activa_id where p.id=$1 and p.activo`, [+req.params.id])).rows[0];
   if (p) p.codigoV = PF.codigoV(p.codigo, p.version);
+  res.locals.RESP = PF.RESP;
   if (!p) throw E(404, 'Perfil no encontrado'); modal(req, res, 'perfil_vista', { title: p.nombre, p });
 }));
 r.post('/perfiles/:id/solicitar', w(async (req, res) => {

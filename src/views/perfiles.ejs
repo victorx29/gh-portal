@@ -1,7 +1,7 @@
 <%- include('partials/head') %>
 <div class="top"><div><%- include('partials/crumb', { aqui: 'Gestión de cargos' }) %><h1>Perfiles y Cargos</h1>
 <p class="sub">Cada perfil tiene un código fijo (GH-PF-NNN) y versiones (GH-PF-NNN-VV). Editar el contenido crea una versión nueva; la versión activa es la que usan las requisiciones nuevas.</p></div>
-<div class="row"><a class="btn" href="/perfiles/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/perfiles/carga"><%- ic('subir') %>Carga masiva</a><a class="btn p" href="/perfiles/nuevo" data-modal><%- ic('mas') %>Nuevo perfil</a></div></div>
+<div class="row"><a class="btn" href="/perfiles/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/perfiles/importar-docx"><%- ic('subir') %>Importar Word</a><a class="btn" href="/perfiles/carga"><%- ic('subir') %>Carga masiva (Excel)</a><a class="btn p" href="/perfiles/nuevo" data-modal><%- ic('mas') %>Nuevo perfil</a></div></div>
 <%- include('partials/config_nav') %>
 <form method="get" action="/perfiles" class="filtros">
   <div><label for="pb">Buscar</label><input id="pb" name="buscar" value="<%= f.buscar %>" placeholder="Cargo o código"></div>

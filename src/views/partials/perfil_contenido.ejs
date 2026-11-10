@@ -1,7 +1,21 @@
-<% const c = typeof cont !== 'undefined' && cont ? cont : {}; %>
-<label for="pc-o-<%= k %>">Objetivo del cargo</label><textarea id="pc-o-<%= k %>" name="objetivo" rows="2"><%= c.objetivo || '' %></textarea>
-<label for="pc-f-<%= k %>">Funciones</label><textarea id="pc-f-<%= k %>" name="funciones" rows="4"><%= c.funciones || '' %></textarea>
-<label for="pc-r-<%= k %>">Requisitos</label><textarea id="pc-r-<%= k %>" name="requisitos" rows="3"><%= c.requisitos || '' %></textarea>
-<div class="g2"><div><label for="pc-c-<%= k %>">Competencias</label><textarea id="pc-c-<%= k %>" name="competencias" rows="3"><%= c.competencias || '' %></textarea></div>
-<div><label for="pc-k-<%= k %>">Conocimientos</label><textarea id="pc-k-<%= k %>" name="conocimientos" rows="3"><%= c.conocimientos || '' %></textarea></div></div>
-<label for="pc-x-<%= k %>">Criterios de evaluación de CV (uno por línea)</label><textarea id="pc-x-<%= k %>" name="criterios" rows="4"><%= (c.criterios || []).join('\n') %></textarea>
+<%# Componente: campos del contenido de un perfil (formato de la descripción de cargo de GH). Variables: k (sufijo de ids), cont %>
+<% const c = typeof cont !== 'undefined' && cont ? cont : {}, R = c.responsabilidades || {}, L = a => (a || []).map(x => typeof x === 'object' ? x.nombre + (x.descripcion ? ': ' + x.descripcion : '') : x).join('\n'); %>
+<fieldset><legend>Objetivo y funciones</legend>
+<label for="pc-o-<%= k %>">Objetivo del cargo</label><textarea id="pc-o-<%= k %>" name="objetivo" rows="3"><%= c.objetivo || '' %></textarea>
+<label for="pc-f-<%= k %>">Funciones (una por línea)</label><textarea id="pc-f-<%= k %>" name="funciones" rows="6"><%= Array.isArray(c.funciones) ? c.funciones.join('\n') : (c.funciones || '') %></textarea></fieldset>
+<fieldset><legend>Perfil del cargo</legend>
+<label for="pc-e-<%= k %>">Educación</label><textarea id="pc-e-<%= k %>" name="educacion" rows="2"><%= c.educacion || c.requisitos || '' %></textarea>
+<div class="g2"><div><label for="pc-x-<%= k %>">Experiencia</label><input id="pc-x-<%= k %>" name="experiencia" value="<%= c.experiencia || '' %>" placeholder="Entre 4 y 5 años en el área"></div>
+<div class="g2"><div><label for="pc-xn-<%= k %>">Años mín.</label><input id="pc-xn-<%= k %>" name="experiencia_min" type="number" min="0" max="60" value="<%= c.experiencia_min ?? '' %>"></div>
+<div><label for="pc-xm-<%= k %>">Años máx.</label><input id="pc-xm-<%= k %>" name="experiencia_max" type="number" min="0" max="60" value="<%= c.experiencia_max ?? '' %>"></div></div></div>
+<label for="pc-k-<%= k %>">Conocimientos</label><textarea id="pc-k-<%= k %>" name="conocimientos" rows="3"><%= c.conocimientos || '' %></textarea>
+<div class="g2"><div><label for="pc-ce-<%= k %>">Certificaciones profesionales</label><input id="pc-ce-<%= k %>" name="certificaciones" value="<%= c.certificaciones || '' %>"></div>
+<div><label for="pc-i-<%= k %>">Idiomas</label><input id="pc-i-<%= k %>" name="idiomas" value="<%= c.idiomas || '' %>"></div></div>
+<label for="pc-cc-<%= k %>">Competencias conductuales (separadas por coma)</label><input id="pc-cc-<%= k %>" name="competencias_conductuales" value="<%= (c.competencias_conductuales || []).join(', ') %>"></fieldset>
+<fieldset><legend>Competencias</legend><label for="pc-c-<%= k %>">Una por línea; con descripción: «Nombre: descripción»</label><textarea id="pc-c-<%= k %>" name="competencias" rows="5"><%= L(c.competencias) %></textarea></fieldset>
+<fieldset><legend>Responsabilidades</legend><div class="g2">
+<div><label for="pc-rd-<%= k %>">Dinero</label><textarea id="pc-rd-<%= k %>" name="resp_dinero" rows="2"><%= R.dinero || '' %></textarea></div>
+<div><label for="pc-ri-<%= k %>">Información confidencial</label><textarea id="pc-ri-<%= k %>" name="resp_informacion" rows="2"><%= R.informacion || '' %></textarea></div>
+<div><label for="pc-rt-<%= k %>">Toma de decisiones</label><textarea id="pc-rt-<%= k %>" name="resp_decisiones" rows="3"><%= R.decisiones || '' %></textarea></div>
+<div><label for="pc-rs-<%= k %>">Supervisión</label><textarea id="pc-rs-<%= k %>" name="resp_supervision" rows="3"><%= R.supervision || '' %></textarea></div></div></fieldset>
+<fieldset><legend>Portal</legend><label for="pc-cr-<%= k %>">Criterios de evaluación de CV (uno por línea; los usará la IA)</label><textarea id="pc-cr-<%= k %>" name="criterios" rows="3"><%= (c.criterios || []).join('\n') %></textarea></fieldset>

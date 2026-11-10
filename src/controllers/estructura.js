@@ -1,4 +1,4 @@
-const r = require('express').Router(), ES = require('../services/estructura'), PL = require('../services/plantilla'), IM = require('../services/importar'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS } = require('../util');
+const r = require('express').Router(), ES = require('../services/estructura'), PL = require('../services/plantilla'), IM = require('../services/importar'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo } = require('../util');
 const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
 const sup = (req, res, next) => P.esSuper(req.user) ? next() : next(E(403, 'Solo el superadmin'));
 const ESTADOS = ['Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes', 'Delta Amacuro', 'Distrito Capital', 'Falcón', 'Guárico', 'La Guaira', 'Lara', 'Mérida', 'Miranda',
@@ -39,8 +39,8 @@ r.post('/config/estructura/importar', gh, subidaXlsx('/config/estructura/importa
   try {
     if (!req.file) throw E(400, 'Selecciona el archivo');
     const data = await IM.leer(req.file.buffer), out = await IM.analizar(data);
-    req.session.carga = out.errs.length ? null : { data, archivo: req.file.originalname, en: Date.now() };
-    res.render('importar', { title: 'Carga masiva', nav: 'config', sub: 'estructura', res: { ...out, archivo: req.file.originalname } });
+    req.session.carga = out.errs.length ? null : { data, archivo: nombreArchivo(req.file), en: Date.now() };
+    res.render('importar', { title: 'Carga masiva', nav: 'config', sub: 'estructura', res: { ...out, archivo: nombreArchivo(req.file) } });
   } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect('/config/estructura/importar'); }
 }));
 r.post('/config/estructura/importar/aplicar', gh, hacer(async req => {

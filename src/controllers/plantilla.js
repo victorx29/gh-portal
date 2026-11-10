@@ -1,5 +1,5 @@
 const r = require('express').Router(), PL = require('../services/plantilla'), ES = require('../services/estructura'), P = require('../services/perm'), { q } = require('../db'),
-  { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS } = require('../util');
+  { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo } = require('../util');
 // Plantilla de puestos: solo Gestión Humana (todo se valida aquí, en el servidor)
 const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
 r.use(['/config/plantilla', '/config/plazas'], gh);
@@ -32,7 +32,7 @@ r.post('/config/plantilla/carga', subidaXlsx('/config/plantilla/carga'), w(async
     if (!req.file) throw E(400, 'Selecciona el archivo');
     const filas = await PL.leer(req.file.buffer), out = await PL.analizar(filas);
     req.session.cargaPlantilla = out.errs.length ? null : { filas, en: Date.now() };
-    res.render('plantilla_carga', { title: 'Carga masiva de plantilla', nav: 'config', sub: 'plantilla', res: { ...out, archivo: req.file.originalname } });
+    res.render('plantilla_carga', { title: 'Carga masiva de plantilla', nav: 'config', sub: 'plantilla', res: { ...out, archivo: nombreArchivo(req.file) } });
   } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect('/config/plantilla/carga'); }
 }));
 r.post('/config/plantilla/carga/aplicar', hacer(async req => {

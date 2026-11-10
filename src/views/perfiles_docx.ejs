@@ -1,0 +1,33 @@
+<%- include('partials/head') %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Importar descripciones de cargo' }) %><h1>Importar descripciones de cargo (Word)</h1>
+<p class="sub">Sube los .docx con la plantilla de GH. Se crean los perfiles, o una versión nueva si el cargo ya existe y su contenido cambió. Nada se aplica hasta que revises la vista previa.</p></div></div>
+<%- include('partials/config_nav') %>
+<ol class="pasos">
+  <li><b>Selecciona los Word</b> (varios a la vez, hasta 300, de 5 MB cada uno). Puedes subirlos por dirección o área.</li>
+  <li><b>Revisa:</b> el portal lee el cargo, el objetivo, las funciones, el perfil, las competencias, las responsabilidades y el control documental. «Reporta a» y «Departamento» no se importan: los da la plantilla de puestos.</li>
+  <li><b>Corrige los nombres</b> si hace falta (por ejemplo, dos cargos que se llaman igual) y aplica.</li></ol>
+<form method="post" action="/perfiles/importar-docx?_csrf=<%= csrf %>" enctype="multipart/form-data" class="row form-max"><label class="sr" for="ad">Archivos .docx</label>
+<input id="ad" type="file" name="archivos" accept=".docx" multiple required style="max-width:460px"><button class="btn p"><%- ic('subir') %>Leer documentos</button></form>
+<% if (res) { const s = res.resumen, CH = { nuevo: ['', 'Nuevo perfil'], version: [' w', 'Nueva versión'], igual: [' mu', 'Sin cambios'] }; %>
+<h2 class="h2s">Vista previa</h2>
+<div class="kpi"><div><small>Documentos</small><strong><%= s.archivos %></strong></div><div><small>Perfiles nuevos</small><strong><%= s.nuevos %></strong></div><div><small>Versiones nuevas</small><strong><%= s.versiones %></strong></div>
+<div><small>Sin cambios</small><strong><%= s.iguales %></strong></div><div><small>Ilegibles</small><strong><%= s.ilegibles %></strong></div><div><small>Conflictos</small><strong><%= s.conflictos %></strong></div></div>
+<% if (s.conflictos) { %><div class="flash err" role="alert"><%- ic('alerta') %> <span><b><%= s.conflictos %> conflicto<%= s.conflictos > 1 ? 's' : '' %>.</b> Corrige los nombres marcados y pulsa «Revisar de nuevo».</span></div><% } %>
+<form method="post" action="/perfiles/importar-docx/aplicar" id="fdocx"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<fieldset><legend>Alcance de los perfiles nuevos</legend>
+<label class="chk"><input type="radio" name="alcance" value="ninguno"<%= !alc.tipo || alc.tipo === 'ninguno' ? ' checked' : '' %>>Sin alcance: GH lo asigna después (nadie los ve todavía al solicitar)</label>
+<label class="chk"><input type="radio" name="alcance" value="general"<%= alc.tipo === 'general' ? ' checked' : '' %>>General: los ve cualquier solicitante</label>
+<label class="chk"><input type="radio" name="alcance" value="unidad"<%= alc.tipo === 'unidad' ? ' checked' : '' %>>Una unidad y sus dependientes:</label>
+<div data-when="alcance=unidad"><label for="du">Unidad</label><select id="du" name="unidad_id" data-buscar><option value="">Selecciona la unidad</option><% unidades.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= String(o.id) === String(alc.unidad_id) ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select></div>
+<p class="sub">Los perfiles que ya existen conservan su alcance.</p></fieldset>
+<div class="tw"><table class="mid docx-t"><tr><th>Documento</th><th>Cargo (puedes corregirlo)</th><th>Resultado</th><th>Contenido leído</th><th>Avisos</th></tr>
+<% res.filas.forEach(f => { %><tr<%- f.ok && f.errores.length ? ' class="err-row"' : '' %>><td><small><%= f.archivo %></small></td>
+<% if (!f.ok) { %><td colspan="2"><span class="chip r">Ilegible</span></td><td colspan="2" class="mu"><%= f.error %></td>
+<% } else { const c = f.contenido; %><td><label class="sr" for="n<%= f.i %>">Cargo</label><input id="n<%= f.i %>" name="nombre_<%= f.i %>" value="<%= f.nombre %>" required></td>
+<td><span class="chip<%= CH[f.accion][0] %>"><%= CH[f.accion][1] %></span><% if (f.existe) { %><br><small class="mu"><%= f.existe.codigo %> · versión actual <%= String(f.existe.version || 0).padStart(2, '0') %></small><% } %></td>
+<td><small><%= c.funciones.length %> funciones · <%= c.competencias.length %> competencias<%= c.experiencia_min != null ? ' · exp. ' + c.experiencia_min + (c.experiencia_max != null ? '–' + c.experiencia_max : '+') + ' años' : '' %><%= f.control && f.control.fecha_actualizacion ? ' · doc. ' + f.control.fecha_actualizacion.split('-').reverse().join('/') : '' %></small></td>
+<td><% f.errores.forEach(e => { %><div class="err-txt">⛔ <%= e %></div><% }) %><% f.avisos.concat(f.avisosEval).forEach(a => { %><div><small>⚠ <%= a %></small></div><% }) %><% if (!f.errores.length && !f.avisos.length && !f.avisosEval.length) { %><span class="mu">—</span><% } %></td><% } %></tr><% }) %></table></div>
+<p class="act"><button class="btn" formaction="/perfiles/importar-docx/revisar">Revisar de nuevo</button> <button class="btn p"<%= s.nuevos + s.versiones ? '' : ' disabled' %>>Aplicar importación</button></p></form>
+<form method="post" action="/perfiles/importar-docx/descartar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">Descartar</button></form>
+<% } %>
+<%- include('partials/foot') %>

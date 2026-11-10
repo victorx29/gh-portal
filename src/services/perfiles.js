@@ -2,10 +2,27 @@ const ExcelJS = require('exceljs'), { q, tx } = require('../db'), ES = require('
 // Código del perfil: GH-PF-NNN (correlativo). Código de versión: GH-PF-NNN-VV.
 const pad = (n, w) => String(n).padStart(w, '0');
 const codigoV = (codigo, v) => codigo + '-' + pad(v, 2);
-const CAMPOS = ['objetivo', 'funciones', 'requisitos', 'competencias', 'conocimientos'];
+// Contenido del perfil con el formato de las descripciones de cargo de GH. Una sola normalización para formulario, Excel y Word.
+// «Departamento», «Reporta a» y «Trabajador ocupante» NO viven aquí: salen de la plantilla (puesto) y de los empleados.
+const TEXTOS = ['objetivo', 'educacion', 'experiencia', 'conocimientos', 'certificaciones', 'idiomas'];
+const RESP = { dinero: 'Dinero', informacion: 'Información confidencial', decisiones: 'Toma de decisiones', supervision: 'Supervisión' };
+const lineas = v => (Array.isArray(v) ? v : String(v || '').split(/\n|;/)).map(x => String(typeof x === 'object' && x ? (x.nombre + (x.descripcion ? ': ' + x.descripcion : '')) : x).replace(/^[\s•\-–·*\d.)]+/, '').trim()).filter(Boolean);
+const competencia = t => { const m = /^([^:]{2,60}):\s*(.+)$/.exec(t); return m ? { nombre: m[1].trim(), descripcion: m[2].trim() } : { nombre: t }; };
+const entero = v => { const n = parseInt(v, 10); return Number.isInteger(n) && n >= 0 && n <= 60 ? n : null; };
+// Años de experiencia a partir del texto: «entre 4 y 5» → 4–5; «Más de 6» / «Mínimo 15» / «3 años» → mínimo
+const anios = t => { const s = String(t || '').toLowerCase(), m = /entre\s+(\d+)\s*(?:y|a|-)\s*(\d+)/.exec(s) || /(\d+)\s*(?:a|-)\s*(\d+)\s*a[ñn]os/.exec(s); if (m) return [+m[1], +m[2]]; const k = /(\d+)\s*a[ñn]os|(?:m[aá]s de|m[ií]nimo|al menos)\s*(\d+)/.exec(s); return k ? [+(k[1] || k[2]), null] : [null, null]; };
 const contenidoDe = b => {
-  const c = {}; CAMPOS.forEach(k => { c[k] = String(b[k] || '').trim(); });
-  c.criterios = (Array.isArray(b.criterios) ? b.criterios : String(b.criterios || '').split(/\n|;/)).map(s => String(s).trim()).filter(Boolean);
+  b = b || {}; const c = {};
+  TEXTOS.forEach(k => { c[k] = String(b[k] || '').trim(); });
+  if (!c.educacion && b.requisitos) c.educacion = String(b.requisitos).trim();          // versiones anteriores a 0.7.1: «Requisitos» pasa a «Educación»
+  c.funciones = lineas(b.funciones);
+  const [mn, mx] = anios(c.experiencia);
+  c.experiencia_min = entero(b.experiencia_min) != null ? entero(b.experiencia_min) : mn;
+  c.experiencia_max = entero(b.experiencia_max) != null ? entero(b.experiencia_max) : mx;
+  c.competencias_conductuales = (Array.isArray(b.competencias_conductuales) ? b.competencias_conductuales : String(b.competencias_conductuales || '').split(/\n|;|,/)).map(x => String(x).replace(/\.$/, '').trim()).filter(Boolean);
+  c.competencias = lineas(b.competencias).map(competencia);
+  const r = b.responsabilidades || {}; c.responsabilidades = {}; Object.keys(RESP).forEach(k => { c.responsabilidades[k] = String(r[k] != null ? r[k] : b['resp_' + k] || '').trim(); });
+  c.criterios = lineas(b.criterios);
   return c;
 };
 const igual = (a, b) => JSON.stringify(contenidoDe(a || {})) === JSON.stringify(contenidoDe(b || {}));
@@ -97,7 +114,14 @@ const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\
 const key = s => String(s == null ? '' : s).trim().toLowerCase();
 const lista = s => String(s || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
 const COLS = [['Código', 'codigo', 14], ['Cargo *', 'nombre', 34], ['Nivel', 'nivel', 8], ['General', 'general', 9], ['Empresas', 'empresas', 18], ['Unidades', 'unidades', 26],
-  ['Objetivo', 'objetivo', 40], ['Funciones', 'funciones', 40], ['Requisitos', 'requisitos', 30], ['Competencias', 'competencias', 30], ['Conocimientos', 'conocimientos', 30], ['Criterios', 'criterios', 30]];
+  ['Objetivo', 'objetivo', 40], ['Funciones', 'funciones', 50], ['Educación', 'educacion', 30], ['Experiencia', 'experiencia', 30], ['Años mín.', 'experiencia_min', 9], ['Años máx.', 'experiencia_max', 9],
+  ['Conocimientos', 'conocimientos', 40], ['Certificaciones', 'certificaciones', 20], ['Idiomas', 'idiomas', 14], ['Competencias conductuales', 'competencias_conductuales', 30], ['Competencias', 'competencias', 40],
+  ['Dinero', 'resp_dinero', 20], ['Información confidencial', 'resp_informacion', 26], ['Toma de decisiones', 'resp_decisiones', 30], ['Supervisión', 'resp_supervision', 30], ['Criterios', 'criterios', 30]];
+const CONT_COLS = COLS.slice(6).map(c => c[1]);
+const aFila = c => ({ objetivo: c.objetivo || '', funciones: (c.funciones || []).join('; '), educacion: c.educacion || c.requisitos || '', experiencia: c.experiencia || '', experiencia_min: c.experiencia_min ?? '', experiencia_max: c.experiencia_max ?? '',
+  conocimientos: c.conocimientos || '', certificaciones: c.certificaciones || '', idiomas: c.idiomas || '', competencias_conductuales: (c.competencias_conductuales || []).join('; '),
+  competencias: (c.competencias || []).map(x => x.nombre + (x.descripcion ? ': ' + x.descripcion : '')).join('; '), resp_dinero: (c.responsabilidades || {}).dinero || '', resp_informacion: (c.responsabilidades || {}).informacion || '',
+  resp_decisiones: (c.responsabilidades || {}).decisiones || '', resp_supervision: (c.responsabilidades || {}).supervision || '', criterios: (c.criterios || []).join('; ') });
 async function plantilla() {
   const ps = await listar(), wb = new ExcelJS.Workbook(); wb.creator = 'Portal de Gestión Humana';
   const ins = wb.addWorksheet('Instrucciones'); ins.getColumn(1).width = 110;
@@ -105,14 +129,14 @@ async function plantilla() {
     '2. Código vacío = perfil nuevo: el sistema le asigna el siguiente GH-PF-NNN. No inventes códigos.',
     '3. Si cambias Objetivo, Funciones, Requisitos, Competencias, Conocimientos o Criterios, se crea una versión nueva y queda activa. Las requisiciones ya hechas conservan la suya.',
     '4. General = Sí: lo ven todas las empresas y unidades. Si es No, indica Empresas (siglas o razón social) y/o Unidades (código o nombre exacto), separadas por coma.',
-    '5. Una unidad incluye a todas las que dependen de ella. Criterios: separados por punto y coma.',
+    '5. Una unidad incluye a todas las que dependen de ella. Funciones, competencias y criterios: separados por punto y coma. Competencias con descripción: «Nombre: descripción».',
     '6. Lo que no está en el archivo no se modifica ni se borra. Antes de aplicar verás una vista previa con errores y advertencias.'].forEach((t, i) => { const c = ins.getCell(i + 1, 1); c.value = t; if (!i) c.font = { bold: true, size: 14 }; });
   const ws = wb.addWorksheet('Cargos', { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = COLS.map(([header, k, width]) => ({ header, key: k, width }));
   const h = ws.getRow(1); h.font = { bold: true }; h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FD' } };
   for (const p of ps) { const c = p.contenido || {};
     ws.addRow({ codigo: p.codigo, nombre: p.nombre, nivel: p.nivel || '', general: p.general ? 'Sí' : 'No', empresas: p.alcance.filter(a => a.empresa_id).map(a => a.empresa).join(', '),
-      unidades: p.alcance.filter(a => a.unidad_id).map(a => a.unidad_codigo).join(', '), ...Object.fromEntries(CAMPOS.map(k => [k, c[k] || ''])), criterios: (c.criterios || []).join('; ') }); }
+      unidades: p.alcance.filter(a => a.unidad_id).map(a => a.unidad_codigo).join(', '), ...aFila(contenidoDe(c)) }); }
   ws.dataValidations.add('D2:D5000', { type: 'list', allowBlank: true, formulae: ['"Sí,No"'] });
   return wb.xlsx.writeBuffer();
 }
@@ -166,4 +190,22 @@ const analizar = filas => tx(c => procesar(c, filas, null, false));
 async function aplicarCarga(filas, usr) {
   return tx(async c => { const r = await procesar(c, filas, usr, true); if (r.errs.length) throw E(400, 'Los perfiles cambiaron desde la vista previa. Vuelve a subir el archivo'); return r; });
 }
-module.exports = { codigoV, CAMPOS, listar, detalle, crear, editar, nuevaVersion, activarVersion, activo, paraFormulario, ancestros, aplica, validarParaRequisicion, plantilla, leer, analizar, aplicarCarga };
+// ---- Control documental (ISO), registro simple por versión ----
+async function guardarControlC(c, u, versionId, b, origen) {
+  const f = k => /^\d{4}-\d{2}-\d{2}$/.test(String(b[k] || '')) ? b[k] : null, t = k => String(b[k] || '').trim() || null;
+  const v = [versionId, f('fecha_actualizacion'), t('revisado_por'), f('fecha_revision'), t('aprobado_por'), f('fecha_aprobacion'), origen || 'manual', u && u.id];
+  if (v[3] && v[5] && v[5] < v[3]) throw E(400, 'La fecha de aprobación no puede ser anterior a la de revisión');
+  await c.query(`insert into perfil_version_control(version_id,fecha_actualizacion,revisado_por,fecha_revision,aprobado_por,fecha_aprobacion,origen,registrado_por) values($1,$2,$3,$4,$5,$6,$7,$8)
+    on conflict (version_id) do update set fecha_actualizacion=excluded.fecha_actualizacion, revisado_por=excluded.revisado_por, fecha_revision=excluded.fecha_revision,
+    aprobado_por=excluded.aprobado_por, fecha_aprobacion=excluded.fecha_aprobacion, registrado_por=excluded.registrado_por, registrado_en=now()`, v);
+  const pid = (await c.query('select perfil_id, version from perfil_version where id=$1', [versionId])).rows[0];
+  await hist(c, u, pid.perfil_id, 'control', { version: pid.version, revisado_por: v[2], fecha_revision: v[3], aprobado_por: v[4], fecha_aprobacion: v[5], origen: v[6] });
+}
+async function guardarControl(u, perfilId, versionId, b) {
+  return tx(async c => {
+    if (!(await c.query('select 1 from perfil_version where id=$1 and perfil_id=$2', [versionId, perfilId])).rowCount) throw E(404, 'Versión no encontrada');
+    await guardarControlC(c, u, versionId, b, 'manual');
+  });
+}
+const controles = ids => ids.length ? q('select * from perfil_version_control where version_id = any($1)', [ids]).then(r => new Map(r.rows.map(x => [x.version_id, x]))) : Promise.resolve(new Map());
+module.exports = { __igual: igual, guardarControl, guardarControlC, controles, crearC, nuevaVersionC, codigoV, contenidoDe, RESP, anios, listar, detalle, crear, editar, nuevaVersion, activarVersion, activo, paraFormulario, ancestros, aplica, validarParaRequisicion, plantilla, leer, analizar, aplicarCarga };

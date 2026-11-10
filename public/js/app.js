@@ -57,6 +57,7 @@
     if (e.target.closest('[data-perfil-ver]')) { const v = $('#f-perfil'); if (v && v.value) abrir('/perfiles/' + v.value + '/vista', dlg2); return; }
     const c = e.target.closest('[data-close]'); if (c) { const m = c.closest('dialog'); if (m) m.close(); return; }
     if (e.target === dlg || e.target === dlg2) e.target.close();
+    if (e.target.closest('[data-print]')) { window.print(); return; }
     if (e.target.closest('#th')) { const dark = root.dataset.theme === 'dark' || (!root.dataset.theme && matchMedia('(prefers-color-scheme:dark)').matches); root.dataset.theme = dark ? 'light' : 'dark'; try { localStorage.setItem('gh.theme', root.dataset.theme); } catch (x) {} }
     if (e.target.closest('#cl')) { const k = $('#side').classList.toggle('c'); try { localStorage.setItem('gh.col', k ? '1' : '0'); } catch (x) {} }
   });

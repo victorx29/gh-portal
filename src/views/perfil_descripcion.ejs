@@ -1,0 +1,24 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title><%= title %></title>
+<link rel="stylesheet" href="/css/app.css"><script src="/js/app.js" defer></script></head><body class="desc-body">
+<% const c = v.contenido || {}, R = c.responsabilidades || {}, fd = x => x ? String(x).slice(0, 10).split('-').reverse().join('/') : '',
+   fun = Array.isArray(c.funciones) ? c.funciones : String(c.funciones || '').split('\n').filter(Boolean), dep = sel ? (sel.direccion || sel.unidad) : '';
+   const anios = c.experiencia_min != null ? ' (' + (c.experiencia_max != null ? c.experiencia_min + '–' + c.experiencia_max : 'mín. ' + c.experiencia_min) + ' años)' : ''; %>
+<div class="desc-bar noprint"><a class="btn" href="/perfiles?modal=<%= encodeURIComponent('/perfiles/' + p.id) %>">Volver al perfil</a>
+<% if (puestos.length > 1) { %><form method="get" class="row"><input type="hidden" name="v" value="<%= v.version %>"><label for="ps">Puesto</label><select id="ps" name="puesto" data-autosubmit><% puestos.forEach(x => { %><option value="<%= x.id %>"<%= sel && x.id === sel.id ? ' selected' : '' %>><%= x.unidad %></option><% }) %></select></form><% } %>
+<button class="btn p" type="button" data-print>Imprimir o PDF</button></div>
+<% if (!sel) { %><p class="flash noprint">Este perfil todavía no tiene puesto en la plantilla: «Departamento» y «Reporta a» quedan en blanco hasta que GH lo agregue.</p><% } %>
+<article class="desc">
+<table class="desc-t"><tr><td class="desc-logo" rowspan="2">Grupo APB</td><td class="desc-tit">DESCRIPCIÓN DE CARGO</td><td><b>Departamento:</b> <%= dep %></td></tr>
+<tr><td class="desc-cargo"><%= p.nombre.toUpperCase() %><br><small><%= codigoV(p.codigo, v.version) %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %></small></td><td><b>Reporta a:</b> <%= sel && sel.reporta ? sel.reporta : '' %><% if (sel && sel.direccion && sel.direccion !== sel.unidad) { %><br><small>Unidad: <%= sel.unidad %></small><% } %></td></tr>
+</table>
+<section class="desc-s"><h4>Objetivo:</h4><p class="pre"><%= c.objetivo || '' %></p></section>
+<div class="desc-g"><section class="desc-s"><h4>Funciones:</h4><ul><% fun.forEach(f => { %><li><%= f %></li><% }) %></ul></section>
+<section class="desc-s"><h4>Perfil del Cargo:</h4><ul class="desc-kv">
+<li><b>Educación:</b> <%= c.educacion || c.requisitos || '' %></li><li><b>Competencias conductuales:</b> <%= (c.competencias_conductuales || []).join(', ') %></li>
+<li><b>Certificaciones profesionales:</b> <%= c.certificaciones || '' %></li><li><b>Experiencia:</b> <%= c.experiencia || '' %><%= anios %></li>
+<li><b>Conocimientos:</b> <%= c.conocimientos || '' %></li><li><b>Idiomas:</b> <%= c.idiomas || '' %></li></ul></section></div>
+<div class="desc-g"><section class="desc-s"><h4>Competencias:</h4><ul><% (c.competencias || []).forEach(x => { %><li><% if (typeof x === 'object') { %><%= x.nombre %><%= x.descripcion ? ': ' + x.descripcion : '' %><% } else { %><%= x %><% } %></li><% }) %></ul></section>
+<section class="desc-s"><h4>Responsabilidades:</h4><ul class="desc-kv"><% Object.entries(RESP).forEach(([k, t]) => { %><li><b><%= t %>:</b> <span class="pre"><%= R[k] || '' %></span></li><% }) %></ul></section></div>
+<table class="desc-t desc-ctl"><tr><td><b>Fecha de actualización:</b> <%= fd(ctl.fecha_actualizacion) || fd(v.creado_en) %></td><td><b>Fecha de revisión:</b> <%= fd(ctl.fecha_revision) %></td><td><b>Revisado por:</b> <%= ctl.revisado_por || '' %></td></tr>
+<tr><td><b>Aprobado por:</b> <%= ctl.aprobado_por || '' %></td><td><b>Fecha de aprobación:</b> <%= fd(ctl.fecha_aprobacion) %></td><td><b>Trabajador ocupante:</b> </td></tr></table>
+</article></body></html>
