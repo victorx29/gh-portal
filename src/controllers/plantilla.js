@@ -20,6 +20,7 @@ r.post('/config/plantilla/puesto/:id/editar', hacer(req => PL.editarPuesto(req.u
 r.post('/config/plantilla/puesto/:id/plazas', hacer(async req => { const c = await PL.agregarPlazas(req.user, +req.params.id, req.body); return aPuesto(req.params.id); }, 'Plazas agregadas', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id), 'Puesto desactivado', req => aPuesto(req.params.id)));
 r.post('/config/plazas/:id/congelar', hacer(async req => aPuesto(await PL.congelar(req.user, +req.params.id, req.body.on === '1', req.body.motivo)), 'Plaza actualizada', '/config/plantilla'));
+r.post('/config/plazas/:id/empresa', hacer(async req => aPuesto(await PL.cambiarEmpresaPlaza(req.user, +req.params.id, req.body.empresa_id, req.body.motivo)), 'Empresa de la plaza actualizada', '/config/plantilla'));
 r.post('/config/plazas/:id/cerrar', hacer(async req => aPuesto(await PL.cerrarPlaza(req.user, +req.params.id, req.body.motivo)), 'Plaza cerrada con fecha de hoy', '/config/plantilla'));
 // Carga masiva
 r.get('/config/plantilla/plantilla.xlsx', w(async (req, res) => {

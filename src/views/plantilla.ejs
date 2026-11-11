@@ -13,7 +13,7 @@
   <div class="end"><button class="btn">Aplicar</button><% if (f.buscar || f.unidad || f.empresa || f.modalidad || f.fecha) { %> <a class="btn" href="/config/plantilla">Limpiar</a><% } %></div>
 </form>
 <% if (!esHoy) { %><div class="flash" role="status"><%- ic('reloj') %> Plantilla al <b><%= fd(L.f) %></b>: las plazas que empiezan después de esa fecha se ven como proyectadas. Solo lectura.</div><% } %>
-<div class="kpi"><div><small>HC de nómina</small><strong><%= t.hc %></strong></div><div><small>Congeladas</small><strong><%= t.cong %></strong></div><div><small>Proyectadas</small><strong><%= t.proy %></strong></div>
+<div class="kpi"><div><small>HC de nómina</small><strong><%= t.hc %></strong></div><div><small>En proceso (↻)</small><strong><%= t.enProceso %></strong></div><div><small>Empresa por definir</small><strong><%= t.porDefinir %></strong></div><div><small>Congeladas</small><strong><%= t.cong %></strong></div><div><small>Proyectadas</small><strong><%= t.proy %></strong></div>
 <div><small>Outsourcing</small><strong><%= t.ext.outsourcing %></strong></div><div><small>Pasantes · becarios · aprendices</small><strong><%= t.ext.pasante %> · <%= t.ext.becario %> · <%= t.ext.aprendiz %></strong></div><div><small>Puestos</small><strong><%= L.rows.length %></strong></div></div>
 <p class="sub">Ocupadas y vacantes aparecerán cuando se carguen los empleados (0.8).</p>
 <% if (!L.rows.length) { %><div class="empty">No hay puestos con este filtro. Crea uno con «Nuevo puesto» o carga la plantilla con el Excel.</div><% } else { %>

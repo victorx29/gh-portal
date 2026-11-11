@@ -4,7 +4,7 @@
 <table class="kv"><tr><th>Unidad</th><td><%= x.unidad || '—' %><% if (x.unidad_codigo) { %> <small class="mu"><%= x.unidad_codigo %></small><% } %></td></tr><tr><th>Tipo</th><td><%= x.tipo === 'nuevo' ? 'Cargo nuevo' : 'Reemplazo' %><% if (x.sustituye_a) { %> · sustituye a <%= x.sustituye_a %><% } %></td></tr>
 <tr><th>Profesión u oficio</th><td><%= x.profesion || '—' %></td></tr><tr><th>Grado de instrucción</th><td><%= x.grado || '—' %></td></tr><tr><th>Experiencia</th><td style="white-space:pre-line"><%= x.experiencia || '—' %></td></tr>
 <tr><th>Contratación</th><td><%= x.contratacion %><% if (x.contratacion === 'Temporal') { %> · del <%= f(x.vigencia_desde) %> al <%= f(x.vigencia_hasta) %><% } %></td></tr>
-<tr><th>Plazas</th><td><%= x.plazas %></td></tr><tr><th>Fecha requerida</th><td><%= f(x.fecha_requerida) %></td></tr><tr><th>Perfil</th><td>versión <%= x.perfil_v %> · <a href="/perfiles/<%= x.perfil_id %>/vista" data-modal2>ver</a></td></tr>
+<tr><th>Plaza</th><td><% if (x.plaza_codigo) { %><%= x.plaza_codigo %><% if (gh) { %> · <a href="/config/plantilla?buscar=<%= encodeURIComponent(x.unidad || '') %>">ver en plantilla</a><% } %><% } else if (x.tipo === 'nuevo') { %><span class="mu">Se crea en la plantilla al aprobarse</span><% } else { %><span class="mu">— (requisición anterior a la plantilla)</span><% } %></td></tr><tr><th>Fecha requerida</th><td><%= f(x.fecha_requerida) %></td></tr><tr><th>Perfil</th><td>versión <%= x.perfil_v %> · <a href="/perfiles/<%= x.perfil_id %>/vista" data-modal2>ver</a></td></tr>
 <tr><th>Equipos</th><td><%= x.equipos.map(e => e.nombre + (e.requiere_linea ? ' (con línea)' : '')).join(', ') || '—' %><% if (x.equipos_otros) { %><br>Otros: <%= x.equipos_otros %><% } %></td></tr>
 <tr><th>Accesos</th><td><%= x.accesos.map(a => a.nombre + (a.nivel ? ' — ' + a.nivel : '')).join('; ') || '—' %></td></tr><tr><th>Correo corporativo</th><td><%= x.correo_corporativo ? 'Sí' : 'No' %></td></tr>
 <tr><th>Solicitante</th><td><%= x.solicitante %></td></tr><tr><th>Justificación</th><td><%= x.justificacion || '—' %></td></tr><% if (x.motivo_cierre) { %><tr><th>Motivo de cierre</th><td><%= x.motivo_cierre %></td></tr><% } %></table>
@@ -25,6 +25,14 @@
 <% aps.forEach(p => { const f = p.estructura || {}; %><div class="log"><b><%= DEC[p.decision] || p.decision %></b> — <%= p.autor %> · <%= p.paso === 'presidencia' ? 'Presidencia' : 'Director' %><br><small><%= new Date(p.fecha).toLocaleString('es-VE') %></small>
 <% if (p.comentario) { %><br><span style="white-space:pre-line"><%= p.comentario %></span><% } %>
 <% if ((f.cadena || []).length) { %><br><small class="mu">Estructura en ese momento: <%= f.cadena.map(c => c.nombre + (f.aprobadora && c.id === f.aprobadora.id ? ' (aprobó)' : '')).join(' › ') %></small><% } else if (f.regla === 'empresa') { %><br><small class="mu">Aprobada por la regla de transición: director de la empresa.</small><% } %></div><% }) %></details><% } %>
+<% if (gh && !['rechazada', 'anulada', 'cancelado'].includes(x.estado)) { %><details><summary>Cambiar empresa (Gestión Humana)</summary>
+<form method="post" action="/requisiciones/<%= x.id %>/empresa"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<p class="sub">Cambia la empresa de la requisición<%= x.plaza_codigo ? ' y de su plaza ' + x.plaza_codigo : '' %>. Queda en la línea de tiempo y se avisa a n8n. La foto de la aprobación no cambia.</p>
+<div class="g2"><div><label for="ce-e">Nueva empresa</label><select id="ce-e" name="empresa_id" required><% empresas.filter(e => e.id !== x.empresa_id).forEach(e => { %><option value="<%= e.id %>"><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.nombre %></option><% }) %></select></div>
+<div><label for="ce-m">Motivo</label><input id="ce-m" name="motivo" required placeholder="Decisión de Gestión Humana: nómina CIM"></div></div>
+<% if (confirmar) { %><p class="flash err" role="alert"><%- ic('alerta') %> <span>Fue aprobada por alguien con alcance de empresa (Presidencia o director de la empresa). El cambio <b>no repite</b> la aprobación.</span></p>
+<label class="chk"><input type="checkbox" name="confirmo" required>Entiendo y quiero cambiarla igual</label><% } %>
+<p class="act"><button class="btn">Cambiar empresa</button></p></form></details><% } %>
 <details open><summary>Comentarios (<%= com.length %>)</summary>
 <% com.forEach(c => { %><div class="cmt<%= c.ambito === 'gh' ? ' gh' : '' %>"><b><%= c.autor %></b><% if (c.ambito === 'gh') { %> <span class="chip w">nota interna GH</span><% } %> <small><%= new Date(c.creado_en).toLocaleString('es-VE') %></small><br><span style="white-space:pre-line"><%= c.texto %></span></div><% }) %>
 <% if (!com.length) { %><p class="sub">Sin comentarios todavía.</p><% } %>

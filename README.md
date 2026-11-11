@@ -45,7 +45,7 @@ DATABASE_URL=postgres://gh:gh@localhost:5432/gh npm run dev
 6. Backups programados del servicio PostgreSQL y prueba de restauración antes de producción.
 
 ## Contrato con n8n
-La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
+La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url`, `detalle.plaza` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.empresa_cambiada`, `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
 
 ## Diagrama de estructura
 `/config/estructura/diagrama` (solo GH): vista de cajas con filtros por unidad, empresas, división y fecha; impresión o PDF e imagen. Sin librerías externas (`public/js/diagrama.js`).
@@ -54,6 +54,8 @@ La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x
 Puesto = perfil en una unidad (un jefe por unidad); plaza = posición autorizada con empresa de nómina, modalidad y vigencia.
 Estado de plan calculado a cualquier fecha (vigente, congelada, proyectada, cerrada). Reporte: jefe directo por defecto más excepciones, sin ciclos.
 Puestos y plazas no se borran (disparadores en la base). Ver `UPDATE_0.7.md`.
+Una plaza por requisición: el reemplazo elige una plaza de su unidad; el cargo nuevo crea su plaza al aprobarse. Plaza de unidad corporativa con empresa
+«Por definir» hasta que se aprueba la requisición; GH puede cambiar la empresa de la plaza o de la requisición (con motivo). Ver `UPDATE_0.7.2.md`.
 
 ## Perfiles y Cargos
 Contenido con el formato de la descripción de cargo de GH: objetivo, funciones, educación, experiencia (con años mín./máx.), conocimientos, certificaciones, idiomas,
@@ -64,5 +66,5 @@ Código automático `GH-PF-NNN` y versiones inmutables `GH-PF-NNN-VV`; el perfil
 Alcance en `perfil_alcance`: general, empresas, unidades (incluye dependientes) o ambas. La requisición guarda la versión activa al crearse.
 
 ## Pendiente (siguientes entregas)
-0.7.2 Requisición ligada a la plaza. 0.8 Empleados (importación del Excel) y organigrama por división, empresa y unidad.
+0.8 Empleados (importación del Excel) y organigrama por división, empresa y unidad.
 0.9 Postulados con IA. 1.0 Notificaciones. SSO Microsoft 365 antes de abrir el portal a todos los gerentes.

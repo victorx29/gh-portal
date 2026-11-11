@@ -1,11 +1,11 @@
-const r = require('express').Router(), S = require('../services/requisiciones'), ES = require('../services/estructura'), PF = require('../services/perfiles'), C = require('../services/comunicacion'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash, modal } = require('../util');
+const r = require('express').Router(), S = require('../services/requisiciones'), ES = require('../services/estructura'), PF = require('../services/perfiles'), C = require('../services/comunicacion'), P = require('../services/perm'), PT = require('../services/plantilla'), { q } = require('../db'), { w, E, flash, modal } = require('../util');
 const APROB = ['borrador', 'pend_director', 'pend_presidencia', 'rechazada', 'anulada'];
 // El formulario ofrece solo las unidades (y empresas) para las que el usuario puede solicitar
-async function datosForm(u) {
+async function datosForm(u, reqId) {
   const [emp, per, gra, eqp, acc, unidades] = await Promise.all([q('select id,coalesce(razon_social,nombre) nombre,siglas from empresa where activa order by 2'), PF.paraFormulario().then(rows => ({ rows })),
     q('select id,nombre from grado_instruccion where activo order by orden,nombre'), q('select id,nombre,requiere_linea from catalogo_equipo where activo order by nombre'), q('select id,nombre from catalogo_acceso where activo order by nombre'), ES.alcanceSolicitud(u)]);
-  const ids = new Set(unidades.flatMap(x => x.empresas));
-  return { emps: emp.rows.filter(e => ids.has(e.id)), pers: per.rows, unidades, grados: gra.rows, equipos: eqp.rows, accesos: acc.rows };
+  const ids = new Set(unidades.flatMap(x => x.empresas)), plazas = await PT.plazasParaSolicitud(unidades.map(x => x.id), reqId);   // reemplazo: plazas de sus unidades
+  return { emps: emp.rows.filter(e => ids.has(e.id)), pers: per.rows, unidades, plazas, grados: gra.rows, equipos: eqp.rows, accesos: acc.rows };
 }
 r.get('/requisiciones/nueva', w(async (req, res) => modal(req, res, 'req_form', { title: 'Nueva requisición', v: {}, ...await datosForm(req.user) })));
 r.post('/requisiciones', w(async (req, res) => {
@@ -15,11 +15,19 @@ r.post('/requisiciones', w(async (req, res) => {
 r.get('/requisiciones/:id', w(async (req, res) => {
   const x = await S.obtener(req.user, +req.params.id);
   const [a, com, adj, linea, aps] = await Promise.all([S.acciones(req.user, x), C.comentarios(req.user, x.id), C.adjuntos(x.id), C.lineaTiempo(req.user, x), S.aprobaciones(x.id)]);
-  modal(req, res, 'req_detalle', { title: x.codigo, x, a, com, adj, linea, aps });
+  const gh = P.esGH(req.user), empresas = gh ? (await q('select id, siglas, coalesce(razon_social,nombre) nombre from empresa where activa order by 3')).rows : [];
+  const confirmar = gh && aps.some(p => p.paso === 'presidencia' || (p.estructura || {}).regla === 'empresa');
+  modal(req, res, 'req_detalle', { title: x.codigo, x, a, com, adj, linea, aps, gh, empresas, confirmar });
+}));
+// GH cambia la empresa de la requisición (y de su plaza)
+r.post('/requisiciones/:id/empresa', w(async (req, res) => {
+  try { await S.cambiarEmpresa(req.user, +req.params.id, req.body.empresa_id, req.body.motivo, req.body.confirmo === 'on'); flash(req, 'ok', 'Empresa cambiada: queda en la línea de tiempo'); }
+  catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
+  res.redirect('/pipeline?abrir=' + req.params.id);
 }));
 r.get('/requisiciones/:id/editar', w(async (req, res) => {
   const x = await S.obtener(req.user, +req.params.id); if (!(await S.acciones(req.user, x)).editar) throw E(403, 'No puedes editar');
-  modal(req, res, 'req_form', { title: 'Editar', v: x, ...await datosForm(req.user) });
+  modal(req, res, 'req_form', { title: 'Editar', v: x, ...await datosForm(req.user, x.id) });
 }));
 r.post('/requisiciones/:id/editar', w(async (req, res) => {
   try { await S.guardar(req.user, +req.params.id, req.body); flash(req, 'ok', 'Borrador actualizado'); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }

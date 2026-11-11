@@ -91,7 +91,7 @@ details.blk{border-width:1px 0 0;border-radius:0;padding:6px 0 0}
 .pl-f{grid-template-columns:1.4fr 2fr 1.4fr 1fr 1fr auto}.pl-u td{border-top:2px solid var(--bd)}
 details.inl-d{display:inline-block;border:0;padding:0;margin:0;position:relative}details.inl-d>summary{list-style:none;min-height:44px}details.inl-d>summary::-webkit-details-marker{display:none}
 details.inl-d .pop{position:absolute;right:0;top:calc(100% + 4px);z-index:5;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px;width:300px;box-shadow:0 8px 24px #0002;display:grid;gap:8px;white-space:normal;text-align:left}
-details.inl-d .pop form{display:flex;gap:6px}details.inl-d .pop input{min-height:40px}
+details.inl-d .pop form{display:flex;gap:6px;flex-wrap:wrap}details.inl-d .pop select{width:auto;min-height:40px}details.inl-d .pop input{min-height:40px}
 .chklist{border:1px solid var(--bd);border-radius:10px;padding:4px 12px;max-height:180px;overflow-y:auto}.chklist.alto{max-height:240px}.chklist .chk{margin:6px 0}
 /* Diagrama de estructura: hoja blanca con zoom y desplazamiento */
 .dg-f{grid-template-columns:1.2fr 2fr 1fr 1fr 1.3fr auto}.dg-emp{grid-column:1/-1;margin-top:10px}

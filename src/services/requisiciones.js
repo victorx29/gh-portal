@@ -1,6 +1,6 @@
-const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), ES = require('./estructura'), PF = require('./perfiles'), { E } = require('../util');
-const SEL = `select r.*, coalesce(e.razon_social,e.nombre) empresa, e.siglas empresa_siglas, e.nombre empresa_comercial, pf.codigo perfil_codigo, un.nombre unidad, un.codigo unidad_codigo, unidad_aprobadora(r.unidad_id) aprob_uid, (select nombre from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_nombre, pf.id perfil_id, pf.nombre cargo, pv.version perfil_v, s.nombre solicitante, s.email solicitante_email, g.nombre grado
-  from requisicion r join empresa e on e.id=r.empresa_id left join unidad un on un.id=r.unidad_id
+const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), ES = require('./estructura'), PF = require('./perfiles'), PT = require('./plantilla'), { E } = require('../util');
+const SEL = `select r.*, pz.codigo plaza_codigo, pz.empresa_id plaza_empresa_id, coalesce(e.razon_social,e.nombre) empresa, e.siglas empresa_siglas, e.nombre empresa_comercial, pf.codigo perfil_codigo, un.nombre unidad, un.codigo unidad_codigo, unidad_aprobadora(r.unidad_id) aprob_uid, (select nombre from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_nombre, pf.id perfil_id, pf.nombre cargo, pv.version perfil_v, s.nombre solicitante, s.email solicitante_email, g.nombre grado
+  from requisicion r join empresa e on e.id=r.empresa_id left join unidad un on un.id=r.unidad_id left join plaza pz on pz.id=r.plaza_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id join usuario s on s.id=r.solicitante_id
   left join grado_instruccion g on g.id=r.grado_id`;
 
@@ -26,7 +26,7 @@ async function detalleEvento(c, id) {
     c.query('select p.codigo, p.nivel, v.version, v.contenido from perfil_version v join perfil p on p.id=v.perfil_id where v.id=$1', [r.perfil_version_id]).then(q => q.rows[0]),
     c.query('select ap.paso, ap.decision, ap.comentario, ap.fecha, u.nombre autor, u.email from aprobacion ap join usuario u on u.id=ap.decidido_por where ap.requisicion_id=$1 order by ap.id', [id]).then(q => q.rows)]);
   return { codigo: r.codigo, estado: r.estado, tipo: r.tipo, cargo: r.cargo, perfil: { codigo: PF.codigoV(pv.codigo, pv.version), nivel: pv.nivel, contenido: pv.contenido },
-    empresa: r.empresa, empresa_datos: emp, unidad: r.unidad, unidad_codigo: r.unidad_codigo, cadena: cad.map(u => u.nombre), aprobadora: r.aprob_nombre,
+    plaza: r.plaza_codigo || null, empresa: r.empresa, empresa_datos: emp, unidad: r.unidad, unidad_codigo: r.unidad_codigo, cadena: cad.map(u => u.nombre), aprobadora: r.aprob_nombre,
     sustituye_a: r.sustituye_a, plazas: r.plazas, contratacion: r.contratacion, desde: r.vigencia_desde, hasta: r.vigencia_hasta, justificacion: r.justificacion,
     profesion: r.profesion, grado: r.grado, experiencia: r.experiencia, fecha_requerida: r.fecha_requerida, solicitante: r.solicitante, solicitante_email: r.solicitante_email,
     correo_corporativo: r.correo_corporativo, equipos: x.equipos.map(e => ({ nombre: e.nombre, con_linea: e.requiere_linea })), equipos_otros: r.equipos_otros,
@@ -34,6 +34,7 @@ async function detalleEvento(c, id) {
 }
 async function cambiar(c, u, r, est, accion, extra) {
   await c.query('update requisicion set estado=$2, actualizada_en=now() where id=$1', [r.id, est]);
+  if (est === 'aprobado') { const z = await PT.alAprobar(c, u, r); if (z) { r.plaza_id = z.id; extra = { ...(extra || {}), plaza: z.codigo }; } }
   await hist(c, u, r.id, accion, { de: r.estado, a: est, ...(extra || {}) });
   const pl = await PL.resolver(r.empresa_id, 'requisicion', c), base = { requisicion_id: r.id, codigo: r.codigo, estado: est, empresa_id: r.empresa_id, solicitante_id: r.solicitante_id };
   if (est === 'pend_director') { const ap = await ES.aprobacion(c, r); base.aprobadora = ap.unidad && ap.unidad.nombre; base.aprobadores = ap.aprobadores.map(a => ({ nombre: a.nombre, email: a.email })); }
@@ -102,20 +103,25 @@ async function guardar(u, id, b) {
   const op = (await ES.alcanceSolicitud(u)).find(o => o.id === uid);
   if (!op) throw E(403, 'Esa unidad no está en tu alcance, o no atiende a ninguna empresa (GH lo configura en Estructura › Empresas que atiende)');
   if (!op.empresas.includes(emp)) throw E(400, 'Esa unidad no pertenece ni presta servicio a la empresa elegida');
-  const pv = { id: await PF.validarParaRequisicion(+b.perfil_id, emp, uid) };   // versión activa del perfil, si corresponde a esa empresa y unidad
+  // Una plaza por requisición. Reemplazo: una plaza existente de la unidad (su perfil sale del puesto). Cargo nuevo: perfil elegido; la plaza se crea al aprobarse.
   const tipo = b.tipo === 'nuevo' ? 'nuevo' : 'reemplazo', temp = b.contratacion === 'Temporal', t = s => (s || '').trim() || null;
+  const plazaId = tipo === 'reemplazo' ? +b.plaza_id || null : null;
+  if (tipo === 'reemplazo' && !plazaId) throw E(400, 'Elige la plaza que se va a reemplazar');
+  const pv = { id: tipo === 'nuevo' ? await PF.validarParaRequisicion(+b.perfil_id, emp, uid) : null };
   if (temp && (!b.vigencia_desde || !b.vigencia_hasta || b.vigencia_hasta < b.vigencia_desde)) throw E(400, 'En contratación temporal indica fechas válidas: «hasta» no puede ser anterior a «desde»');
-  const v = [emp, uid, pv.id, tipo, temp ? 'Temporal' : 'Permanente', Math.max(1, parseInt(b.plazas) || 1), t(b.justificacion), b.fecha_requerida || null,
+  const v = [emp, uid, pv.id, tipo, temp ? 'Temporal' : 'Permanente', 1, t(b.justificacion), b.fecha_requerida || null,
     tipo === 'reemplazo' ? t(b.sustituye_a) : null, t(b.profesion), b.grado_id || null, t(b.experiencia), temp ? b.vigencia_desde : null, temp ? b.vigencia_hasta : null, b.correo_corporativo === 'on', t(b.equipos_otros)];
   return tx(async c => {
+    if (plazaId) { v[2] = (await PT.validarPlazaC(c, plazaId, uid, emp, id)).perfilVersionId; }
+    v.push(plazaId);
     let rid = id;
     if (!id) {
-      rid = (await c.query(`insert into requisicion(codigo,empresa_id,unidad_id,perfil_version_id,tipo,contratacion,plazas,justificacion,fecha_requerida,sustituye_a,profesion,grado_id,experiencia,vigencia_desde,vigencia_hasta,correo_corporativo,equipos_otros,solicitante_id)
-        values('REQ-'||lpad(nextval('req_seq')::text,5,'0'),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) returning id`, [...v, u.id])).rows[0].id;
+      rid = (await c.query(`insert into requisicion(codigo,empresa_id,unidad_id,perfil_version_id,tipo,contratacion,plazas,justificacion,fecha_requerida,sustituye_a,profesion,grado_id,experiencia,vigencia_desde,vigencia_hasta,correo_corporativo,equipos_otros,plaza_id,solicitante_id)
+        values('REQ-'||lpad(nextval('req_seq')::text,5,'0'),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) returning id`, [...v, u.id])).rows[0].id;
     } else {
       const r = await lock(c, id); if (r.estado !== 'borrador' || r.solicitante_id != u.id) throw E(403, 'Solo el solicitante edita un borrador');
       await c.query(`update requisicion set empresa_id=$2,unidad_id=$3,perfil_version_id=$4,tipo=$5,contratacion=$6,plazas=$7,justificacion=$8,fecha_requerida=$9,sustituye_a=$10,profesion=$11,grado_id=$12,experiencia=$13,
-        vigencia_desde=$14,vigencia_hasta=$15,correo_corporativo=$16,equipos_otros=$17,actualizada_en=now() where id=$1`, [id, ...v]);
+        vigencia_desde=$14,vigencia_hasta=$15,correo_corporativo=$16,equipos_otros=$17,plaza_id=$18,actualizada_en=now() where id=$1`, [id, ...v]);
     }
     await c.query('delete from requisicion_equipo where requisicion_id=$1', [rid]); await c.query('delete from requisicion_acceso where requisicion_id=$1', [rid]);
     for (const e of [].concat(b.eq || [])) await c.query('insert into requisicion_equipo(requisicion_id,equipo_id,requiere_linea) values($1,$2,$3) on conflict do nothing', [rid, +e, b['linea_' + e] === 'on']);
@@ -147,6 +153,8 @@ async function enviar(u, id) {
     const r = await lock(c, id);
     if (r.solicitante_id != u.id || r.estado !== 'borrador') throw E(400, 'No se puede enviar esta requisición');
     if (!r.unidad_id) throw E(400, 'Indica la unidad que solicita (edita el borrador) antes de enviarlo');
+    if (r.plaza_id) await PT.validarPlazaC(c, r.plaza_id, r.unidad_id, r.empresa_id, r.id);
+    else if (r.tipo === 'reemplazo') throw E(400, 'Indica la plaza que se reemplaza (edita el borrador) antes de enviarlo');
     const ap = await ES.aprobacion(c, r);
     let est = 'pend_director';
     if (ap.aprobadores.some(a => a.id === u.id)) {   // quien aprueba esa unidad y solicita, se aprueba automáticamente
@@ -208,4 +216,28 @@ async function registrar(u, id, b) {
   const ck = [].concat(b.check || []).filter(i => ((et.reglas && et.reglas.checklist) || []).includes(i));
   await hist({ query: q }, u, id, 'registro', { etapa: et.nombre, resultado: ['apto', 'no_apto'].includes(b.resultado) ? b.resultado : 'pendiente', checklist: ck, nota: (b.nota || '').trim() || undefined });
 }
-module.exports = { detalleEvento, urlReq, listar, obtener, aprobaciones, acciones, guardar, eliminar, anular, enviar, decidir, mover, cancelar, registrar, lock, cambiar, hist };
+// GH cambia la empresa de la requisición (y de su plaza). La foto de la aprobación no se toca; si se aprobó con alcance «por empresa», pide confirmación.
+async function aprobadaPorEmpresa(c, id) {
+  return (await c.query(`select 1 from aprobacion where requisicion_id=$1 and (paso='presidencia' or estructura->>'regla'='empresa') limit 1`, [id])).rowCount > 0;
+}
+async function cambiarEmpresa(u, id, empresaId, motivo, confirmado) {
+  if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana cambia la empresa');
+  motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo del cambio');
+  const emp = +empresaId; if (!emp) throw E(400, 'Elige la empresa');
+  return tx(async c => {
+    const r = await lock(c, id);
+    if (['rechazada', 'anulada', 'cancelado'].includes(r.estado)) throw E(400, 'La requisición está cerrada');
+    if (r.empresa_id === emp) throw E(400, 'Ya es de esa empresa');
+    const e = (await c.query('select siglas, coalesce(razon_social,nombre) nombre from empresa where id=$1 and activa', [emp])).rows[0]; if (!e) throw E(400, 'La empresa no existe o está inactiva');
+    const plNueva = await PL.resolver(emp, 'requisicion', c), plVieja = await PL.resolver(r.empresa_id, 'requisicion', c);
+    if (plVieja.flujo.some(x => x.clave === r.estado) && !plNueva.flujo.some(x => x.clave === r.estado))
+      throw E(400, `El pipeline de ${e.siglas || e.nombre} no tiene la etapa actual («${r.estado}»): la tarjeta desaparecería del tablero. Ajusta el pipeline o espera a otra etapa`);
+    if (await aprobadaPorEmpresa(c, id) && !confirmado) throw E(400, 'Fue aprobada por alguien con alcance de empresa (Presidencia o director de la empresa). Marca la confirmación: el cambio no repite la aprobación');
+    await c.query('update requisicion set empresa_id=$2, actualizada_en=now() where id=$1', [id, emp]);
+    if (r.plaza_id) await PT.cambiarEmpresaC(c, u, r.plaza_id, emp, motivo + ' (requisición ' + r.codigo + ')', 'requisicion');
+    const de = (await c.query('select coalesce(siglas, razon_social, nombre) n from empresa where id=$1', [r.empresa_id])).rows[0];
+    await hist(c, u, id, 'empresa', { de: r.empresa_id, a: emp, de_txt: de && de.n, a_txt: e.siglas || e.nombre, motivo });
+    await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['requisicion.empresa_cambiada', { requisicion_id: id, codigo: r.codigo, de: r.empresa_id, a: emp, motivo, por: u.nombre, url: urlReq(id), detalle: await detalleEvento(c, id) }]);
+  });
+}
+module.exports = { cambiarEmpresa, aprobadaPorEmpresa, detalleEvento, urlReq, listar, obtener, aprobaciones, acciones, guardar, eliminar, anular, enviar, decidir, mover, cancelar, registrar, lock, cambiar, hist };

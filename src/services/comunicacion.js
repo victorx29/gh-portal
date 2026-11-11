@@ -26,6 +26,7 @@ function etiqueta(h, nom) {
   switch (h.accion) {
     case 'crear': return ['Creó la requisición', ''];
     case 'editar': return ['Editó el borrador', ''];
+    case 'empresa': return ['Cambió la empresa', [d.de_txt && d.a_txt ? d.de_txt + ' → ' + d.a_txt : '', d.motivo].filter(Boolean).join(' · ')];
     case 'enviar': return ['Envió a aprobación', ['Estado: ' + n(d.a), d.aprobadora ? 'Aprueba: ' + d.aprobadora : d.regla === 'empresa' ? 'Aprueba: director de la empresa (regla de transición)' : ''].filter(Boolean).join(' · ')];
     case 'mover': return ['Avanzó a «' + n(d.a) + '»', 'Desde «' + n(d.de) + '»'];
     case 'registro': return ['Registró la etapa «' + d.etapa + '»', [d.resultado && 'Resultado: ' + d.resultado, ...(d.checklist || []).map(x => '✓ ' + x), d.nota].filter(Boolean).join(' · ')];

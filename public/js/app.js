@@ -38,6 +38,13 @@
       op.hidden = !(op.dataset.g === '1' || ((pe.length || pu.length) && E && A.length && (!pe.length || pe.includes(E)) && (!pu.length || pu.some(x => A.includes(x)))));
     });
     if (pf.selectedOptions[0] && pf.selectedOptions[0].hidden) pf.value = '';
+    plazas(scope);
+  }
+  // Plazas para reemplazo: solo las de la unidad elegida
+  function plazas(scope) {
+    const un = scope.querySelector('#f-unidad'), pz = scope.querySelector('#f-plaza'); if (!un || !pz) return;
+    [...pz.options].forEach(o => { if (o.dataset.u !== undefined) { o.dataset.hu = o.dataset.u === un.value ? '0' : '1'; o.hidden = o.dataset.hu === '1'; } });
+    if (pz.selectedOptions[0] && pz.selectedOptions[0].hidden) pz.value = '';
   }
   // Campos condicionales: data-when="campo=valor" o "campo=a|b"; el campo se busca en el mismo formulario
   const cond = scope => scope.querySelectorAll('[data-when]').forEach(el => {
@@ -54,7 +61,11 @@
   d.addEventListener('click', e => {
     const a = e.target.closest('[data-modal],[data-modal2]');
     if (a) { e.preventDefault(); abrir(a.getAttribute('href'), a.hasAttribute('data-modal2') ? dlg2 : dlg); return; }
-    if (e.target.closest('[data-perfil-ver]')) { const v = $('#f-perfil'); if (v && v.value) abrir('/perfiles/' + v.value + '/vista', dlg2); return; }
+    if (e.target.closest('[data-perfil-ver]')) {
+      const f = e.target.closest('form'), t = f && f.querySelector('#f-tipo'), z = f && f.querySelector('#f-plaza'), v = f && f.querySelector('#f-perfil');
+      const id = t && t.value === 'reemplazo' ? (z && z.selectedOptions[0] && z.selectedOptions[0].dataset.p) : v && v.value;
+      if (id) abrir('/perfiles/' + id + '/vista', dlg2); return;
+    }
     const c = e.target.closest('[data-close]'); if (c) { const m = c.closest('dialog'); if (m) m.close(); return; }
     if (e.target === dlg || e.target === dlg2) e.target.close();
     if (e.target.closest('[data-print]')) { window.print(); return; }
@@ -65,6 +76,10 @@
     if (e.target.matches('[data-autosubmit]')) e.target.form.submit();
     if (e.target.matches('#f-empresa')) unidades(e.target.closest('form'));
     if (e.target.matches('#f-unidad')) perfiles(e.target.closest('form'));
+    if (e.target.matches('#f-plaza')) {   // la plaza manda la empresa si ya la tiene
+      const o = e.target.selectedOptions[0], em = e.target.form.querySelector('#f-empresa');
+      if (o && o.dataset.e && em && em.value !== o.dataset.e) { em.value = o.dataset.e; unidades(e.target.form); e.target.value = o.value; }
+    }
     const f = e.target.closest('form'); if (f) cond(f);
   });
   // Filtro de listas de casillas: <input data-filtra> seguido de .chklist
