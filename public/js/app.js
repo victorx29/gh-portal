@@ -40,6 +40,18 @@
     if (pf.selectedOptions[0] && pf.selectedOptions[0].hidden) pf.value = '';
     plazas(scope);
   }
+  // Nuevo puesto: perfiles del área elegida (alcance en la unidad o una superior, o en una empresa que atiende) y generales; «otras áreas» bajo casilla
+  function perfilesPuesto(scope) {
+    const un = scope.querySelector('#pu-u'), pf = scope.querySelector('#pu-p'), todos = scope.querySelector('#pu-todos'); if (!un || !pf) return;
+    const o = un.selectedOptions[0], A = o && o.dataset.a ? o.dataset.a.split(',') : [], EM = o && o.dataset.e ? o.dataset.e.split(',') : [];
+    [...pf.options].forEach(op => {
+      if (op.dataset.g === undefined) { if (!op.value) op.textContent = un.value ? 'Selecciona el perfil' : 'Elige primero la unidad'; return; }
+      const pu = op.dataset.pu ? op.dataset.pu.split(',') : [], pe = op.dataset.pe ? op.dataset.pe.split(',') : [];
+      const aplica = op.dataset.g === '1' || pu.some(x => A.includes(x)) || (!pu.length && pe.some(x => EM.includes(x)));
+      op.dataset.he = un.value && (aplica || (todos && todos.checked)) ? '0' : '1'; vis(op);
+    });
+    if (pf.selectedOptions[0] && pf.selectedOptions[0].dataset.he === '1') { pf.value = ''; [...pf.options].forEach(vis); }
+  }
   // Plazas para reemplazo: solo las de la unidad elegida
   function plazas(scope) {
     const un = scope.querySelector('#f-unidad'), pz = scope.querySelector('#f-plaza'); if (!un || !pz) return;
@@ -56,7 +68,7 @@
   async function abrir(url, target) {
     const r = await fetch(url, { headers: { 'X-Modal': '1' }, credentials: 'same-origin' });
     if (!r.ok) { if (target === dlg) location.href = url; return; }
-    target.innerHTML = await r.text(); buscadores(target); unidades(target); cond(target); if (!target.open) target.showModal();
+    target.innerHTML = await r.text(); buscadores(target); unidades(target); perfilesPuesto(target); cond(target); if (!target.open) target.showModal();
   }
   window.ghAbrir = url => abrir(url, dlg);   // lo usa el diagrama de estructura
   d.addEventListener('click', e => {
@@ -77,6 +89,7 @@
     if (e.target.matches('[data-autosubmit]')) e.target.form.submit();
     if (e.target.matches('#f-empresa')) unidades(e.target.closest('form'));
     if (e.target.matches('#f-unidad')) perfiles(e.target.closest('form'));
+    if (e.target.matches('#pu-u, #pu-todos')) perfilesPuesto(e.target.closest('form'));
     if (e.target.matches('#f-plaza')) {   // la plaza manda la empresa si ya la tiene
       const o = e.target.selectedOptions[0], em = e.target.form.querySelector('#f-empresa');
       if (o && o.dataset.e && em && em.value !== o.dataset.e) { em.value = o.dataset.e; unidades(e.target.form); e.target.value = o.value; }

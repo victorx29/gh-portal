@@ -1,4 +1,4 @@
-const r = require('express').Router(), PL = require('../services/plantilla'), ES = require('../services/estructura'), P = require('../services/perm'), { q } = require('../db'),
+const r = require('express').Router(), PL = require('../services/plantilla'), PF = require('../services/perfiles'), ES = require('../services/estructura'), P = require('../services/perm'), { q } = require('../db'),
   { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo } = require('../util');
 // Plantilla de puestos: solo Gestión Humana (todo se valida aquí, en el servidor)
 const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
@@ -6,7 +6,7 @@ r.use(['/config/plantilla', '/config/plazas'], gh);
 const aPuesto = id => '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + id);
 const datosForm = async () => ({
   unidades: await ES.opciones(), empresas: (await q('select id, siglas, coalesce(razon_social,nombre) mostrar from empresa where activa order by 3')).rows,
-  perfiles: (await q("select id, codigo, nombre from perfil where activo and version_activa_id is not null order by nombre")).rows, puestos: await PL.opcionesPuestos(), MODALIDADES: PL.MODALIDADES });
+  perfiles: await PF.paraFormulario(), puestos: await PL.opcionesPuestos(), MODALIDADES: PL.MODALIDADES });
 
 r.get('/config/plantilla', w(async (req, res) => {
   const f = { buscar: req.query.buscar || '', unidad: req.query.unidad || '', empresa: req.query.empresa || '', modalidad: PL.MODALIDADES[req.query.modalidad] ? req.query.modalidad : '', fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '' };
