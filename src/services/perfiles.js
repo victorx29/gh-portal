@@ -41,6 +41,14 @@ async function listar(f = {}) {
   if (f.nivel) { p.push(f.nivel); w.push(`p.nivel=$${p.length}`); }
   if (f.estado === 'activos' || f.estado === 'sindesc') w.push('p.activo'); if (f.estado === 'inactivos') w.push('not p.activo');
   if (f.empresa) { p.push(+f.empresa); w.push(`(p.general or exists(select 1 from perfil_alcance a where a.perfil_id=p.id and a.empresa_id=$${p.length}))`); }
+  // Alcance: 'general', 'sin' (ni general ni empresas/unidades) o 'u<ID>' = perfiles cuyo alcance es esa unidad (y sus dependientes, si f.sub)
+  if (f.alcance === 'general') w.push('p.general');
+  if (f.alcance === 'sin') w.push('not p.general and not exists(select 1 from perfil_alcance a where a.perfil_id=p.id)');
+  const uid = /^u(\d+)$/.exec(f.alcance || '');
+  if (uid) {
+    const g = await ES.grafo(), ids = f.sub ? [...ES.descendientes(g.by, +uid[1])] : [+uid[1]];
+    p.push(ids); w.push(`exists(select 1 from perfil_alcance a where a.perfil_id=p.id and a.unidad_id = any($${p.length}))`);
+  }
   const rows = (await q(LISTA + (w.length ? ' where ' + w.join(' and ') : '') + ' order by p.correlativo', p)).rows;
   rows.forEach(r => { r.sinDesc = sinDescripcion(r.contenido); });
   return f.estado === 'sindesc' ? rows.filter(r => r.sinDesc) : rows;

@@ -5,7 +5,8 @@ const opciones = async () => ({ empresas: (await q('select id,nombre,razon_socia
 const NIVELES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
 r.get('/perfiles', gh, w(async (req, res) => {
-  const f = { buscar: req.query.buscar || '', empresa: req.query.empresa || '', nivel: req.query.nivel || '', estado: req.query.estado || 'activos' };
+  const f = { buscar: req.query.buscar || '', empresa: req.query.empresa || '', nivel: req.query.nivel || '', estado: req.query.estado || 'activos',
+    alcance: /^(general|sin|u\d+)$/.test(req.query.alcance || '') ? req.query.alcance : '', sub: req.query.alcance ? req.query.sub === '1' : true };
   res.render('perfiles', { title: 'Perfiles y Cargos', nav: 'config', sub: 'cargos', ps: await PF.listar(f), f, NIVELES, codigoV: PF.codigoV, ...await opciones() });
 }));
 r.get('/perfiles/nuevo', gh, w(async (req, res) => modal(req, res, 'perfil_form', { title: 'Nuevo perfil', nav: 'config', sub: 'cargos', NIVELES, ...await opciones() })));

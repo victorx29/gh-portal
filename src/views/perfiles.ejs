@@ -3,12 +3,15 @@
 <p class="sub">Cada perfil tiene un código fijo (GH-PF-NNN) y versiones (GH-PF-NNN-VV). Editar el contenido crea una versión nueva; la versión activa es la que usan las requisiciones nuevas.</p></div>
 <div class="row"><a class="btn" href="/perfiles/plantilla.xlsx"><%- ic('bajar') %>Descargar Excel</a><a class="btn" href="/perfiles/importar-docx"><%- ic('subir') %>Importar Word</a><a class="btn" href="/perfiles/carga"><%- ic('subir') %>Carga masiva (Excel)</a><a class="btn p" href="/perfiles/nuevo" data-modal><%- ic('mas') %>Nuevo perfil</a></div></div>
 <%- include('partials/config_nav') %>
-<form method="get" action="/perfiles" class="filtros">
+<form method="get" action="/perfiles" class="filtros pf-f">
   <div><label for="pb">Buscar</label><input id="pb" name="buscar" value="<%= f.buscar %>" placeholder="Cargo o código"></div>
+  <div><label for="pa">Alcance (área)</label><select id="pa" name="alcance" data-buscar><option value="">Todos</option><option value="general"<%= f.alcance === 'general' ? ' selected' : '' %>>General (todas las áreas)</option><option value="sin"<%= f.alcance === 'sin' ? ' selected' : '' %>>Sin alcance (nadie lo ve)</option>
+    <% unidades.forEach(o => { %><option value="u<%= o.id %>" data-a="<%= o.anc.map(x => 'u' + x).join(',') %>" data-t="<%= o.codigo %>"<%= f.alcance === 'u' + o.id ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select>
+    <label class="chk"><input type="checkbox" name="sub" value="1"<%= f.sub ? ' checked' : '' %>>Incluir las unidades que dependen de ella</label></div>
   <div><label for="pe">Empresa</label><select id="pe" name="empresa"><option value="">Todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(f.empresa) ? ' selected' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.razon_social || e.nombre %></option><% }) %></select></div>
   <div><label for="pn">Nivel</label><select id="pn" name="nivel"><option value="">Todos</option><% NIVELES.forEach(n => { %><option<%= n === f.nivel ? ' selected' : '' %>><%= n %></option><% }) %></select></div>
   <div><label for="ps">Estado</label><select id="ps" name="estado"><% [['activos', 'Activos'], ['sindesc', 'Activos sin descripción'], ['inactivos', 'Inactivos'], ['todos', 'Todos']].forEach(([v, t]) => { %><option value="<%= v %>"<%= v === f.estado ? ' selected' : '' %>><%= t %></option><% }) %></select></div>
-  <div class="end"><button class="btn">Aplicar</button></div>
+  <div class="end"><button class="btn">Aplicar</button><% if (f.buscar || f.empresa || f.nivel || f.alcance || f.estado !== 'activos') { %> <a class="btn" href="/perfiles">Limpiar</a><% } %></div>
 </form>
 <p class="sub"><%= ps.length %> perfil<%= ps.length === 1 ? '' : 'es' %></p>
 <div class="tw"><table class="mid"><tr><th>Código</th><th>Cargo</th><th>Nivel</th><th>Alcance</th><th>Versión activa</th><th></th></tr>

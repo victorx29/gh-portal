@@ -95,6 +95,7 @@ dialog.confirm{width:min(440px,calc(100% - 24px))}dialog.confirm h2{font-size:18
 @media print{.desc-body{padding:0}.desc{max-width:none;font-size:10.5pt}.desc-g{display:block}.desc-g .desc-s+.desc-s{margin-left:0}.desc-ctl,.desc li{break-inside:avoid}}
 .ctl{font-size:13px;color:var(--mu);border:1px dashed var(--bd);border-radius:8px;padding:8px 10px;margin:10px 0}.ctl b{color:var(--tx)}
 /* Plantilla de puestos */
+.pf-f{grid-template-columns:1.3fr 2fr 1.4fr .7fr 1fr auto}.pf-f .chk{font-size:13px;margin:6px 0 0}
 .pl-f{grid-template-columns:1.4fr 2fr 1.4fr 1fr 1fr auto}.pl-u td{border-top:2px solid var(--bd)}
 details.inl-d{display:inline-block;border:0;padding:0;margin:0;position:relative}details.inl-d>summary{list-style:none;min-height:44px}details.inl-d>summary::-webkit-details-marker{display:none}
 details.inl-d .pop{position:absolute;right:0;top:calc(100% + 4px);z-index:5;background:var(--bg);border:1px solid var(--bd);border-radius:10px;padding:10px;width:300px;box-shadow:0 8px 24px #0002;display:grid;gap:8px;white-space:normal;text-align:left}
@@ -118,7 +119,7 @@ details.inl-d .pop form{display:flex;gap:6px;flex-wrap:wrap}details.inl-d .pop s
   .app{flex-direction:column}main{flex:1;padding:16px 16px 32px}
   .side,.side.c{width:auto;flex-direction:row;overflow-x:auto;overflow-y:hidden;border-right:0;border-bottom:1px solid var(--bd);padding:6px;flex:none}
   .side .t{display:inline}.side .who,.side .sp,.side .brand{display:none}.nav{width:auto;white-space:nowrap}
-  .g2,.eq,.filtros,.pl-f{grid-template-columns:1fr}details.inl-d .pop{position:static;width:auto;box-shadow:none}.filtros .end{margin-top:10px}
+  .g2,.eq,.filtros,.pl-f,.pf-f{grid-template-columns:1fr}details.inl-d .pop{position:static;width:auto;box-shadow:none}.filtros .end{margin-top:10px}
   .kpi{gap:18px}.node{--g:14px}td.acts{white-space:normal}
   table.mid,table.mid tbody,table.mid tr,table.mid td{display:block}table.mid th{display:none}table.mid tr{border-bottom:1px solid var(--bd);padding:8px 0}table.mid td{border:0;padding:4px 0}td.acts{text-align:left}td.acts>*{margin:4px 6px 0 0}
   .cfgnav{flex-wrap:nowrap;overflow-x:auto;gap:4px;margin:10px 0 14px;padding-bottom:8px;scrollbar-width:thin}.cfg-g{flex-wrap:nowrap}.cfg-t{display:none}.pill{white-space:nowrap}
