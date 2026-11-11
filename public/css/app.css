@@ -75,6 +75,13 @@ details.blk{border-width:1px 0 0;border-radius:0;padding:6px 0 0}
 .cambios{margin:6px 0;padding-left:18px}.cambios li{margin:4px 0}.cambios .chip{margin:0 4px 0 0}
 .addrow{margin-top:12px}
 .buscar-sel{margin-bottom:6px}
+/* Avisos flotantes y confirmación */
+.toast{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));right:16px;z-index:1000;max-width:min(440px,calc(100% - 32px));margin:0;box-shadow:0 10px 30px #0003;align-items:center;animation:toast-in .2s ease-out}
+.toast span{flex:1}.toast .x{color:inherit}.toast.sale{opacity:0;transform:translateY(-6px);transition:all .2s}.flash.ok{background:var(--okl);color:var(--ok)}
+@keyframes toast-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+dialog.confirm{width:min(440px,calc(100% - 24px))}dialog.confirm h2{font-size:18px;margin-bottom:6px}dialog.confirm p{margin:0 0 6px}
+.btn.peligro{background:var(--rd);border-color:var(--rd);color:#fff;font-weight:600}.btn.peligro:hover{filter:brightness(.95);background:var(--rd)}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}.toast.sale{transition:none}}
 /* Perfil: presentación y control documental */
 .pv h3{margin:16px 0 6px}.pv ul{margin:0 0 0 18px;padding:0}.pv li{margin:3px 0}.pre{white-space:pre-line}
 .pv-dl{display:grid;grid-template-columns:minmax(140px,max-content) 1fr;gap:6px 14px;margin:0}.pv-dl dt{color:var(--mu)}.pv-dl dd{margin:0}

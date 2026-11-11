@@ -13,7 +13,7 @@
 <div class="kpi"><div><small>Documentos</small><strong><%= s.archivos %></strong></div><div><small>Perfiles nuevos</small><strong><%= s.nuevos %></strong></div><div><small>Versiones nuevas</small><strong><%= s.versiones %></strong></div>
 <div><small>Sin cambios</small><strong><%= s.iguales %></strong></div><div><small>Ilegibles</small><strong><%= s.ilegibles %></strong></div><div><small>Conflictos</small><strong><%= s.conflictos %></strong></div></div>
 <% if (s.conflictos) { %><div class="flash err" role="alert"><%- ic('alerta') %> <span><b><%= s.conflictos %> conflicto<%= s.conflictos > 1 ? 's' : '' %>.</b> Corrige los nombres marcados y pulsa «Revisar de nuevo».</span></div><% } %>
-<form method="post" action="/perfiles/importar-docx/aplicar" id="fdocx"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<form method="post" action="/perfiles/importar-docx/aplicar" data-confirm="Se crearán los perfiles nuevos y las versiones nuevas de la vista previa." data-ok="Aplicar importación" id="fdocx"><input type="hidden" name="_csrf" value="<%= csrf %>">
 <fieldset><legend>Alcance de los perfiles nuevos</legend>
 <label class="chk"><input type="radio" name="alcance" value="ninguno"<%= !alc.tipo || alc.tipo === 'ninguno' ? ' checked' : '' %>>Sin alcance: GH lo asigna después (nadie los ve todavía al solicitar)</label>
 <label class="chk"><input type="radio" name="alcance" value="general"<%= alc.tipo === 'general' ? ' checked' : '' %>>General: los ve cualquier solicitante</label>
@@ -28,6 +28,6 @@
 <td><small><%= c.funciones.length %> funciones · <%= c.competencias.length %> competencias<%= c.experiencia_min != null ? ' · exp. ' + c.experiencia_min + (c.experiencia_max != null ? '–' + c.experiencia_max : '+') + ' años' : '' %><%= f.control && f.control.fecha_actualizacion ? ' · doc. ' + f.control.fecha_actualizacion.split('-').reverse().join('/') : '' %></small></td>
 <td><% f.errores.forEach(e => { %><div class="err-txt">⛔ <%= e %></div><% }) %><% f.avisos.concat(f.avisosEval).forEach(a => { %><div><small>⚠ <%= a %></small></div><% }) %><% if (!f.errores.length && !f.avisos.length && !f.avisosEval.length) { %><span class="mu">—</span><% } %></td><% } %></tr><% }) %></table></div>
 <p class="act"><button class="btn" formaction="/perfiles/importar-docx/revisar">Revisar de nuevo</button> <button class="btn p"<%= s.nuevos + s.versiones ? '' : ' disabled' %>>Aplicar importación</button></p></form>
-<form method="post" action="/perfiles/importar-docx/descartar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">Descartar</button></form>
+<form method="post" action="/perfiles/importar-docx/descartar" data-confirm="Se descarta la vista previa y los nombres que corregiste." data-ok="Descartar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">Descartar</button></form>
 <% } %>
 <%- include('partials/foot') %>

@@ -34,5 +34,5 @@
 <%- include('partials/alcance', { actual, uid: p.id }) %>
 <p class="act"><button class="btn p">Guardar datos y alcance</button></p></form></details>
 
-<form method="post" action="/perfiles/<%= p.id %>/activo" class="blk"><%- hid %><p class="sub"><%= p.activo ? 'Desactivarlo lo quita del formulario de requisición. Las requisiciones existentes no cambian.' : 'Está inactivo: no aparece en el formulario de requisición.' %></p>
+<form method="post" action="/perfiles/<%= p.id %>/activo" <%- p.activo ? 'data-confirm="El perfil deja de ofrecerse en el formulario de requisición." data-ok="Desactivar" data-peligro' : '' %> class="blk"><%- hid %><p class="sub"><%= p.activo ? 'Desactivarlo lo quita del formulario de requisición. Las requisiciones existentes no cambian.' : 'Está inactivo: no aparece en el formulario de requisición.' %></p>
 <button class="btn<%= p.activo ? ' d' : '' %>"><%= p.activo ? 'Desactivar perfil' : 'Activar perfil' %></button></form>

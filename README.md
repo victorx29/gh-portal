@@ -50,6 +50,10 @@ La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x
 ## Diagrama de estructura
 `/config/estructura/diagrama` (solo GH): vista de cajas con filtros por unidad, empresas, división y fecha; impresión o PDF e imagen. Sin librerías externas (`public/js/diagrama.js`).
 
+## Avisos y confirmaciones (componente propio, sin dependencias)
+Los avisos aparecen flotantes: los de éxito se cierran solos y los de error quedan hasta cerrarlos. Cualquier `<form>` o `<button>` con
+`data-confirm="mensaje"` pide confirmación en un modal del portal (`data-ok` = texto del botón, `data-peligro` = acción irreversible, botón rojo).
+
 ## Plantilla de puestos
 Puesto = perfil en una unidad (un jefe por unidad); plaza = posición autorizada con empresa de nómina, modalidad y vigencia.
 Estado de plan calculado a cualquier fecha (vigente, congelada, proyectada, cerrada). Reporte: jefe directo por defecto más excepciones, sin ciclos.

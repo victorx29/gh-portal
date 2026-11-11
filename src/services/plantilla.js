@@ -11,10 +11,10 @@ const estado = (z, f) => (z.hasta && (z.hasta <= f || z.hasta <= z.desde)) ? 'ce
 const ESTADOS = { vigente: 'Vigente', congelada: 'Congelada', proyectada: 'Proyectada', cerrada: 'Cerrada' };
 
 // Conteo de un conjunto de plazas. HC = nómina propia vigente. Congeladas y proyectadas: nómina. Externas: vigentes, aparte.
-function contar(plazas, f, empSet) {
+function contar(plazas, f, empSet, modSet) {   // modSet: modalidades a contar (sin él, todas)
   const k = { hc: 0, cong: 0, proy: 0, porDefinir: 0, enProceso: 0, ext: { outsourcing: 0, pasante: 0, becario: 0, aprendiz: 0 }, porEmp: {} };
   for (const z of plazas) {
-    if (empSet && !empSet.has(z.empresa_id)) continue;
+    if (empSet && !empSet.has(z.empresa_id)) continue; if (modSet && !modSet.has(z.modalidad)) continue;
     const e = estado(z, f); if (e === 'cerrada') continue;
     if (z.modalidad !== 'nomina') { if (e === 'vigente') k.ext[z.modalidad]++; continue; }
     if (e === 'vigente') { k.hc++; const s = z.empresa_id ? (z.siglas || z.empresa) : POR_DEFINIR; k.porEmp[s] = (k.porEmp[s] || 0) + 1; if (!z.empresa_id) k.porDefinir++; if (z.req) k.enProceso++; }
@@ -53,10 +53,10 @@ function resolver(byP, byU) {
 const cicla = (byP, id) => { let x = byP.get(id), n = 0; while (x && n++ < 200) { x = byP.get(x.reporta_id); if (x && x.id === id) return true; } return false; };
 
 // Resumen por unidad (árbol y diagrama de unidades)
-async function resumenUnidades(fecha, empresas) {
-  const { f, byP } = await cargar(fecha), empSet = empresas && empresas.length ? new Set(empresas.map(Number)) : null, por = new Map();
+async function resumenUnidades(fecha, empresas, modalidades) {
+  const { f, byP } = await cargar(fecha), empSet = empresas && empresas.length ? new Set(empresas.map(Number)) : null, por = new Map(), modSet = modalidades && modalidades.length ? new Set(modalidades) : null;
   for (const p of byP.values()) { const a = por.get(p.unidad_id) || []; a.push(...p.plazas); por.set(p.unidad_id, a); }
-  const out = new Map(); for (const [uid, pl] of por) { const k = contar(pl, f, empSet); out.set(uid, Object.assign(k, { txt: resumenTxt(k) })); }
+  const out = new Map(); for (const [uid, pl] of por) { const k = contar(pl, f, empSet, modSet); out.set(uid, Object.assign(k, { txt: resumenTxt(k) })); }
   return out;
 }
 
@@ -127,6 +127,9 @@ async function crearPuesto(u, b) {
   return tx(async c => {
     if (!(await c.query('select 1 from unidad where id=$1 and activa', [unidad])).rowCount) throw E(400, 'La unidad no existe o está inactiva');
     if (!(await c.query('select 1 from perfil where id=$1 and activo', [perfil])).rowCount) throw E(400, 'El perfil no existe o está inactivo');
+    // El mismo cargo en la misma unidad es UN puesto: las demás empresas o modalidades son plazas de ese puesto
+    const ya = (await c.query('select id from puesto where unidad_id=$1 and perfil_id=$2 and activo', [unidad, perfil])).rows[0];
+    if (ya) throw Object.assign(E(400, 'Ese cargo ya existe en esa unidad: te abrí su puesto para que le agregues las plazas (por ejemplo, de otra empresa)'), { puestoId: ya.id });
     await validarReporte(c, null, reportaA, jefe);
     await c.query('savepoint sp'); let id;
     try { id = (await c.query('insert into puesto(unidad_id,perfil_id,jefe,reporta_a,creado_por) values($1,$2,$3,$4,$5) returning id', [unidad, perfil, jefe, reportaA, u.id])).rows[0].id; }
@@ -245,20 +248,23 @@ async function diagramaPuestos(fl) {
   const empSet = new Set([].concat(fl.empresas || []).map(Number).filter(Boolean));
   if (fl.division) (await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+fl.division])).rows.forEach(r => empSet.add(r.id));
   const filtra = empSet.size > 0, unidades = new Map(dg.nodes.filter(n => !n.ctx).map(n => [n.id, n]));
-  const abiertas = p => p.plazas.filter(z => estado(z, f) !== 'cerrada' && (!filtra || empSet.has(z.empresa_id)));
-  const match = new Set([...byP.values()].filter(p => unidades.has(p.unidad_id) && (!filtra || abiertas(p).length)).map(p => p.id));
+  const modSet = new Set((fl.mods && fl.mods.length ? fl.mods : ['nomina']));   // por defecto: solo nómina propia
+  const abiertasTodas = p => p.plazas.filter(z => estado(z, f) !== 'cerrada' && (!filtra || empSet.has(z.empresa_id)));
+  const abiertas = p => abiertasTodas(p).filter(z => modSet.has(z.modalidad));
+  // Entra si tiene plazas de las modalidades elegidas; un puesto sin ninguna plaza (p. ej. Presidente) se muestra igual, salvo con filtro de empresa
+  const match = new Set([...byP.values()].filter(p => unidades.has(p.unidad_id) && (abiertas(p).length || (!filtra && !abiertasTodas(p).length))).map(p => p.id));
   const vis = new Set(match);
   for (const id of match) { let s = byP.get(byP.get(id).reporta_id), n = 0; while (s && n++ < 60 && unidades.has(s.unidad_id)) { vis.add(s.id); s = byP.get(s.reporta_id); } }
   const nodes = [...vis].map(id => {
-    const p = byP.get(id), un = unidades.get(p.unidad_id), k = contar(p.plazas, f, filtra ? empSet : null), pe = Object.entries(k.porEmp);
+    const p = byP.get(id), un = unidades.get(p.unidad_id), k = contar(p.plazas, f, filtra ? empSet : null, modSet), pe = Object.entries(k.porEmp), total = k.hc + k.externas;
     let sup = byP.get(p.reporta_id), n = 0; while (sup && !vis.has(sup.id) && n++ < 60) sup = byP.get(sup.reporta_id);
     const empresas = [...new Set(abiertas(p).map(z => z.empresa_id))].map(eid => { const e = emp.get(eid) || {}; return { s: e.siglas || '', r: e.razon || '' }; });
-    return { id: p.id, padre: sup ? sup.id : null, salta: !!p.reporta_id && !vis.has(p.reporta_id) && !!sup, nombre: p.perfil + (k.hc > 1 ? ' (' + k.hc + ')' : ''), tipo: (p.jefe ? '★ ' : '') + un.nombre,
+    return { id: p.id, padre: sup ? sup.id : null, salta: !!p.reporta_id && !vis.has(p.reporta_id) && !!sup, nombre: p.perfil + (total > 1 ? ' (' + total + ')' : ''), tipo: (p.jefe ? '★ ' : '') + un.nombre,
       nivel: un.nivel * 10 + (p.jefe ? 0 : 5), nivelBanda: un.nivel, codigo: p.perfil_codigo, aprueba: false, aprobadores: [], ctx: !match.has(id), externa: false, propia: true, hereda: false, comparte: false,
-      empresas, funcionalFuera: [], pie: [pe.length > 1 ? pe.map(([s, c]) => s + ' ' + c).join(' · ') : '', k.cong ? '❄ ' + k.cong + ' congelada' + (k.cong > 1 ? 's' : '') : '', k.proy ? '⏳ ' + k.proy + ' proyectada' + (k.proy > 1 ? 's' : '') : '', k.externas ? '+' + k.externas + ' ext.' : ''].filter(Boolean).join(' · '),
+      empresas, funcionalFuera: [], pie: [pe.length > 1 ? pe.map(([s, c]) => s + ' ' + c).join(' · ') : '', k.cong ? '❄ ' + k.cong + ' congelada' + (k.cong > 1 ? 's' : '') : '', k.proy ? '⏳ ' + k.proy + ' proyectada' + (k.proy > 1 ? 's' : '') : '', ...EXTERNAS.filter(m => k.ext[m]).map(m => k.ext[m] + ' ' + MODALIDADES[m].toLowerCase() + (k.ext[m] > 1 && m !== 'outsourcing' ? 's' : ''))].filter(Boolean).join(' · '),
       unidad_id: p.unidad_id };
   });
-  const tot = contar([...match].flatMap(id => byP.get(id).plazas), f, filtra ? empSet : null);
+  const tot = contar([...match].flatMap(id => byP.get(id).plazas), f, filtra ? empSet : null, modSet);
   return { fecha: dg.fecha, esHoy: dg.esHoy, nodes, links: [], leyenda: dg.leyenda, tot };
 }
 // Unidades con plazas abiertas de alguna de esas empresas (para que entren al filtrar por empresa aunque no la «atiendan»)

@@ -22,7 +22,7 @@
 <% [['grupos', 'Grupos'], ['empresas', 'Empresas'], ['unidades', 'Unidades']].forEach(([k, t]) => { if (!res.cambios[k].length) return; %>
 <details<%= res.cambios[k].length <= 40 ? ' open' : '' %>><summary><%= t %> (<%= res.cambios[k].length %>)</summary><ul class="cambios">
 <% res.cambios[k].forEach(c => { %><li><span class="chip<%= c.accion === 'nuevo' ? '' : ' w' %>"><%= c.accion === 'nuevo' ? 'Nueva' : 'Cambia' %></span> <%= c.txt %><% if (c.detalle) { %> <small class="mu">· <%= c.detalle %></small><% } %></li><% }) %></ul></details><% }) %>
-<form method="post" action="/config/estructura/importar/aplicar" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<form method="post" action="/config/estructura/importar/aplicar" data-confirm="Se aplicarán todos los cambios de la vista previa. Las dependencias que cambian se cierran con fecha de hoy." data-ok="Aplicar cambios" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>">
 <button class="btn p">Aplicar cambios</button> <a class="btn" href="/config/estructura/importar">Descartar</a></form>
 <p class="sub">Las dependencias que cambian se cierran con fecha de hoy y se abren nuevas. El historial anterior se conserva.</p><% } %>
 <% } %>

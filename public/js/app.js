@@ -49,7 +49,8 @@
   // Campos condicionales: data-when="campo=valor" o "campo=a|b"; el campo se busca en el mismo formulario
   const cond = scope => scope.querySelectorAll('[data-when]').forEach(el => {
     const [n, v] = el.dataset.when.split('='), f = (el.closest('form') || scope).querySelector('[name="' + n + '"]');
-    const val = f && f.type === 'checkbox' ? (f.checked ? f.value : '') : f && f.value;
+    // casilla: su valor si está marcada; botones de opción: el valor del marcado del grupo
+    const val = !f ? '' : f.type === 'checkbox' ? (f.checked ? f.value : '') : f.type === 'radio' ? (((el.closest('form') || scope).querySelector('[name="' + n + '"]:checked') || {}).value || '') : f.value;
     el.hidden = !f || !v.split('|').includes(val);
   });
   async function abrir(url, target) {
@@ -88,6 +89,38 @@
     const t = e.target.value.trim().toLowerCase(), l = e.target.nextElementSibling;
     if (l) [...l.querySelectorAll('label')].forEach(x => { x.hidden = !!t && !x.textContent.toLowerCase().includes(t); });
   });
+  // ---- Avisos flotantes: los de éxito se cierran solos (salvo cursor o foco encima); los de error quedan hasta cerrarlos ----
+  const toast = $('.toast');
+  if (toast) {
+    const quitar = () => { toast.classList.add('sale'); setTimeout(() => toast.remove(), 250); };
+    if (!toast.classList.contains('err')) { let t = setTimeout(quitar, 6000); const pausa = () => clearTimeout(t); toast.addEventListener('mouseenter', pausa); toast.addEventListener('focusin', pausa); toast.addEventListener('mouseleave', () => { t = setTimeout(quitar, 3000); }); }
+    toast.querySelector('[data-toast-x]').addEventListener('click', quitar);
+  }
+  // ---- Confirmación con el modal del portal: <form data-confirm="…"> o <button data-confirm="…">; data-peligro = acción irreversible ----
+  function confirmar(msg, okTxt, peligro) {
+    return new Promise(res => {
+      let dl = d.getElementById('gh-confirm');
+      if (!dl) {
+        dl = d.createElement('dialog'); dl.id = 'gh-confirm'; dl.className = 'confirm'; dl.setAttribute('aria-labelledby', 'gh-confirm-t'); dl.setAttribute('aria-describedby', 'gh-confirm-m');
+        dl.innerHTML = '<h2 id="gh-confirm-t">¿Confirmas?</h2><p id="gh-confirm-m"></p><p class="act"><button type="button" class="btn" data-r="no">Cancelar</button> <button type="button" class="btn p" data-r="si">Confirmar</button></p>';
+        d.body.appendChild(dl);
+      }
+      dl.querySelector('#gh-confirm-m').textContent = msg;
+      const si = dl.querySelector('[data-r=si]'), no = dl.querySelector('[data-r=no]');
+      si.textContent = okTxt || 'Confirmar'; si.className = 'btn ' + (peligro ? 'peligro' : 'p');
+      const fin = v => { dl.close(); res(v); };
+      si.onclick = () => fin(true); no.onclick = () => fin(false); dl.oncancel = e => { e.preventDefault(); fin(false); };
+      dl.showModal(); no.focus();   // el foco empieza en la opción segura
+    });
+  }
+  const confirmados = new WeakSet();
+  d.addEventListener('submit', e => {
+    const f = e.target, b = e.submitter, src = b && b.dataset.confirm ? b : f.dataset.confirm ? f : null;
+    if (!src) return;
+    if (confirmados.has(f)) { confirmados.delete(f); return; }
+    e.preventDefault();
+    confirmar(src.dataset.confirm, src.dataset.ok, src.hasAttribute('data-peligro')).then(ok => { if (ok) { confirmados.add(f); f.requestSubmit(b || undefined); } });
+  }, true);
   cond(d); buscadores(d);
   // Volver a abrir el modal tras guardar: ?abrir=<id requisición> o ?modal=/ruta/interna
   const qs = new URLSearchParams(location.search), ab = qs.get('abrir'), md = qs.get('modal');

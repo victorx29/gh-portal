@@ -7,13 +7,13 @@
   <div><label for="pb">Buscar</label><input id="pb" name="buscar" value="<%= f.buscar %>" placeholder="Cargo o código"></div>
   <div><label for="pe">Empresa</label><select id="pe" name="empresa"><option value="">Todas</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(e.id) === String(f.empresa) ? ' selected' : '' %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.razon_social || e.nombre %></option><% }) %></select></div>
   <div><label for="pn">Nivel</label><select id="pn" name="nivel"><option value="">Todos</option><% NIVELES.forEach(n => { %><option<%= n === f.nivel ? ' selected' : '' %>><%= n %></option><% }) %></select></div>
-  <div><label for="ps">Estado</label><select id="ps" name="estado"><% [['activos', 'Activos'], ['inactivos', 'Inactivos'], ['todos', 'Todos']].forEach(([v, t]) => { %><option value="<%= v %>"<%= v === f.estado ? ' selected' : '' %>><%= t %></option><% }) %></select></div>
+  <div><label for="ps">Estado</label><select id="ps" name="estado"><% [['activos', 'Activos'], ['sindesc', 'Activos sin descripción'], ['inactivos', 'Inactivos'], ['todos', 'Todos']].forEach(([v, t]) => { %><option value="<%= v %>"<%= v === f.estado ? ' selected' : '' %>><%= t %></option><% }) %></select></div>
   <div class="end"><button class="btn">Aplicar</button></div>
 </form>
 <p class="sub"><%= ps.length %> perfil<%= ps.length === 1 ? '' : 'es' %></p>
 <div class="tw"><table class="mid"><tr><th>Código</th><th>Cargo</th><th>Nivel</th><th>Alcance</th><th>Versión activa</th><th></th></tr>
 <% ps.forEach(p => { const al = p.general ? 'General' : p.alcance.map(a => a.empresa || a.unidad).join(', '); %><tr<%- p.activo ? '' : ' class="off"' %>>
-<td class="cod"><%= p.codigo %></td><td><b><%= p.nombre %></b><% if (!p.activo) { %> <span class="chip r">inactivo</span><% } %><% if (p.codigo_anterior) { %><br><small class="mu">antes <%= p.codigo_anterior %></small><% } %></td>
+<td class="cod"><%= p.codigo %></td><td><b><%= p.nombre %></b><% if (!p.activo) { %> <span class="chip r">inactivo</span><% } %><% if (p.sinDesc) { %> <span class="chip w" title="Solo tiene nombre: sin objetivo, funciones ni educación">Sin descripción</span><% } %><% if (p.codigo_anterior) { %><br><small class="mu">antes <%= p.codigo_anterior %></small><% } %></td>
 <td><%= p.nivel || '—' %></td><td><% if (al) { %><%= al %><% } else { %><span class="chip w" title="No es general ni tiene empresas o unidades">Nadie lo ve</span><% } %></td><td><%= p.v_activa ? codigoV(p.codigo, p.v_activa) : '—' %><% if (p.n_versiones > 1) { %> <small class="mu">de <%= p.n_versiones %></small><% } %></td>
 <td class="acts"><a class="btn" href="/perfiles/<%= p.id %>" data-modal>Ver</a></td></tr><% }) %>
 <% if (!ps.length) { %><tr><td colspan="6" class="empty">No hay perfiles con ese filtro.</td></tr><% } %></table></div>

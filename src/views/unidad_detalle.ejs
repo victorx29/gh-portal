@@ -4,7 +4,7 @@
 <section class="blk"><h3><%- ic('estructura') %> Depende de</h3>
 <% if (d.padre) { %><p><b><%= d.padre.padre_nombre %></b> <small class="mu">(<%= d.padre.padre_codigo %>) · vigente desde <%= fd(d.padre.desde) %></small></p><% } else { %><p class="mu">Sin superior: es una unidad raíz.</p><% } %>
 <details><summary>Cambiar dependencia</summary>
-<form method="post" action="/config/estructura/<%= u.id %>/dependencia"><%- hid %>
+<form method="post" action="/config/estructura/<%= u.id %>/dependencia" data-confirm="La dependencia actual se cierra con fecha de hoy y la nueva empieza hoy. Las requisiciones en curso usarán la nueva estructura." data-ok="Cambiar dependencia"><%- hid %>
 <label for="dp">Nueva unidad superior</label><select id="dp" name="padre_id" data-buscar><option value="">Sin superior (raíz)</option><% opciones.filter(o => o.id !== u.id).forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= d.padre && d.padre.padre_id === o.id ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select>
 <label for="dm">Motivo (queda en el historial)</label><input id="dm" name="motivo" required placeholder="Reorganización aprobada por Presidencia">
 <p class="sub">La dependencia actual se cierra con fecha de hoy y la nueva empieza hoy. Las aprobaciones ya hechas conservan la estructura con la que se decidieron.</p>
@@ -13,7 +13,7 @@
 <section class="blk"><h3><%- ic('punteada') %> Dependencias funcionales</h3>
 <% if (!d.funcionales.length) { %><p class="mu">Ninguna. Úsalas para líneas punteadas, como una gerencia de administración de un concesionario que responde funcionalmente a Contraloría.</p><% } %>
 <% d.funcionales.forEach(r => { %><div class="rowl"><span><b><%= r.padre_nombre %></b> <small class="mu">desde <%= fd(r.desde) %></small></span>
-<form method="post" action="/config/relaciones/<%= r.id %>/cerrar" class="inl"><%- hid %><button class="btn">Cerrar</button></form></div><% }) %>
+<form method="post" action="/config/relaciones/<%= r.id %>/cerrar" data-confirm="La dependencia funcional se cierra con fecha de hoy." data-ok="Cerrar dependencia" data-peligro class="inl"><%- hid %><button class="btn">Cerrar</button></form></div><% }) %>
 <details><summary>Agregar dependencia funcional</summary><form method="post" action="/config/estructura/<%= u.id %>/funcional"><%- hid %>
 <label for="fp">Responde funcionalmente a</label><select id="fp" name="padre_id" required data-buscar><% opciones.filter(o => o.id !== u.id).forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"><%= o.escalera %></option><% }) %></select>
 <label for="fm">Motivo (opcional)</label><input id="fm" name="motivo"><p class="act"><button class="btn p">Agregar</button></p></form></details></section>
@@ -41,7 +41,7 @@
 <div><label for="ee">Empresa dueña</label><select id="ee" name="empresa_id"><option value="">Ninguna: corporativa del grupo</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= sel(e.id, u.empresa_id) %>><%= e.siglas ? e.siglas + ' · ' : '' %><%= e.mostrar %></option><% }) %></select></div></div>
 <label class="chk"><input type="checkbox" name="aprueba"<%= u.aprueba ? ' checked' : '' %>>Las requisiciones de esta unidad y sus dependientes se aprueban aquí</label>
 <p class="act"><button class="btn p">Guardar datos</button></p></form>
-<form method="post" action="/config/estructura/<%= u.id %>/activa"><%- hid %><p class="sub"><%= u.activa ? 'Desactivarla la quita de los formularios. Solo se puede si no tiene dependientes activos.' : 'Está inactiva: no aparece en los formularios.' %></p><button class="btn<%= u.activa ? ' d' : '' %>"><%= u.activa ? 'Desactivar unidad' : 'Activar unidad' %></button></form></details>
+<form method="post" action="/config/estructura/<%= u.id %>/activa" <%- u.activa ? 'data-confirm="La unidad deja de ofrecerse en los formularios." data-ok="Desactivar" data-peligro' : '' %>><%- hid %><p class="sub"><%= u.activa ? 'Desactivarla la quita de los formularios. Solo se puede si no tiene dependientes activos.' : 'Está inactiva: no aparece en los formularios.' %></p><button class="btn<%= u.activa ? ' d' : '' %>"><%= u.activa ? 'Desactivar unidad' : 'Activar unidad' %></button></form></details>
 
 <details class="blk"><summary>Dependientes directos (<%= d.hijos.length %>) · requisiciones (<%= d.reqs %>)</summary>
 <% if (!d.hijos.length) { %><p class="mu">Ninguna unidad depende de esta.</p><% } else { %><ul><% d.hijos.forEach(h => { %><li><%= h.nombre %> <small class="mu"><%= h.codigo %></small></li><% }) %></ul><% } %></details>

@@ -14,8 +14,14 @@ r.get('/config/plantilla', w(async (req, res) => {
   res.render('plantilla', { title: 'Plantilla de puestos', nav: 'config', sub: 'plantilla', f, L, ...d, esHoy: L.f === await ES.hoy() });
 }));
 r.get('/config/plantilla/puesto/nuevo', w(async (req, res) => modal(req, res, 'puesto_form', { title: 'Nuevo puesto', nav: 'config', sub: 'plantilla', v: { unidad_id: +req.query.unidad || null }, ...await datosForm() })));
-r.post('/config/plantilla/puesto', hacer(async req => aPuesto(await PL.crearPuesto(req.user, req.body)), 'Puesto creado', '/config/plantilla'));
-r.get('/config/plantilla/puesto/:id', w(async (req, res) => modal(req, res, 'puesto_detalle', { title: 'Puesto', nav: 'config', sub: 'plantilla', d: await PL.detalle(+req.params.id), ...await datosForm() })));
+r.post('/config/plantilla/puesto', w(async (req, res) => {
+  try { const id = await PL.crearPuesto(req.user, req.body); flash(req, 'ok', 'Puesto creado'); res.redirect(aPuesto(id)); }
+  catch (e) {
+    if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message);
+    res.redirect(e.puestoId ? '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + e.puestoId + '?agregar=1') : '/config/plantilla');
+  }
+}));
+r.get('/config/plantilla/puesto/:id', w(async (req, res) => modal(req, res, 'puesto_detalle', { title: 'Puesto', nav: 'config', sub: 'plantilla', d: await PL.detalle(+req.params.id), agregar: req.query.agregar === '1', ...await datosForm() })));
 r.post('/config/plantilla/puesto/:id/editar', hacer(req => PL.editarPuesto(req.user, +req.params.id, req.body), 'Puesto actualizado', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/puesto/:id/plazas', hacer(async req => { const c = await PL.agregarPlazas(req.user, +req.params.id, req.body); return aPuesto(req.params.id); }, 'Plazas agregadas', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id), 'Puesto desactivado', req => aPuesto(req.params.id)));

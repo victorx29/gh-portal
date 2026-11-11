@@ -8,4 +8,4 @@
 <% if (!res.errs.length && !res.cambios.length) { %><div class="flash" role="status">El archivo coincide con lo que ya está cargado. No hay nada que aplicar.</div>
 <% } else if (!res.errs.length) { %><details<%= res.cambios.length <= 60 ? ' open' : '' %>><summary>Cambios (<%= res.cambios.length %>)</summary><ul class="cambios">
 <% res.cambios.forEach(c => { %><li><span class="chip<%= c.accion === 'nuevo' ? '' : ' w' %>"><%= c.accion === 'nuevo' ? 'Nuevo' : 'Cambia' %></span> <%= c.txt %><% if (c.detalle) { %> <small class="mu">· <%= c.detalle %></small><% } %></li><% }) %></ul></details>
-<form method="post" action="<%= aplicar %>" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Aplicar cambios</button> <a class="btn" href="<%= descartar %>">Descartar</a></form><% } %>
+<form method="post" action="<%= aplicar %>" data-confirm="Se aplicarán todos los cambios de la vista previa." data-ok="Aplicar cambios" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn p">Aplicar cambios</button> <a class="btn" href="<%= descartar %>">Descartar</a></form><% } %>

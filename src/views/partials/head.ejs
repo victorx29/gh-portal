@@ -11,4 +11,4 @@
   <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="nav" type="submit" title="Cerrar sesión"><%- ic('salir') %><span class="t">Cerrar sesión</span></button></form>
 </aside><main>
 <% } else { %><main class="solo"><% } %>
-<% if (flash) { %><div class="flash <%= flash.type %>" role="status"><%= flash.msg %></div><% } %>
+<% if (flash) { %><div class="flash <%= flash.type %> toast" role="<%= flash.type === 'err' ? 'alert' : 'status' %>"><span><%= flash.msg %></span><button type="button" class="x" data-toast-x aria-label="Cerrar aviso">×</button></div><% } %>

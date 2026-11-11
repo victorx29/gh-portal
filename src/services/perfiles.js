@@ -33,13 +33,17 @@ const LISTA = `select p.*, pv.version v_activa, pv.contenido, (select count(*)::
   coalesce((select json_agg(json_build_object('empresa_id',a.empresa_id,'unidad_id',a.unidad_id,'empresa',coalesce(e.siglas,e.razon_social,e.nombre),'unidad',un.nombre,'unidad_codigo',un.codigo))
     from perfil_alcance a left join empresa e on e.id=a.empresa_id left join unidad un on un.id=a.unidad_id where a.perfil_id=p.id),'[]') alcance
   from perfil p left join perfil_version pv on pv.id=p.version_activa_id`;
+// Perfil «mínimo» (solo nombre): sin objetivo, funciones ni educación. Útil para pasantes, outsourcing o Presidencia; ISO pide documentar el resto.
+const sinDescripcion = c => { c = c || {}; return !String(c.objetivo || '').trim() && !(Array.isArray(c.funciones) ? c.funciones.length : String(c.funciones || '').trim()) && !String(c.educacion || c.requisitos || '').trim(); };
 async function listar(f = {}) {
   const w = [], p = [];
   if (f.buscar) { p.push('%' + f.buscar.trim() + '%'); w.push(`(p.nombre ilike $${p.length} or p.codigo ilike $${p.length} or p.codigo_anterior ilike $${p.length})`); }
   if (f.nivel) { p.push(f.nivel); w.push(`p.nivel=$${p.length}`); }
-  if (f.estado === 'activos') w.push('p.activo'); if (f.estado === 'inactivos') w.push('not p.activo');
+  if (f.estado === 'activos' || f.estado === 'sindesc') w.push('p.activo'); if (f.estado === 'inactivos') w.push('not p.activo');
   if (f.empresa) { p.push(+f.empresa); w.push(`(p.general or exists(select 1 from perfil_alcance a where a.perfil_id=p.id and a.empresa_id=$${p.length}))`); }
-  return (await q(LISTA + (w.length ? ' where ' + w.join(' and ') : '') + ' order by p.correlativo', p)).rows;
+  const rows = (await q(LISTA + (w.length ? ' where ' + w.join(' and ') : '') + ' order by p.correlativo', p)).rows;
+  rows.forEach(r => { r.sinDesc = sinDescripcion(r.contenido); });
+  return f.estado === 'sindesc' ? rows.filter(r => r.sinDesc) : rows;
 }
 async function detalle(id) {
   const p = (await q(LISTA + ' where p.id=$1', [id])).rows[0]; if (!p) throw E(404, 'Perfil no encontrado');
