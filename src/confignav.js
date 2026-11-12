@@ -14,5 +14,6 @@ module.exports = [
     ['grados', '/config/maestros?m=grados', 'Grados de instrucción', 'grado', 'Opciones del formulario de requisición', 'super'],
     ['equipos', '/config/maestros?m=equipos', 'Equipos', 'equipo', 'Equipos que puede pedir el solicitante', 'super'],
     ['accesos', '/config/maestros?m=accesos', 'Accesos a sistemas', 'acceso', 'Sistemas a los que se solicita acceso', 'super'],
-    ['tipos', '/config/maestros?m=tipos', 'Tipos de unidad', 'tipos', 'Presidencia, dirección, gerencia, coordinación…', 'super']] }
+    ['tipos', '/config/maestros?m=tipos', 'Tipos de unidad', 'tipos', 'Presidencia, dirección, gerencia, coordinación…', 'super'],
+    ['niveles', '/config/maestros?m=niveles', 'Niveles jerárquicos', 'estructura', 'Orden de los cargos en el organigrama (una fila por nivel)', 'super']] }
 ];

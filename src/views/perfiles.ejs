@@ -14,10 +14,10 @@
   <div class="end"><button class="btn">Aplicar</button><% if (f.buscar || f.empresa || f.nivel || f.alcance || f.estado !== 'activos') { %> <a class="btn" href="/perfiles">Limpiar</a><% } %></div>
 </form>
 <p class="sub"><%= ps.length %> perfil<%= ps.length === 1 ? '' : 'es' %></p>
-<div class="tw"><table class="mid"><tr><th>Código</th><th>Cargo</th><th>Nivel</th><th>Alcance</th><th>Versión activa</th><th></th></tr>
+<div class="tw"><table class="mid"><tr><th>Código</th><th>Cargo</th><th>Nivel</th><th>Jerarquía</th><th>Alcance</th><th>Versión activa</th><th></th></tr>
 <% ps.forEach(p => { const al = p.general ? 'General' : p.alcance.map(a => a.empresa || a.unidad).join(', '); %><tr<%- p.activo ? '' : ' class="off"' %>>
 <td class="cod"><%= p.codigo %></td><td><b><%= p.nombre %></b><% if (!p.activo) { %> <span class="chip r">inactivo</span><% } %><% if (p.sinDesc) { %> <span class="chip w" title="Solo tiene nombre: sin objetivo, funciones ni educación">Sin descripción</span><% } %><% if (p.codigo_anterior) { %><br><small class="mu">antes <%= p.codigo_anterior %></small><% } %></td>
-<td><%= p.nivel || '—' %></td><td><% if (al) { %><%= al %><% } else { %><span class="chip w" title="No es general ni tiene empresas o unidades">Nadie lo ve</span><% } %></td><td><%= p.v_activa ? codigoV(p.codigo, p.v_activa) : '—' %><% if (p.n_versiones > 1) { %> <small class="mu">de <%= p.n_versiones %></small><% } %></td>
+<td><%= p.nivel || '—' %></td><td><%= p.nivel_j || '—' %></td><td><% if (al) { %><%= al %><% } else { %><span class="chip w" title="No es general ni tiene empresas o unidades">Nadie lo ve</span><% } %></td><td><%= p.v_activa ? codigoV(p.codigo, p.v_activa) : '—' %><% if (p.n_versiones > 1) { %> <small class="mu">de <%= p.n_versiones %></small><% } %></td>
 <td class="acts"><a class="btn" href="/perfiles/<%= p.id %>" data-modal>Ver</a></td></tr><% }) %>
-<% if (!ps.length) { %><tr><td colspan="6" class="empty">No hay perfiles con ese filtro.</td></tr><% } %></table></div>
+<% if (!ps.length) { %><tr><td colspan="7" class="empty">No hay perfiles con ese filtro.</td></tr><% } %></table></div>
 <%- include('partials/foot') %>

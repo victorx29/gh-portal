@@ -13,7 +13,7 @@ r.get('/config', gh, (req, res) => res.render('config_inicio', { title: 'Configu
 r.get('/config/estructura', gh, w(async (req, res) => {
   const f = { fecha: ES.fechaValida(req.query.fecha) ? req.query.fecha : '', empresa: req.query.empresa || '', grupo: req.query.grupo || '', buscar: req.query.buscar || '', division: req.query.division || '' };
   const [a, empresas, grupos, divisiones, hc, pendientes] = await Promise.all([ES.arbol(f), ES.empresas(), ES.grupos(), ES.divisiones(), PL.resumenUnidades(f.fecha, f.empresa ? [f.empresa] : null),
-    q("select count(*)::int n from requisicion where estado='pend_director' and unidad_id is not null and unidad_aprobadora(unidad_id) is not null and unidad_aprobadora(unidad_id) not in (select ur.unidad_id from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id is not null and us.activo)").then(x => x.rows[0].n)]);
+    q("select count(*)::int n from requisicion where estado='pend_director' and unidad_id is not null and unidad_aprobadora(unidad_id) is not null and unidad_aprobadora(unidad_id) not in (select ur.unidad_id from usuario_rol ur join usuario us on us.id=ur.usuario_id join unidad x on x.id=ur.unidad_id where ur.rol='director' and us.activo and x.activa)").then(x => x.rows[0].n)]);
   res.render('estructura', { title: 'Estructura organizativa', nav: 'config', sub: 'estructura', a, f, empresas, grupos, divisiones, hc, pendientes });
 }));
 const datosModal = async () => ({ tipos: await ES.tipos(), grupos: await ES.grupos(), empresas: await ES.empresas(), opciones: await ES.opciones() });

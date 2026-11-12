@@ -1,6 +1,6 @@
 <% const act = p.versiones.find(v => v.id === p.version_activa_id), hid = '<input type="hidden" name="_csrf" value="' + csrf + '">';
    const actual = { general: p.general, emps: p.alcance.filter(a => a.empresa_id).map(a => a.empresa_id), unis: p.alcance.filter(a => a.unidad_id).map(a => a.unidad_id) }; %>
-<div class="mh"><div><h2><%= p.nombre %></h2><p class="sub"><%= p.codigo %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %> · <%= p.general ? 'General' : (p.alcance.map(a => a.empresa || a.unidad).join(', ') || 'sin alcance: nadie lo ve') %>
+<div class="mh"><div><h2><%= p.nombre %></h2><p class="sub"><%= p.codigo %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %><%= p.nivel_j ? ' · ' + p.nivel_j : '' %> · <%= p.general ? 'General' : (p.alcance.map(a => a.empresa || a.unidad).join(', ') || 'sin alcance: nadie lo ve') %>
 <% if (!p.activo) { %> · <span class="chip r">inactivo</span><% } %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 
 <section class="blk"><h3><%- ic('cargo') %> Versión activa: <%= act ? codigoV(p.codigo, act.version) : 'ninguna' %></h3>
@@ -30,7 +30,7 @@
 <details class="blk"><summary>Datos y alcance</summary>
 <form method="post" action="/perfiles/<%= p.id %>/editar"><%- hid %><div class="g2">
 <div><label for="pd-n">Nombre del cargo</label><input id="pd-n" name="nombre" value="<%= p.nombre %>" required></div>
-<div><label for="pd-l">Nivel</label><select id="pd-l" name="nivel"><option value="">—</option><% NIVELES.concat(p.nivel && !NIVELES.includes(p.nivel) ? [p.nivel] : []).forEach(n => { %><option<%= n === p.nivel ? ' selected' : '' %>><%= n %></option><% }) %></select></div></div>
+<div><label for="pd-l">Nivel</label><select id="pd-l" name="nivel"><option value="">—</option><% NIVELES.concat(p.nivel && !NIVELES.includes(p.nivel) ? [p.nivel] : []).forEach(n => { %><option<%= n === p.nivel ? ' selected' : '' %>><%= n %></option><% }) %></select></div><div><label for="pf-nj<%= typeof p !== 'undefined' ? p.id : '' %>">Nivel jerárquico (fila en el organigrama)</label><select id="pf-nj<%= typeof p !== 'undefined' ? p.id : '' %>" name="nivel_jerarquico_id"><option value="">Sin nivel</option><% niveles.forEach(n => { %><option value="<%= n.id %>"<%= typeof p !== 'undefined' && p.nivel_jerarquico_id === n.id ? ' selected' : '' %>><%= n.nombre %></option><% }) %></select></div></div>
 <%- include('partials/alcance', { actual, uid: p.id }) %>
 <p class="act"><button class="btn p">Guardar datos y alcance</button></p></form></details>
 

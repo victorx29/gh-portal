@@ -29,10 +29,10 @@ const igual = (a, b) => JSON.stringify(contenidoDe(a || {})) === JSON.stringify(
 const hist = (c, u, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u && u.id, 'perfil', String(id), accion, detalle || {}]);
 const ids = v => [...new Set([].concat(v || []).map(Number).filter(Boolean))];
 
-const LISTA = `select p.*, pv.version v_activa, pv.contenido, (select count(*)::int from perfil_version where perfil_id=p.id) n_versiones,
+const LISTA = `select p.*, nj.nombre nivel_j, nj.orden nivel_j_orden, pv.version v_activa, pv.contenido, (select count(*)::int from perfil_version where perfil_id=p.id) n_versiones,
   coalesce((select json_agg(json_build_object('empresa_id',a.empresa_id,'unidad_id',a.unidad_id,'empresa',coalesce(e.siglas,e.razon_social,e.nombre),'unidad',un.nombre,'unidad_codigo',un.codigo))
     from perfil_alcance a left join empresa e on e.id=a.empresa_id left join unidad un on un.id=a.unidad_id where a.perfil_id=p.id),'[]') alcance
-  from perfil p left join perfil_version pv on pv.id=p.version_activa_id`;
+  from perfil p left join perfil_version pv on pv.id=p.version_activa_id left join nivel_jerarquico nj on nj.id=p.nivel_jerarquico_id`;
 // Perfil «mínimo» (solo nombre): sin objetivo, funciones ni educación. Útil para pasantes, outsourcing o Presidencia; ISO pide documentar el resto.
 const sinDescripcion = c => { c = c || {}; return !String(c.objetivo || '').trim() && !(Array.isArray(c.funciones) ? c.funciones.length : String(c.funciones || '').trim()) && !String(c.educacion || c.requisitos || '').trim(); };
 async function listar(f = {}) {
@@ -64,13 +64,15 @@ async function guardarAlcance(c, id, b) {
   for (const e of ids(b.empresas)) await c.query('insert into perfil_alcance(perfil_id,empresa_id) values($1,$2)', [id, e]);
   for (const un of ids(b.unidades)) await c.query('insert into perfil_alcance(perfil_id,unidad_id) values($1,$2)', [id, un]);
 }
+// Nivel jerárquico: id del catálogo (o vacío = sin nivel)
+const nivelJ = b => b.nivel_jerarquico_id ? +b.nivel_jerarquico_id || null : null;
 function datos(b) {
   const nombre = String(b.nombre || '').trim(); if (!nombre) throw E(400, 'El nombre del cargo es obligatorio');
   return { nombre, nivel: String(b.nivel || '').trim() || null, general: b.general === 'on' || b.general === true };
 }
 async function crearC(c, u, b) {
   const d = datos(b), n = (await c.query("select nextval('perfil_seq')::int n")).rows[0].n, codigo = 'GH-PF-' + pad(n, 3);
-  const id = (await c.query('insert into perfil(codigo,correlativo,nombre,nivel,general) values($1,$2,$3,$4,$5) returning id', [codigo, n, d.nombre, d.nivel, d.general])).rows[0].id;
+  const id = (await c.query('insert into perfil(codigo,correlativo,nombre,nivel,general,nivel_jerarquico_id) values($1,$2,$3,$4,$5,$6) returning id', [codigo, n, d.nombre, d.nivel, d.general, nivelJ(b)])).rows[0].id;
   await guardarAlcance(c, id, b);
   const vid = (await c.query('insert into perfil_version(perfil_id,version,contenido,creado_por) values($1,1,$2,$3) returning id', [id, contenidoDe(b), u.id])).rows[0].id;
   await c.query('update perfil set version_activa_id=$2 where id=$1', [id, vid]);
@@ -79,7 +81,7 @@ async function crearC(c, u, b) {
 const crear = (u, b) => tx(c => crearC(c, u, b));
 async function editarC(c, u, id, b) {
   const d = datos(b), a = (await c.query('select * from perfil where id=$1 for update', [id])).rows[0]; if (!a) throw E(404, 'Perfil no encontrado');
-  await c.query('update perfil set nombre=$2, nivel=$3, general=$4 where id=$1', [id, d.nombre, d.nivel, d.general]);
+  await c.query('update perfil set nombre=$2, nivel=$3, general=$4, nivel_jerarquico_id=$5 where id=$1', [id, d.nombre, d.nivel, d.general, nivelJ(b)]);
   await guardarAlcance(c, id, b); await hist(c, u, id, 'editar', d);
 }
 const editar = (u, id, b) => tx(c => editarC(c, u, id, b));
@@ -125,11 +127,10 @@ async function validarParaRequisicion(perfilId, emp, unidadId) {
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const key = s => String(s == null ? '' : s).trim().toLowerCase();
 const lista = s => String(s || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
-const COLS = [['Código', 'codigo', 14], ['Cargo *', 'nombre', 34], ['Nivel', 'nivel', 8], ['General', 'general', 9], ['Empresas', 'empresas', 18], ['Unidades', 'unidades', 26],
+const COLS = [['Código', 'codigo', 14], ['Cargo *', 'nombre', 34], ['Nivel', 'nivel', 8], ['Nivel jerárquico', 'nivel_j', 18], ['General', 'general', 9], ['Empresas', 'empresas', 18], ['Unidades', 'unidades', 26],
   ['Objetivo', 'objetivo', 40], ['Funciones', 'funciones', 50], ['Educación', 'educacion', 30], ['Experiencia', 'experiencia', 30], ['Años mín.', 'experiencia_min', 9], ['Años máx.', 'experiencia_max', 9],
   ['Conocimientos', 'conocimientos', 40], ['Certificaciones', 'certificaciones', 20], ['Idiomas', 'idiomas', 14], ['Competencias conductuales', 'competencias_conductuales', 30], ['Competencias', 'competencias', 40],
   ['Dinero', 'resp_dinero', 20], ['Información confidencial', 'resp_informacion', 26], ['Toma de decisiones', 'resp_decisiones', 30], ['Supervisión', 'resp_supervision', 30], ['Criterios', 'criterios', 30]];
-const CONT_COLS = COLS.slice(6).map(c => c[1]);
 const aFila = c => ({ objetivo: c.objetivo || '', funciones: (c.funciones || []).join('; '), educacion: c.educacion || c.requisitos || '', experiencia: c.experiencia || '', experiencia_min: c.experiencia_min ?? '', experiencia_max: c.experiencia_max ?? '',
   conocimientos: c.conocimientos || '', certificaciones: c.certificaciones || '', idiomas: c.idiomas || '', competencias_conductuales: (c.competencias_conductuales || []).join('; '),
   competencias: (c.competencias || []).map(x => x.nombre + (x.descripcion ? ': ' + x.descripcion : '')).join('; '), resp_dinero: (c.responsabilidades || {}).dinero || '', resp_informacion: (c.responsabilidades || {}).informacion || '',
@@ -141,13 +142,14 @@ async function plantilla() {
     '2. Código vacío = perfil nuevo: el sistema le asigna el siguiente GH-PF-NNN. No inventes códigos.',
     '3. Si cambias Objetivo, Funciones, Requisitos, Competencias, Conocimientos o Criterios, se crea una versión nueva y queda activa. Las requisiciones ya hechas conservan la suya.',
     '4. General = Sí: lo ven todas las empresas y unidades. Si es No, indica Empresas (siglas o razón social) y/o Unidades (código o nombre exacto), separadas por coma.',
+    '4b. «Nivel jerárquico» = nombre de un nivel de Configuración › Niveles jerárquicos (fila del cargo en el organigrama). Vacío = sin nivel.',
     '5. Una unidad incluye a todas las que dependen de ella. Funciones, competencias y criterios: separados por punto y coma. Competencias con descripción: «Nombre: descripción».',
     '6. Lo que no está en el archivo no se modifica ni se borra. Antes de aplicar verás una vista previa con errores y advertencias.'].forEach((t, i) => { const c = ins.getCell(i + 1, 1); c.value = t; if (!i) c.font = { bold: true, size: 14 }; });
   const ws = wb.addWorksheet('Cargos', { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = COLS.map(([header, k, width]) => ({ header, key: k, width }));
   const h = ws.getRow(1); h.font = { bold: true }; h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FD' } };
   for (const p of ps) { const c = p.contenido || {};
-    ws.addRow({ codigo: p.codigo, nombre: p.nombre, nivel: p.nivel || '', general: p.general ? 'Sí' : 'No', empresas: p.alcance.filter(a => a.empresa_id).map(a => a.empresa).join(', '),
+    ws.addRow({ codigo: p.codigo, nombre: p.nombre, nivel: p.nivel || '', nivel_j: p.nivel_j || '', general: p.general ? 'Sí' : 'No', empresas: p.alcance.filter(a => a.empresa_id).map(a => a.empresa).join(', '),
       unidades: p.alcance.filter(a => a.unidad_id).map(a => a.unidad_codigo).join(', '), ...aFila(contenidoDe(c)) }); }
   ws.dataValidations.add('D2:D5000', { type: 'list', allowBlank: true, formulae: ['"Sí,No"'] });
   return wb.xlsx.writeBuffer();
@@ -167,6 +169,7 @@ async function procesar(c, filas, usr, aplicar) {
   const empRef = new Map(); es.forEach(e => [e.siglas, e.razon_social, e.nombre].filter(Boolean).forEach(k => empRef.set(key(k), e)));
   const uCod = new Map(us.map(u => [key(u.codigo), u])), uNom = new Map(); us.forEach(u => uNom.set(key(u.nombre), (uNom.get(key(u.nombre)) || []).concat(u)));
   const porCod = new Map(ps.map(p => [key(p.codigo), p])), vistos = new Set(), plan = [], cambios = [];
+  const njs = (await c.query('select id, nombre from nivel_jerarquico where activo')).rows, njRef = new Map(njs.map(n => [norm(n.nombre), n.id]));
   for (const f of filas) {
     const n0 = errs.length; if (!f.nombre) err(f.fila, 'Falta el nombre del cargo');
     const ex = f.codigo ? porCod.get(key(f.codigo)) : null; if (f.codigo && !ex) err(f.fila, `El código «${f.codigo}» no existe. Déjalo vacío para crear un perfil nuevo`);
@@ -177,12 +180,14 @@ async function procesar(c, filas, usr, aplicar) {
       const u = uCod.get(key(x)) || ((uNom.get(key(x)) || []).length === 1 ? uNom.get(key(x))[0] : null);
       if (!u) err(f.fila, (uNom.get(key(x)) || []).length > 1 ? `La unidad «${x}» existe varias veces: usa su código` : `La unidad «${x}» no existe`); return u && u.id; }).filter(Boolean);
     if (errs.length > n0) continue;
-    const b = { ...f, general: g === 'si' || g === 's', empresas, unidades };
+    const nj = f.nivel_j ? njRef.get(norm(f.nivel_j)) : null; if (f.nivel_j && !nj) err(f.fila, `El nivel jerárquico «${f.nivel_j}» no existe (ver Configuración › Niveles jerárquicos)`);
+    if (errs.length > n0) continue;
+    const b = { ...f, general: g === 'si' || g === 's', empresas, unidades, nivel_jerarquico_id: nj };
     if (!b.general && !empresas.length && !unidades.length) aviso(f.fila, `«${f.nombre}» no es general ni tiene empresas o unidades: ningún solicitante lo verá`);
     if (!ex) { const mismo = ps.find(p => key(p.nombre) === key(f.nombre)); if (mismo) aviso(f.fila, `Ya existe «${mismo.nombre}» (${mismo.codigo}). Si es el mismo cargo, pon su código para no duplicarlo`);
       cambios.push({ accion: 'nuevo', txt: f.nombre }); plan.push({ b, ex: null }); continue; }
     const d = [], alcA = JSON.stringify([ex.alcance.filter(a => a.empresa_id).map(a => a.empresa_id).sort(), ex.alcance.filter(a => a.unidad_id).map(a => a.unidad_id).sort()]);
-    if (ex.nombre !== f.nombre) d.push('nombre'); if ((ex.nivel || '') !== (f.nivel || '')) d.push('nivel'); if (ex.general !== b.general) d.push('general');
+    if (ex.nombre !== f.nombre) d.push('nombre'); if ((ex.nivel || '') !== (f.nivel || '')) d.push('nivel'); if ((ex.nivel_jerarquico_id || null) !== (b.nivel_jerarquico_id || null)) d.push('nivel jerárquico'); if (ex.general !== b.general) d.push('general');
     if (alcA !== JSON.stringify([[...empresas].sort(), [...unidades].sort()])) d.push('alcance');
     const contenido = !igual(ex.contenido, f); if (contenido) d.push('contenido → nueva versión ' + pad((ex.n_versiones || 0) + 1, 2));
     if (d.length) { cambios.push({ accion: 'cambia', txt: `${ex.codigo} · ${ex.nombre}`, detalle: d.join(', ') }); plan.push({ b, ex, datos: d.some(x => !x.startsWith('contenido')), contenido }); }
@@ -220,4 +225,5 @@ async function guardarControl(u, perfilId, versionId, b) {
   });
 }
 const controles = ids => ids.length ? q('select * from perfil_version_control where version_id = any($1)', [ids]).then(r => new Map(r.rows.map(x => [x.version_id, x]))) : Promise.resolve(new Map());
-module.exports = { __igual: igual, guardarControl, guardarControlC, controles, crearC, nuevaVersionC, codigoV, contenidoDe, RESP, anios, listar, detalle, crear, editar, nuevaVersion, activarVersion, activo, paraFormulario, ancestros, aplica, validarParaRequisicion, plantilla, leer, analizar, aplicarCarga };
+const nivelesJ = () => q('select * from nivel_jerarquico where activo order by orden, nombre').then(r => r.rows);
+module.exports = { nivelesJ, __igual: igual, guardarControl, guardarControlC, controles, crearC, nuevaVersionC, codigoV, contenidoDe, RESP, anios, listar, detalle, crear, editar, nuevaVersion, activarVersion, activo, paraFormulario, ancestros, aplica, validarParaRequisicion, plantilla, leer, analizar, aplicarCarga };

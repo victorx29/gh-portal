@@ -1,4 +1,4 @@
-const r = require('express').Router(), PL = require('../services/pipelines'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash } = require('../util');
+const r = require('express').Router(), PL = require('../services/pipelines'), P = require('../services/perm'), { q, tx } = require('../db'), { w, E, flash } = require('../util');
 const TIPOS = ['requisicion', 'seleccion'];
 r.use('/config', (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana')));
 const sup = (req, res, next) => P.esSuper(req.user) ? next() : next(E(403, 'Solo el superadmin'));
@@ -28,7 +28,7 @@ r.post('/config/etapas/:id/quitar', guardado(async req => { await puedePipeline(
 
 // Maestros configurables (superadmin): nada de listas fijas en el código. Una pestaña por catálogo.
 const MAESTROS = { grados: ['grado_instruccion', 'Grados de instrucción', 'orden, nombre'], equipos: ['catalogo_equipo', 'Equipos', 'nombre'],
-  accesos: ['catalogo_acceso', 'Accesos a sistemas', 'nombre'], tipos: ['tipo_unidad', 'Tipos de unidad', 'nivel, nombre'], divisiones: ['division', 'Divisiones', 'nombre'] };
+  accesos: ['catalogo_acceso', 'Accesos a sistemas', 'nombre'], tipos: ['tipo_unidad', 'Tipos de unidad', 'nivel, nombre'], niveles: ['nivel_jerarquico', 'Niveles jerárquicos', 'orden, nombre'], divisiones: ['division', 'Divisiones', 'nombre'] };
 const volverM = m => '/config/maestros?m=' + (MAESTROS[m] ? m : 'grados');
 r.get('/config/maestros', sup, w(async (req, res) => {
   const m = MAESTROS[req.query.m] ? req.query.m : 'grados', [t, titulo, orden] = MAESTROS[m];
@@ -42,10 +42,21 @@ r.post('/config/maestros/:m', sup, w(async (req, res) => {
     let ins;
     if (req.params.m === 'equipos') ins = await q('insert into catalogo_equipo(nombre,requiere_linea) values($1,$2) on conflict do nothing', [n, req.body.requiere_linea === 'on']);
     else if (req.params.m === 'tipos') ins = await q('insert into tipo_unidad(nombre,nivel) values($1,$2) on conflict do nothing', [n, Math.min(999, Math.max(1, parseInt(req.body.nivel) || 50))]);
+    else if (req.params.m === 'niveles') ins = await q('insert into nivel_jerarquico(nombre,orden) values($1,(select coalesce(max(orden),0)+10 from nivel_jerarquico)) on conflict do nothing', [n]);   // entra al final; luego se sube
     else ins = await q(`insert into ${m[0]}(nombre) values($1) on conflict do nothing`, [n]);
     flash(req, ins.rowCount ? 'ok' : 'err', ins.rowCount ? 'Elemento agregado' : '«' + n + '» ya existe');
   }
   res.redirect(volverM(req.params.m));
+}));
+// Niveles jerárquicos: subir o bajar (intercambia el orden con el vecino)
+r.post('/config/maestros/niveles/:id/mover', sup, w(async (req, res) => {
+  const arriba = req.body.dir === 'up';
+  await tx(async c => {
+    const a = (await c.query('select id, orden from nivel_jerarquico where id=$1 for update', [+req.params.id])).rows[0]; if (!a) throw E(404, 'Nivel no encontrado');
+    const b = (await c.query(`select id, orden from nivel_jerarquico where ${arriba ? 'orden < $1 order by orden desc' : 'orden > $1 order by orden'} limit 1 for update`, [a.orden])).rows[0];
+    if (b) { await c.query('update nivel_jerarquico set orden=$2 where id=$1', [a.id, b.orden]); await c.query('update nivel_jerarquico set orden=$2 where id=$1', [b.id, a.orden]); }
+  });
+  res.redirect('/config/maestros?m=niveles');
 }));
 r.post('/config/maestros/:m/:id/activo', sup, w(async (req, res) => {
   const m = MAESTROS[req.params.m]; if (!m) throw E(404, 'Catálogo desconocido');

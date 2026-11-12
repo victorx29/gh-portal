@@ -1,6 +1,6 @@
 {
   "name": "gh-portal",
-  "version": "0.7.6",
+  "version": "0.7.8",
   "private": true,
   "description": "Portal de Gestión Humana (MVC + PostgreSQL; n8n para notificaciones e IA)",
   "scripts": {

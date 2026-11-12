@@ -77,8 +77,9 @@ async function detalle(id) {
     q("select us.nombre, us.email, us.activo from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id=$1 order by us.nombre", [id]).then(r => r.rows),
     q(`select h.codigo, h.nombre from unidad_relacion r join unidad h on h.id=r.unidad_id where r.padre_id=$1 and r.tipo='solida' and r.hasta is null order by h.nombre`, [id]).then(r => r.rows),
     q("select count(*)::int n from requisicion where unidad_id=$1", [id]).then(r => r.rows[0].n)]);
-  const g = await grafo(), gu = g.by.get(id);
-  return { u, heredadas: gu && gu.hereda ? gu.efectivas : [], rels, sirve, aprob, hijos, reqs, padre: rels.find(r => r.tipo === 'solida' && !r.hasta) || null, funcionales: rels.filter(r => r.tipo === 'funcional' && !r.hasta) };
+  const g = await grafo(), gu = g.by.get(id), bloqueos = u.activa ? await bloqueosDesactivar({ query: q }, id) : [];
+  const perfilesAlcance = (await q('select pf.codigo, pf.nombre from perfil_alcance a join perfil pf on pf.id=a.perfil_id where a.unidad_id=$1 and pf.activo order by 2', [id])).rows;
+  return { u, bloqueos, perfilesAlcance, heredadas: gu && gu.hereda ? gu.efectivas : [], rels, sirve, aprob, hijos, reqs, padre: rels.find(r => r.tipo === 'solida' && !r.hasta) || null, funcionales: rels.filter(r => r.tipo === 'funcional' && !r.hasta) };
 }
 // Datos para el diagrama visual. Filtros: raíz (esa unidad hacia abajo), empresas (una o varias) y división (suma sus empresas).
 // Las unidades que coinciden se muestran completas; sus superiores aparecen atenuados como contexto, hasta la raíz elegida.
@@ -156,12 +157,24 @@ async function editar(u, id, b) {
     if (Object.keys(cambios).length) await histU(c, u, id, 'editar', cambios);
   });
 }
+// Una unidad solo se desactiva vacía: sin dependientes, puestos, roles, requisiciones en curso ni dependencias funcionales entrantes
+const REQ_ABIERTA = `r.estado not in ('rechazada','anulada','cancelado') and r.estado not in (select clave from etapa where clase in ('exito','cierre'))`;
+async function bloqueosDesactivar(c, id) {
+  const f = (sql, p) => c.query(sql, p || [id]).then(r => r.rows), b = [];
+  (await f("select h.nombre from unidad_relacion r join unidad h on h.id=r.unidad_id where r.padre_id=$1 and r.tipo='solida' and r.hasta is null and h.activa order by 1")).forEach(x => b.push({ tipo: 'Unidad dependiente', txt: x.nombre, que: 'cámbiala de dependencia o desactívala primero' }));
+  (await f(`select pf.nombre, (select count(*)::int from plaza z where z.puesto_id=p.id and (z.hasta is null or (z.hasta > current_date and z.hasta > z.desde))) n
+    from puesto p join perfil pf on pf.id=p.perfil_id where p.unidad_id=$1 and p.activo order by 1`)).forEach(x => b.push({ tipo: 'Puesto', txt: x.nombre + (x.n ? ' (' + x.n + ' plaza' + (x.n > 1 ? 's' : '') + ' abierta' + (x.n > 1 ? 's' : '') + ')' : ''), que: 'muévelo a otra unidad o ciérrale las plazas y desactívalo' }));
+  (await f("select us.nombre, ur.rol from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.unidad_id=$1 order by 1")).forEach(x => b.push({ tipo: 'Rol', txt: x.rol + ' de ' + x.nombre, que: 'reasígnalo a otra unidad en Usuarios y roles' }));
+  (await f(`select r.codigo from requisicion r where r.unidad_id=$1 and ${REQ_ABIERTA} order by 1`)).forEach(x => b.push({ tipo: 'Requisición en curso', txt: x.codigo, que: 'espera a que termine o anúlala/cancélala' }));
+  (await f("select h.nombre from unidad_relacion r join unidad h on h.id=r.unidad_id where r.padre_id=$1 and r.tipo='funcional' and r.hasta is null order by 1")).forEach(x => b.push({ tipo: 'Dependencia funcional', txt: x.nombre + ' responde funcionalmente a esta', que: 'cierra esa línea punteada' }));
+  return b;
+}
 async function activar(u, id) {
   return tx(async c => {
     const a = (await c.query('select * from unidad where id=$1 for update', [id])).rows[0]; if (!a) throw E(404, 'Unidad no encontrada');
     if (a.activa) {
-      const n = (await c.query("select count(*)::int n from unidad_relacion r join unidad h on h.id=r.unidad_id where r.padre_id=$1 and r.tipo='solida' and r.hasta is null and h.activa", [id])).rows[0].n;
-      if (n) throw E(400, 'Tiene ' + n + ' unidad(es) dependientes activas: reasígnalas antes de desactivarla');
+      const b = await bloqueosDesactivar(c, id);
+      if (b.length) throw E(400, 'No se puede desactivar: todavía tiene ' + b.slice(0, 6).map(x => x.tipo.toLowerCase() + ' «' + x.txt + '»').join(', ') + (b.length > 6 ? ' y ' + (b.length - 6) + ' más' : '') + '. El detalle de la unidad muestra qué hacer con cada uno');
     }
     await c.query('update unidad set activa = not activa where id=$1', [id]); await histU(c, u, id, a.activa ? 'desactivar' : 'activar');
   });
@@ -233,9 +246,10 @@ async function aprobacion(c, r) {
   const f = c.query.bind(c);
   const uid = r.unidad_id ? (await f('select unidad_aprobadora($1) id', [r.unidad_id])).rows[0].id : null;
   if (uid) {
-    const un = (await f('select id,codigo,nombre from unidad where id=$1', [uid])).rows[0];
-    const ap = (await f("select us.id,us.nombre,us.email from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id=$1 and us.activo", [uid])).rows;
-    return { regla: 'estructura', unidad: un, aprobadores: ap };
+    const un = (await f('select id,codigo,nombre,activa from unidad where id=$1', [uid])).rows[0];
+    // Unidad aprobadora inactiva: nadie aprueba (retenida «sin aprobador»), en lugar de subir sola a la siguiente
+    const ap = un.activa ? (await f("select us.id,us.nombre,us.email from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id=$1 and us.activo", [uid])).rows : [];
+    return { regla: 'estructura', unidad: un, aprobadores: ap, inactiva: !un.activa };
   }
   const ap = (await f("select distinct us.id,us.nombre,us.email from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and ur.unidad_id is null and (ur.empresa_id is null or ur.empresa_id=$1) and us.activo", [r.empresa_id])).rows;
   return { regla: 'empresa', unidad: null, aprobadores: ap };

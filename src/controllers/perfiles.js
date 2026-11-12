@@ -1,7 +1,7 @@
 const r = require('express').Router(), multer = require('multer'), path = require('path'), PF = require('../services/perfiles'), IDX = require('../services/importar_docx'), PL = require('../services/plantilla'), ES = require('../services/estructura'), P = require('../services/perm'), { q } = require('../db'), { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo } = require('../util');
 const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
 const aPerfil = id => '/perfiles?modal=' + encodeURIComponent('/perfiles/' + id);
-const opciones = async () => ({ empresas: (await q('select id,nombre,razon_social,siglas from empresa where activa order by coalesce(razon_social,nombre)')).rows, unidades: await ES.opciones() });
+const opciones = async () => ({ niveles: await PF.nivelesJ(), empresas: (await q('select id,nombre,razon_social,siglas from empresa where activa order by coalesce(razon_social,nombre)')).rows, unidades: await ES.opciones() });
 const NIVELES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
 r.get('/perfiles', gh, w(async (req, res) => {

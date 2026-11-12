@@ -1,5 +1,5 @@
 const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), ES = require('./estructura'), PF = require('./perfiles'), PT = require('./plantilla'), { E } = require('../util');
-const SEL = `select r.*, pz.codigo plaza_codigo, pz.empresa_id plaza_empresa_id, coalesce(e.razon_social,e.nombre) empresa, e.siglas empresa_siglas, e.nombre empresa_comercial, pf.codigo perfil_codigo, un.nombre unidad, un.codigo unidad_codigo, unidad_aprobadora(r.unidad_id) aprob_uid, (select nombre from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_nombre, pf.id perfil_id, pf.nombre cargo, pv.version perfil_v, s.nombre solicitante, s.email solicitante_email, g.nombre grado
+const SEL = `select r.*, pz.codigo plaza_codigo, pz.empresa_id plaza_empresa_id, coalesce(e.razon_social,e.nombre) empresa, e.siglas empresa_siglas, e.nombre empresa_comercial, pf.codigo perfil_codigo, un.nombre unidad, un.codigo unidad_codigo, unidad_aprobadora(r.unidad_id) aprob_uid, (select nombre from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_nombre, (select activa from unidad where id=unidad_aprobadora(r.unidad_id)) aprob_activa, pf.id perfil_id, pf.nombre cargo, pv.version perfil_v, s.nombre solicitante, s.email solicitante_email, g.nombre grado
   from requisicion r join empresa e on e.id=r.empresa_id left join unidad un on un.id=r.unidad_id left join plaza pz on pz.id=r.plaza_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id join usuario s on s.id=r.solicitante_id
   left join grado_instruccion g on g.id=r.grado_id`;
@@ -47,13 +47,13 @@ const pasoDe = r => ({ pend_director: 'director', pend_presidencia: 'presidencia
 const puedeDecidir = (u, r) => {
   const p = pasoDe(r); if (!p || r.solicitante_id == u.id) return false;
   if (p === 'presidencia') return P.tiene(u, 'presidencia', r.empresa_id);
-  return r.aprob_uid ? P.unidadesDe(u, 'director').includes(r.aprob_uid) : P.tiene(u, 'director', r.empresa_id);
+  return r.aprob_uid ? r.aprob_activa !== false && P.unidadesDe(u, 'director').includes(r.aprob_uid) : P.tiene(u, 'director', r.empresa_id);
 };
 async function contextoAprob() {
-  const rs = (await q("select ur.unidad_id, ur.empresa_id from usuario_rol ur join usuario us on us.id=ur.usuario_id where ur.rol='director' and us.activo")).rows;
+  const rs = (await q("select ur.unidad_id, ur.empresa_id from usuario_rol ur join usuario us on us.id=ur.usuario_id left join unidad un on un.id=ur.unidad_id where ur.rol='director' and us.activo and (ur.unidad_id is null or un.activa)")).rows;
   return { uni: new Set(rs.filter(x => x.unidad_id).map(x => x.unidad_id)), emp: new Set(rs.filter(x => !x.unidad_id).map(x => x.empresa_id)) };
 }
-const sinAprobador = (r, k) => r.estado === 'pend_director' && (r.aprob_uid ? !k.uni.has(r.aprob_uid) : !(k.emp.has(null) || k.emp.has(r.empresa_id)));
+const sinAprobador = (r, k) => r.estado === 'pend_director' && (r.aprob_uid ? (r.aprob_activa === false || !k.uni.has(r.aprob_uid)) : !(k.emp.has(null) || k.emp.has(r.empresa_id)));
 
 async function listar(u, empresaId) {
   const w = [], p = [];
@@ -176,7 +176,9 @@ async function decidir(u, id, d, com) {
     if (r.solicitante_id == u.id) throw E(403, 'Nadie aprueba su propia requisición');
     let ft;
     if (paso === 'director') {   // la autoridad se calcula con la estructura vigente en este momento y queda fotografiada
-      const ap = await ES.aprobacion(c, r); if (!ap.aprobadores.some(a => a.id === u.id)) throw E(403, 'No eres quien aprueba esta unidad');
+      const ap = await ES.aprobacion(c, r);
+      if (ap.inactiva) throw E(400, 'La unidad que aprueba («' + ap.unidad.nombre + '») está inactiva: la requisición queda retenida hasta que Gestión Humana lo resuelva');
+      if (!ap.aprobadores.some(a => a.id === u.id)) throw E(403, 'No eres quien aprueba esta unidad');
       ft = await ES.foto(c, r, ap);
     } else {
       if (!P.tiene(u, 'presidencia', r.empresa_id)) throw E(403, 'No puedes decidir esta requisición');

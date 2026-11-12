@@ -31,10 +31,21 @@
   const MODO = data.disp === 'c' ? 'c' : data.disp === 'k' ? 'k' : 'h', HC = 54, IND = 22, GK = 8;
   const by = new Map(data.nodes.map(n => [n.id, { ...n, hijos: [], h: H }]));
   for (const n of by.values()) { const p = by.get(n.padre); if (p) p.hijos.push(n); }
-  const ord = (a, b) => a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, 'es');
+  const ord = (a, b) => (a.rango != null ? a.rango : 1e9) - (b.rango != null ? b.rango : 1e9) || a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, 'es');
   for (const n of by.values()) { n.hijos.sort(ord); n.apila = MODO === 'c' && n.hijos.length >= APILAR && n.hijos.every(h => !h.hijos.length); }
   const raices = [...by.values()].filter(n => !by.has(n.padre)).sort(ord);
   let altoMax = 0;
+  // Filas por nivel jerárquico (solo en horizontal y si hay niveles): cada rango presente es una fila; un puesto va en la fila de su nivel,
+  // nunca más arriba que una fila bajo su jefe (si su nivel es igual o superior al del jefe, se marca para revisar)
+  const rangos = [...new Set(data.nodes.map(n => n.rango).filter(x => x != null))].sort((a, b) => a - b), idxR = new Map(rangos.map((r, i) => [r, i]));
+  const FILAS = MODO === 'h' && rangos.length > 0;
+  const asignar = (n, padre) => {
+    const quiere = n.rango != null ? idxR.get(n.rango) : null, pf = padre ? padre.fila : null;
+    n.fila = pf == null ? (quiere != null ? quiere : 0) : quiere != null && quiere > pf ? quiere : pf + 1;
+    // Se marca solo el puesto cuyo nivel es igual o superior al de su jefe (el dato mal cargado), no a sus dependientes
+    if (padre && n.rango != null && padre.rango != null && n.rango <= padre.rango) n.fueraNivel = true;
+    n.hijos.forEach(h => asignar(h, n));
+  };
   // Cascada: el subárbol baja con sangría; cajas bajas (nombre y empresa)
   const prof = (n, d) => n.hijos.reduce((m, h) => Math.max(m, prof(h, d + 1)), d);
   const cascada = (n, x, y) => { n.hijos.forEach(h => { h.mini = true; h.h = HC; h.x = x + IND; h.y = y; altoMax = Math.max(altoMax, y + HC); y = cascada(h, x + IND, y + HC + GK); }); return y; };
@@ -47,13 +58,14 @@
   };
   if (MODO === 'k') raices.forEach(r => r.hijos.forEach(c => { c.columna = true; }));
   const ubica = (n, izq, arriba) => {
-    const w = ancho(n); n.y = arriba; altoMax = Math.max(altoMax, arriba + n.h);
+    const w = ancho(n); n.y = FILAS ? n.fila * (H + GY) : arriba; altoMax = Math.max(altoMax, n.y + n.h);
     if (n.columna) { n.x = izq; cascada(n, izq, arriba + H + 14); return; }
     if (n.apila) { n.x = izq; let y = arriba + H + 18; n.hijos.forEach(h => { h.x = izq + 30; h.y = y; altoMax = Math.max(altoMax, y + H); y += H + 14; }); return; }
     n.x = izq + (w - W) / 2; if (!n.hijos.length) return;
     const tot = n.hijos.reduce((s, h) => s + ancho(h), 0) + GX * (n.hijos.length - 1); let x = izq + (w - tot) / 2;
     n.hijos.forEach(h => { ubica(h, x, arriba + H + GY); x += ancho(h) + GX; });
   };
+  if (FILAS) raices.forEach(r => asignar(r, null));
   let x0 = 0; raices.forEach(r => { ubica(r, x0, 0); x0 += ancho(r) + 60; });
   const total = { w: Math.max(W, x0 - 60), h: altoMax };
   // ---- Dibujo ----
@@ -79,10 +91,10 @@
   }
   for (const n of by.values()) {
     const hcW = n.hcTxt ? mide(n.hcTxt, '600 ' + FE) + 10 : 0, e = empresa(n, MAX - hcW), g = el('g', { transform: `translate(${n.x},${n.y})`, 'data-id': n.id, class: 'dg-n', opacity: n.ctx ? 0.45 : 1 }, gN);
-    el('title', {}, g).textContent = [n.externa ? '(Depende funcionalmente de esta vista; su superior jerárquico está fuera)' : '', n.nombre, n.tipo + ' · ' + n.codigo, e.full,
+    el('title', {}, g).textContent = [n.fueraNivel ? '⚠ Su nivel jerárquico es igual o superior al de su jefe: revisa el nivel del perfil o la línea de reporte' : '', n.rangoNombre ? 'Nivel: ' + n.rangoNombre : '', n.externa ? '(Depende funcionalmente de esta vista; su superior jerárquico está fuera)' : '', n.nombre, n.tipo + ' · ' + n.codigo, e.full,
       n.aprueba ? 'Aprueba: ' + (n.aprobadores.join(', ') || 'sin director asignado') : '', n.hcTxt ? 'Plantilla: ' + n.hcTxt : '', n.funcionalFuera.length ? 'Dependencia funcional: ' + n.funcionalFuera.join(', ') : ''].filter(Boolean).join('\n');
     el('rect', Object.assign({ width: W, height: n.h, rx: n.mini ? 7 : 9, fill: C.bg, stroke: n.aprueba ? (n.aprobadores.length ? C.ok : C.wa) : C.bd, 'stroke-width': n.aprueba ? 1.8 : 1 },
-      n.externa ? { 'stroke-dasharray': '5 4', stroke: C.wa } : {}), g);
+      n.externa || n.fueraNivel ? { 'stroke-dasharray': '5 4', stroke: C.wa } : {}), g);
     if (n.mini) {   // caja de cascada: franja lateral de color, nombre (2 líneas) y empresa
       el('rect', { x: 1, y: 1, width: 4, height: n.h - 2, rx: 2, fill: banda(n.nivelBanda != null ? n.nivelBanda : n.nivel) }, g);
       const FM = '600 12px ' + FF; envuelve(n.nombre, FM, MAX, 2).forEach((l, i) => txt(g, 12, 18 + i * 14, l, FM, C.tx));

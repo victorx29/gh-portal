@@ -29,8 +29,8 @@ const resumenTxt = k => [k.hc || k.cong || k.proy ? 'HC ' + k.hc : '', k.enProce
 async function cargar(fecha) {
   const f = fechaOk(fecha) ? fecha : await ES.hoy();
   const [ps, pz, g] = await Promise.all([
-    q(`select p.*, pf.codigo perfil_codigo, pf.nombre perfil, pf.nivel perfil_nivel, u.nombre unidad, u.codigo unidad_codigo
-       from puesto p join perfil pf on pf.id=p.perfil_id join unidad u on u.id=p.unidad_id where p.activo`).then(r => r.rows),
+    q(`select p.*, pf.codigo perfil_codigo, pf.nombre perfil, pf.nivel perfil_nivel, nj.orden nivel_orden, nj.nombre nivel_nombre, u.nombre unidad, u.codigo unidad_codigo
+       from puesto p join perfil pf on pf.id=p.perfil_id join unidad u on u.id=p.unidad_id left join nivel_jerarquico nj on nj.id=pf.nivel_jerarquico_id and nj.activo where p.activo`).then(r => r.rows),
     q(`select z.*, e.siglas, coalesce(e.razon_social,e.nombre) empresa from plaza z left join empresa e on e.id=z.empresa_id join puesto p on p.id=z.puesto_id
        where p.activo and z.creado_en::date <= $1::date and (z.hasta is null or z.hasta > $1 or z.desde > $1)`, [f]).then(r => r.rows),   // creado_en <= fecha: a esa fecha la plaza ya existía en el plan
     ES.grafo(f)]);
@@ -259,6 +259,7 @@ async function alAprobar(c, u, r) {
 }
 
 // ---------- Diagrama de cargos (puestos con su HC; reporta según la regla) ----------
+const RANGO_EXT = { becario: 1, pasante: 2, aprendiz: 3, outsourcing: 4 }, PLURAL_EXT = { becario: 'Becarios', pasante: 'Pasantes', aprendiz: 'Aprendices', outsourcing: 'Outsourcing' };
 async function diagramaPuestos(fl) {
   // Unidades: solo raíz, tipos y fecha. El filtro de empresas se aplica a las PLAZAS (la empresa vive en la plaza),
   // y el contexto sube por la línea de reporte (los jefes por encima de cada puesto que coincide).
@@ -278,7 +279,10 @@ async function diagramaPuestos(fl) {
     const p = byP.get(id), un = unidades.get(p.unidad_id), k = contar(p.plazas, f, filtra ? empSet : null, modSet), pe = Object.entries(k.porEmp), total = k.hc + k.externas;
     let sup = byP.get(p.reporta_id), n = 0; while (sup && !vis.has(sup.id) && n++ < 60) sup = byP.get(sup.reporta_id);
     const empresas = [...new Set(abiertas(p).map(z => z.empresa_id))].map(eid => { const e = emp.get(eid) || {}; return { s: e.siglas || '', r: e.razon || '' }; });
-    return { id: p.id, padre: sup ? sup.id : null, salta: !!p.reporta_id && !vis.has(p.reporta_id) && !!sup, nombre: p.perfil + (total > 1 ? ' (' + total + ')' : ''), tipo: (p.jefe ? '★ ' : '') + un.nombre,
+    // Rango (fila del organigrama): el nivel jerárquico del perfil; si todas sus plazas son externas, debajo del último nivel (becario → pasante → aprendiz → outsourcing)
+    const mods = abiertas(p).map(z => z.modalidad), ext = mods.length && mods.every(m => m !== 'nomina') ? Math.min(...mods.map(m => RANGO_EXT[m])) : null;
+    const rango = ext != null ? 1e6 + ext : p.nivel_orden != null ? p.nivel_orden : null, rangoNombre = ext != null ? PLURAL_EXT[mods.find(m => RANGO_EXT[m] === ext)] : p.nivel_nombre;
+    return { id: p.id, padre: sup ? sup.id : null, salta: !!p.reporta_id && !vis.has(p.reporta_id) && !!sup, rango, rangoNombre, nombre: p.perfil + (total > 1 ? ' (' + total + ')' : ''), tipo: (p.jefe ? '★ ' : '') + un.nombre,
       nivel: un.nivel * 10 + (p.jefe ? 0 : 5), nivelBanda: un.nivel, codigo: p.perfil_codigo, aprueba: false, aprobadores: [], ctx: !match.has(id), externa: false, propia: true, hereda: false, comparte: false,
       empresas, funcionalFuera: [], pie: [pe.length > 1 ? pe.map(([s, c]) => s + ' ' + c).join(' · ') : '', k.cong ? '❄ ' + k.cong + ' congelada' + (k.cong > 1 ? 's' : '') : '', k.proy ? '⏳ ' + k.proy + ' proyectada' + (k.proy > 1 ? 's' : '') : '', ...EXTERNAS.filter(m => k.ext[m]).map(m => k.ext[m] + ' ' + MODALIDADES[m].toLowerCase() + (k.ext[m] > 1 && m !== 'outsourcing' ? 's' : ''))].filter(Boolean).join(' · '),
       unidad_id: p.unidad_id };

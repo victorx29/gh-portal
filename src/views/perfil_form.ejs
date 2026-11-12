@@ -1,7 +1,7 @@
 <div class="mh"><div><h2>Nuevo perfil</h2><p class="sub">El código GH-PF-NNN se asigna solo y la versión 01 queda activa.</p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 <form method="post" action="/perfiles"><input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2">
 <div><label for="pf-n">Nombre del cargo</label><input id="pf-n" name="nombre" required placeholder="Analista Contable"></div>
-<div><label for="pf-l">Nivel</label><select id="pf-l" name="nivel"><option value="">—</option><% NIVELES.forEach(n => { %><option><%= n %></option><% }) %></select></div></div>
+<div><label for="pf-l">Nivel</label><select id="pf-l" name="nivel"><option value="">—</option><% NIVELES.forEach(n => { %><option><%= n %></option><% }) %></select></div><div><label for="pf-nj<%= typeof p !== 'undefined' ? p.id : '' %>">Nivel jerárquico (fila en el organigrama)</label><select id="pf-nj<%= typeof p !== 'undefined' ? p.id : '' %>" name="nivel_jerarquico_id"><option value="">Sin nivel</option><% niveles.forEach(n => { %><option value="<%= n.id %>"<%= typeof p !== 'undefined' && p.nivel_jerarquico_id === n.id ? ' selected' : '' %>><%= n.nombre %></option><% }) %></select></div></div>
 <%- include('partials/alcance') %>
 <%- include('partials/perfil_contenido', { k: 'n', cont: null }) %>
 <p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p">Crear perfil</button></p></form>
