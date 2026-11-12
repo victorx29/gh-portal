@@ -24,6 +24,16 @@ r.post('/config/plantilla/puesto', w(async (req, res) => {
 r.get('/config/plantilla/puesto/:id', w(async (req, res) => modal(req, res, 'puesto_detalle', { title: 'Puesto', nav: 'config', sub: 'plantilla', d: await PL.detalle(+req.params.id), agregar: req.query.agregar === '1', ...await datosForm() })));
 r.post('/config/plantilla/puesto/:id/editar', hacer(req => PL.editarPuesto(req.user, +req.params.id, req.body), 'Puesto actualizado', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/puesto/:id/plazas', hacer(async req => { const c = await PL.agregarPlazas(req.user, +req.params.id, req.body); return aPuesto(req.params.id); }, 'Plazas agregadas', req => aPuesto(req.params.id)));
+r.post('/config/plantilla/puesto/:id/mover', w(async (req, res) => {
+  try {
+    const x = await PL.moverPuesto(req.user, +req.params.id, req.body.unidad_id, req.body.motivo);
+    flash(req, 'ok', 'Puesto movido con sus plazas' + (x.excepcion ? '. Se quitó su excepción de reporte: ahora reporta al jefe de su unidad nueva' : '') + (x.fijadas ? '. ' + x.fijadas + ' plaza(s) «Por definir» tomaron la empresa de la unidad' : ''));
+    res.redirect(aPuesto(req.params.id));
+  } catch (e) {
+    if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message);
+    res.redirect(e.puestoId ? '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + e.puestoId + '?agregar=1') : aPuesto(req.params.id));
+  }
+}));
 r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id), 'Puesto desactivado', req => aPuesto(req.params.id)));
 r.post('/config/plazas/:id/congelar', hacer(async req => aPuesto(await PL.congelar(req.user, +req.params.id, req.body.on === '1', req.body.motivo)), 'Plaza actualizada', '/config/plantilla'));
 r.post('/config/plazas/:id/empresa', hacer(async req => aPuesto(await PL.cambiarEmpresaPlaza(req.user, +req.params.id, req.body.empresa_id, req.body.motivo)), 'Empresa de la plaza actualizada', '/config/plantilla'));

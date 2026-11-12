@@ -149,6 +149,25 @@ async function editarPuesto(u, id, b) {
     await hist(c, u, 'puesto', id, 'editar', { jefe: { de: a.jefe, a: jefe }, reporta_a: { de: a.reporta_a, a: reportaA } });
   });
 }
+// Mover un puesto (con sus plazas) a otra unidad: corrige una unidad equivocada sin cerrar ni recrear plazas.
+// La excepción de reporte se quita (vuelve a la regla por defecto en su unidad nueva). Las requisiciones ya creadas no se tocan.
+async function moverPuesto(u, id, destino, motivo) {
+  motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo del traslado: queda en el historial');
+  destino = +destino; if (!destino) throw E(400, 'Elige la unidad destino');
+  return tx(async c => {
+    const p = (await c.query('select p.*, u.nombre unidad from puesto p join unidad u on u.id=p.unidad_id where p.id=$1 and p.activo for update of p', [id])).rows[0]; if (!p) throw E(404, 'Puesto no encontrado o desactivado');
+    if (p.unidad_id === destino) throw E(400, 'El puesto ya está en esa unidad');
+    const d = (await c.query('select id, nombre, empresa_id from unidad where id=$1 and activa', [destino])).rows[0]; if (!d) throw E(400, 'La unidad destino no existe o está inactiva');
+    const ya = (await c.query('select id from puesto where unidad_id=$1 and perfil_id=$2 and activo', [destino, p.perfil_id])).rows[0];
+    if (ya) throw Object.assign(E(400, 'Ese cargo ya existe en «' + d.nombre + '»: agrégale allí las plazas y cierra estas'), { puestoId: ya.id });
+    if (p.jefe && (await c.query('select 1 from puesto where unidad_id=$1 and jefe and activo', [destino])).rowCount) throw E(400, '«' + d.nombre + '» ya tiene un puesto jefe: desmarca «jefe» en este puesto antes de moverlo');
+    await c.query('update puesto set unidad_id=$2, reporta_a=null where id=$1', [id, destino]);
+    // En una unidad con empresa propia no hay plazas «Por definir»: toman esa empresa
+    const fijadas = d.empresa_id ? (await c.query('update plaza set empresa_id=$2 where puesto_id=$1 and empresa_id is null and (hasta is null or hasta > current_date) returning codigo', [id, d.empresa_id])).rows.map(x => x.codigo) : [];
+    await hist(c, u, 'puesto', id, 'mover', { de: p.unidad, a: d.nombre, de_id: p.unidad_id, a_id: destino, motivo, excepcion_quitada: !!p.reporta_a, plazas_con_empresa: fijadas.length ? fijadas : undefined });
+    return { excepcion: !!p.reporta_a, fijadas: fijadas.length };
+  });
+}
 async function desactivarPuesto(u, id) {
   return tx(async c => {
     const n = (await c.query('select count(*)::int n from plaza where puesto_id=$1 and (hasta is null or hasta > current_date)', [id])).rows[0].n;
@@ -423,5 +442,5 @@ const analizar = filas => tx(c => procesar(c, filas, null, false));
 async function aplicarCarga(filas, usr) {
   return tx(async c => { const r = await procesar(c, filas, usr, true); if (r.errs.length) throw E(400, 'La plantilla cambió desde la vista previa. Vuelve a subir el archivo'); return r; });
 }
-module.exports = { ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
+module.exports = { moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
   diagramaPuestos, plantilla, leer, analizar, aplicarCarga };
