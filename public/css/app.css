@@ -93,6 +93,7 @@ dialog.confirm{width:min(440px,calc(100% - 24px))}dialog.confirm h2{font-size:18
 .desc-col{width:50%}.desc ul{margin:6px 0 0 16px;padding:0}.desc li{margin:2px 0}.desc-kv{list-style:none;margin-left:0!important}.desc-ctl td{width:33%}.desc p{margin:4px 0 0}
 .desc-s{border:1px solid #333;padding:8px 10px;margin:-1px 0 0}.desc-s h4{margin:0 0 4px;font-size:inherit}.desc-g{display:grid;grid-template-columns:1fr 1fr}.desc-g .desc-s+.desc-s{margin-left:-1px}.desc-ctl{margin-top:10px}
 @media print{.desc-body{padding:0}.desc{max-width:none;font-size:10.5pt}.desc-g{display:block}.desc-g .desc-s+.desc-s{margin-left:0}.desc-ctl,.desc li{break-inside:avoid}}
+.rel{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bd)}.rel form input{min-height:40px;width:auto}
 .bloq{margin:6px 0 0 18px;padding:0}
 /* Modo edición del diagrama: panel lateral */
 .dg-area{position:relative;display:flex;gap:12px}.dg-area .dg{flex:1;min-width:0}

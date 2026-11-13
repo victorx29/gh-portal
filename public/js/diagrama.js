@@ -86,8 +86,16 @@
   }
   for (const l of data.links) {
     const a = by.get(l.de), b = by.get(l.a); if (!a || !b) continue;
-    const der = b.x + W / 2 >= a.x + W / 2, x1 = der ? a.x + W : a.x, x2 = der ? b.x : b.x + W, y1 = a.y + a.h / 2, y2 = b.y + b.h / 2, dx = Math.max(50, Math.abs(x2 - x1) / 2) * (der ? 1 : -1);
-    el('path', { d: `M${x1} ${y1}C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`, fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
+    // Línea punteada recta en ángulo, como en los organigramas de GH: de lado a lado si no se solapan en horizontal; si no, de arriba abajo
+    let d;
+    if (a.x + W < b.x || b.x + W < a.x) {
+      const der = b.x > a.x, x1 = der ? a.x + W : a.x, x2 = der ? b.x : b.x + W, y1 = a.y + a.h / 2, y2 = b.y + b.h / 2, xm = der ? x2 - 12 : x2 + 12;   // gira junto al destino, por el pasillo entre cajas
+      d = `M${x1} ${y1}H${xm}V${y2}H${x2}`;
+    } else {
+      const abajo = b.y > a.y, y1 = abajo ? a.y + a.h : a.y, y2 = abajo ? b.y : b.y + b.h, x1 = a.x + W * 0.7, x2 = b.x + W * 0.7, ym = abajo ? y2 - 12 : y2 + 12;
+      d = `M${x1} ${y1}V${ym}H${x2}V${y2}`;
+    }
+    el('path', { d, fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
   }
   for (const n of by.values()) {
     const hcW = n.hcTxt ? mide(n.hcTxt, '600 ' + FE) + 10 : 0, e = empresa(n, MAX - hcW), g = el('g', { transform: `translate(${n.x},${n.y})`, 'data-id': n.id, class: 'dg-n', opacity: n.ctx ? 0.45 : 1 }, gN);
@@ -154,7 +162,7 @@
       acc.innerHTML = ''; const n = nodoActual;
       if (n && data.ver === 'puestos') {
         t.textContent = n.nombre;
-        acc.append(boton('+ Cargo que le reporta', '/config/plantilla/puesto/nuevo?unidad=' + n.unidad_id + '&reporta=' + n.id), boton('+ Plazas', '/config/plantilla/puesto/' + n.id + '?agregar=1'), boton('Ficha del puesto', '/config/plantilla/puesto/' + n.id));
+        acc.append(boton('+ Cargo que le reporta', '/config/plantilla/puesto/nuevo?unidad=' + n.unidad_id + '&reporta=' + n.id), boton('+ Plazas', '/config/plantilla/puesto/' + n.id + '?agregar=1'), boton('+ Línea punteada', '/config/plantilla/puesto/' + n.id + '?funcional=1'), boton('Ficha del puesto', '/config/plantilla/puesto/' + n.id));
       } else if (n) {
         t.textContent = n.nombre;
         acc.append(boton('+ Unidad dependiente', '/config/estructura/nueva?padre=' + n.id), boton('+ Puesto', '/config/plantilla/puesto/nuevo?unidad=' + n.id), boton('Ficha de la unidad', '/config/estructura/' + n.id));

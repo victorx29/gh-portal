@@ -34,7 +34,8 @@ async function cargar(fecha) {
     q(`select z.*, e.siglas, coalesce(e.razon_social,e.nombre) empresa from plaza z left join empresa e on e.id=z.empresa_id join puesto p on p.id=z.puesto_id
        where p.activo and z.creado_en::date <= $1::date and (z.hasta is null or z.hasta > $1 or z.desde > $1)`, [f]).then(r => r.rows),   // creado_en <= fecha: a esa fecha la plaza ya existía en el plan
     ES.grafo(f)]);
-  const byP = new Map(ps.map(p => [p.id, Object.assign(p, { plazas: [] })]));
+  const byP = new Map(ps.map(p => [p.id, Object.assign(p, { plazas: [], funcionales: [] })]));
+  for (const r of (await q('select puesto_id, funcional_de from puesto_relacion where desde <= $1 and (hasta is null or hasta > $1)', [f])).rows) { const p = byP.get(r.puesto_id); if (p && byP.has(r.funcional_de)) p.funcionales.push(r.funcional_de); }
   const reqs = new Map((await q(`select r.plaza_id, r.id, r.codigo, r.estado from requisicion r where r.plaza_id is not null and ${ABIERTA}`)).rows.map(r => [r.plaza_id, r]));
   for (const z of pz) { const p = byP.get(z.puesto_id); if (p) { z.req = reqs.get(z.id) || null; p.plazas.push(z); } }
   resolver(byP, g.by);
@@ -81,8 +82,10 @@ async function detalle(id, fecha) {
   const rq = (await q(`select r.plaza_id, r.id, r.codigo, r.estado, (${ABIERTA}) abierta from requisicion r where r.plaza_id = any($1) order by r.id desc`, [plazas.map(z => z.id)])).rows;
   plazas.forEach(z => { z.estado = estado(z, f); z.reqs = rq.filter(r => r.plaza_id === z.id); z.req = z.reqs.find(r => r.abierta) || null; });
   const historial = (await q(`select h.*, u.nombre autor from historial h left join usuario u on u.id=h.usuario_id
-    where (h.entidad='puesto' and h.entidad_id=$1) or (h.entidad='plaza' and h.entidad_id = any($2)) order by h.id desc limit 100`, [String(id), plazas.map(z => String(z.id))])).rows;
-  return { f, p, plazas, historial, k: contar(plazas, f), reporta: byP.get(p.reporta_id) || null };
+    where (h.entidad='puesto' and h.entidad_id=$1) or (h.entidad='plaza' and h.entidad_id = any($2)) or (h.entidad='puesto_relacion' and (h.detalle->>'puesto_id'=$1 or h.detalle->>'funcional_de'=$1)) order by h.id desc limit 100`, [String(id), plazas.map(z => String(z.id))])).rows;
+  const rel = (await q(`select r.*, pf.nombre perfil, u.nombre unidad, ps.id otro from puesto_relacion r join puesto ps on ps.id = case when r.puesto_id=$1 then r.funcional_de else r.puesto_id end
+    join perfil pf on pf.id=ps.perfil_id join unidad u on u.id=ps.unidad_id where (r.puesto_id=$1 or r.funcional_de=$1) and r.hasta is null order by r.id`, [id])).rows;
+  return { f, p, plazas, historial, k: contar(plazas, f), reporta: byP.get(p.reporta_id) || null, funcionalDe: rel.filter(r => r.puesto_id === +id), funcionalesAqui: rel.filter(r => r.funcional_de === +id) };
 }
 // Opciones para «reporta a»: todos los puestos activos, en orden del árbol
 async function opcionesPuestos() {
@@ -175,12 +178,39 @@ async function moverPuesto(u, id, destino, motivo) {
     return { excepcion: !!p.reporta_a, fijadas: fijadas.length };
   });
 }
+// ---------- Dependencia funcional entre puestos (línea punteada; no cambia el reporte ni la aprobación) ----------
+async function agregarFuncional(u, puestoId, deId, motivo) {
+  motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo: queda en el historial');
+  deId = +deId; if (!deId) throw E(400, 'Elige el puesto al que responde funcionalmente');
+  if (deId === +puestoId) throw E(400, 'Un puesto no puede depender funcionalmente de sí mismo');
+  return tx(async c => {
+    const n = (await c.query('select count(*)::int n from puesto where id = any($1) and activo', [[+puestoId, deId]])).rows[0].n; if (n !== 2) throw E(400, 'Los dos puestos deben existir y estar activos');
+    const p = (await c.query('select reporta_a from puesto where id=$1', [puestoId])).rows[0];
+    if (p.reporta_a === deId) throw E(400, 'Ya le reporta directamente (línea sólida): no hace falta la línea punteada');
+    await c.query('savepoint sp');
+    try { const id = (await c.query('insert into puesto_relacion(puesto_id,funcional_de,motivo,creado_por) values($1,$2,$3,$4) returning id', [puestoId, deId, motivo, u.id])).rows[0].id;
+      await hist(c, u, 'puesto_relacion', id, 'crear', { puesto_id: String(puestoId), funcional_de: String(deId), motivo }); }
+    catch (e) { await c.query('rollback to savepoint sp'); if (e.code === '23505') throw E(400, 'Esa dependencia funcional ya está vigente'); throw e; }
+  });
+}
+async function cerrarFuncional(u, relId, motivo) {
+  motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo del cierre');
+  return tx(async c => {
+    const r = (await c.query('select * from puesto_relacion where id=$1 for update', [relId])).rows[0]; if (!r) throw E(404, 'Dependencia no encontrada');
+    if (r.hasta) throw E(400, 'Ya está cerrada');
+    await c.query('update puesto_relacion set hasta=current_date, cerrado_por=$2, motivo_cierre=$3 where id=$1', [relId, u.id, motivo]);
+    await hist(c, u, 'puesto_relacion', relId, 'cerrar', { puesto_id: String(r.puesto_id), funcional_de: String(r.funcional_de), motivo });
+    return r.puesto_id;
+  });
+}
 async function desactivarPuesto(u, id) {
   return tx(async c => {
     const n = (await c.query('select count(*)::int n from plaza where puesto_id=$1 and (hasta is null or hasta > current_date)', [id])).rows[0].n;
     if (n) throw E(400, 'Tiene ' + n + ' plaza(s) abiertas: ciérralas antes de desactivar el puesto');
     const dep = (await c.query('select count(*)::int n from puesto where reporta_a=$1 and activo', [id])).rows[0].n;
     if (dep) throw E(400, dep + ' puesto(s) le reportan como excepción: cámbialos antes');
+    const fun = (await c.query('select count(*)::int n from puesto_relacion where (puesto_id=$1 or funcional_de=$1) and hasta is null', [id])).rows[0].n;
+    if (fun) throw E(400, 'Tiene ' + fun + ' dependencia(s) funcional(es) vigente(s): ciérralas antes de desactivar el puesto');
     await c.query('update puesto set activo=false, jefe=false where id=$1', [id]); await hist(c, u, 'puesto', id, 'desactivar');
   });
 }
@@ -295,7 +325,8 @@ async function diagramaPuestos(fl) {
       unidad_id: p.unidad_id };
   });
   const tot = contar([...match].flatMap(id => byP.get(id).plazas), f, filtra ? empSet : null, modSet);
-  return { fecha: dg.fecha, esHoy: dg.esHoy, nodes, links: [], leyenda: dg.leyenda, tot };
+  const links = []; for (const id of vis) for (const de of byP.get(id).funcionales) if (vis.has(de)) links.push({ de: id, a: de });
+  return { fecha: dg.fecha, esHoy: dg.esHoy, nodes, links, leyenda: dg.leyenda, tot };
 }
 // Unidades con plazas abiertas de alguna de esas empresas (para que entren al filtrar por empresa aunque no la «atiendan»)
 async function unidadesConPlazas(empresas, fecha) {
@@ -309,7 +340,7 @@ async function unidadesConPlazas(empresas, fecha) {
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
 const key = s => String(s == null ? '' : s).trim().toLowerCase();
 const COLS = [['Unidad *', 'unidad', 12], ['Unidad (nombre, referencia)', 'unidad_nombre', 34], ['Perfil *', 'perfil', 14], ['Cargo (referencia)', 'perfil_nombre', 30], ['Jefe de la unidad', 'jefe', 10],
-  ['Reporta a', 'reporta', 22], ['Empresa', 'empresa', 12], ['Modalidad', 'modalidad', 15], ['Plazas *', 'plazas', 8], ['Congeladas', 'congeladas', 11], ['Proyectadas', 'proyectadas', 11], ['Fecha proyectada', 'fecha_proy', 15]];
+  ['Reporta a', 'reporta', 22], ['Funcional de', 'funcional', 26], ['Empresa', 'empresa', 12], ['Modalidad', 'modalidad', 15], ['Plazas *', 'plazas', 8], ['Congeladas', 'congeladas', 11], ['Proyectadas', 'proyectadas', 11], ['Fecha proyectada', 'fecha_proy', 15]];
 const modDe = s => { const k = norm(s); if (!k) return 'nomina'; return Object.keys(MODALIDADES).find(m => norm(MODALIDADES[m]) === k || m === k || (m === 'nomina' && k.startsWith('nomina'))) || null; };
 async function plantilla() {
   const { f, byP } = await cargar(), wb = new ExcelJS.Workbook(); wb.creator = 'Portal de Gestión Humana';
@@ -322,6 +353,7 @@ async function plantilla() {
     '5. Proyectadas = plazas aprobadas que empiezan en una fecha futura; indica la «Fecha proyectada».',
     '6. Empresa vacía = la empresa propia de la unidad; en unidades corporativas, «Por definir» (se fija al aprobar la requisición o al ingresar la persona). Modalidad vacía = Nómina propia.',
     '7. Reporta a = solo para excepciones, como «UNIDAD/PERFIL» (por ejemplo J-CON/GH-PF-012). Vacío = regla por defecto: el jefe de la unidad.',
+    '7b. Funcional de = líneas punteadas hacia otros puestos, «UNIDAD/PERFIL»; varias separadas por «;». Vacío = ninguna (las que hubiera se cierran con fecha de hoy).',
     '8. Lo que el archivo dice de un puesto queda así: si hay menos plazas de las que existen, las sobrantes se cierran con fecha de hoy.',
     '   Los puestos que no están en el archivo no se tocan. Nada se borra: las plazas se cierran y quedan en el historial.'].forEach((t, i) => { const c = ins.getCell(i + 1, 1); c.value = t; if (!i) c.font = { bold: true, size: 14 }; });
   const ws = wb.addWorksheet('Plantilla', { views: [{ state: 'frozen', ySplit: 1 }] });
@@ -330,7 +362,8 @@ async function plantilla() {
   for (const p of [...byP.values()].sort((a, b) => a.unidad_codigo.localeCompare(b.unidad_codigo) || (b.jefe - a.jefe))) {
     const grupos = new Map();
     for (const z of p.plazas) { const e = estado(z, f); if (e === 'cerrada') continue; const k = z.empresa_id + '|' + z.modalidad; const g = grupos.get(k) || { z, plazas: 0, cong: 0, proy: 0, fp: null }; if (e === 'proyectada') { g.proy++; g.fp = g.fp && g.fp < z.desde ? g.fp : z.desde; } else { g.plazas++; if (e === 'congelada') g.cong++; } grupos.set(k, g); }
-    const rep = p.reporta_a && byP.get(p.reporta_a), base = { unidad: p.unidad_codigo, unidad_nombre: p.unidad, perfil: p.perfil_codigo, perfil_nombre: p.perfil, jefe: p.jefe ? 'Sí' : 'No', reporta: rep ? rep.unidad_codigo + '/' + rep.perfil_codigo : '' };
+    const rep = p.reporta_a && byP.get(p.reporta_a), base = { unidad: p.unidad_codigo, unidad_nombre: p.unidad, perfil: p.perfil_codigo, perfil_nombre: p.perfil, jefe: p.jefe ? 'Sí' : 'No', reporta: rep ? rep.unidad_codigo + '/' + rep.perfil_codigo : '',
+      funcional: p.funcionales.map(x => byP.get(x)).filter(Boolean).map(x => x.unidad_codigo + '/' + x.perfil_codigo).join('; ') };
     if (!grupos.size) ws.addRow({ ...base, plazas: 0 });
     for (const g of grupos.values()) ws.addRow({ ...base, empresa: g.z.siglas || g.z.empresa, modalidad: MODALIDADES[g.z.modalidad], plazas: g.plazas, congeladas: g.cong || '', proyectadas: g.proy || '', fecha_proy: g.fp || '' });
   }
@@ -379,6 +412,7 @@ async function procesar(c, filas, usr, aplicar) {
     const pl = plan.get(k) || { u, pf, ex: puestoDe.get(k) || null, jefe: null, reporta: null, grupos: [], fila: f.fila };
     if (f.jefe) { const j = jefe === 'si' || jefe === 's'; if (pl.jefe != null && pl.jefe !== j) err(f.fila, 'El mismo puesto tiene «Jefe» distinto en otra fila'); pl.jefe = j; }
     if (f.reporta) { if (pl.reporta != null && key(pl.reporta) !== key(f.reporta)) err(f.fila, 'El mismo puesto tiene «Reporta a» distinto en otra fila'); pl.reporta = f.reporta; }
+    if (f.funcional) { const lista = f.funcional.split(';').map(x => x.trim()).filter(Boolean).map(key).sort().join(';'); if (pl.funcional != null && pl.funcional !== lista) err(f.fila, 'El mismo puesto tiene «Funcional de» distinto en otra fila'); pl.funcional = lista; }
     pl.grupos.push({ empId, mod, nP: nP || 0, nC: nC || 0, nY: nY || 0, fp: f.fecha_proy, fila: f.fila });
     plan.set(k, pl);
   }
@@ -394,6 +428,19 @@ async function procesar(c, filas, usr, aplicar) {
     if (!puestoDe.has(k2) && !plan.has(k2)) { err(pl.fila, `«Reporta a» = «${pl.reporta}»: ese puesto no existe ni está en el archivo`); continue; }
     pl.reportaK = k2;
   }
+  // Funcional de: referencias «UNIDAD/PERFIL» → claves de puesto
+  for (const pl of plan.values()) {
+    pl.funcK = new Set();
+    for (const ref of (pl.funcional || '').split(';').filter(Boolean)) {
+      const [uc, pc] = ref.split('/').map(s => (s || '').trim()), u2 = uRef.get(key(uc)), p2 = pfCod.get(key(pc)) || ((pfNom.get(key(pc)) || []).length === 1 ? pfNom.get(key(pc))[0] : null);
+      if (!u2 || !p2) { err(pl.fila, `«Funcional de» = «${ref}»: usa UNIDAD/PERFIL con códigos existentes`); continue; }
+      const k2 = pKey(u2.id, p2.id); if (k2 === pKey(pl.u.id, pl.pf.id)) { err(pl.fila, 'Un puesto no puede depender funcionalmente de sí mismo'); continue; }
+      if (!puestoDe.has(k2) && !plan.has(k2)) { err(pl.fila, `«Funcional de» = «${ref}»: ese puesto no existe ni está en el archivo`); continue; }
+      pl.funcK.add(k2);
+    }
+  }
+  const relAct = (await c.query('select r.id, r.puesto_id, r.funcional_de from puesto_relacion r where r.hasta is null')).rows, keyDeId = new Map(ps.map(p => [p.id, pKey(p.unidad_id, p.perfil_id)]));
+  const conFuncional = filas.some(f => f.funcional !== undefined);   // Excel anterior sin la columna: las líneas punteadas no se tocan
   // Diferencias
   const cambios = []; let altas = 0, cierres = 0, cong = 0;
   for (const pl of plan.values()) {
@@ -415,6 +462,9 @@ async function procesar(c, filas, usr, aplicar) {
       altas += op.abrir + op.abrirY; cierres += op.cerrar.length + op.cerrarY.length; cong += op.congelar.length + op.congelarNuevas + op.descongelar.length;
       pl.ops.push(op);
     }
+    const actFun = pl.ex ? relAct.filter(r => r.puesto_id === pl.ex.id) : [];
+    pl.funAbrir = conFuncional ? [...pl.funcK].filter(k2 => !actFun.some(r => keyDeId.get(r.funcional_de) === k2)) : []; pl.funCerrar = conFuncional ? actFun.filter(r => !pl.funcK.has(keyDeId.get(r.funcional_de))) : [];
+    if (pl.funAbrir.length) d.push('+' + pl.funAbrir.length + ' línea(s) punteada(s)'); if (pl.funCerrar.length) d.push('cierra ' + pl.funCerrar.length + ' línea(s) punteada(s)');
     if (pl.ex) {   // «Reporta a» vacío en el archivo = regla por defecto (se quita la excepción)
       const r = pl.ex.reporta_a && ps.find(x => x.id === pl.ex.reporta_a), actual = r ? pKey(r.unidad_id, r.perfil_id) : null;
       if (!pl.reporta) pl.reportaK = null;
@@ -443,6 +493,13 @@ async function procesar(c, filas, usr, aplicar) {
       for (const z of op.descongelar) { await c.query('update plaza set congelada=false where id=$1', [z.id]); await hist(c, usr, 'plaza', z.id, 'descongelar', { codigo: z.codigo, origen: 'carga masiva' }); }
     }
   }
+  for (const pl of plan.values()) {
+    const pid = idDe.get(pKey(pl.u.id, pl.pf.id));
+    for (const k2 of pl.funAbrir || []) { const rid = (await c.query('insert into puesto_relacion(puesto_id,funcional_de,motivo,creado_por) values($1,$2,$3,$4) returning id', [pid, idDe.get(k2), 'Carga masiva de plantilla', usr.id])).rows[0].id;
+      await hist(c, usr, 'puesto_relacion', rid, 'crear', { puesto_id: String(pid), funcional_de: String(idDe.get(k2)), origen: 'carga masiva' }); }
+    for (const r of pl.funCerrar || []) { await c.query("update puesto_relacion set hasta=current_date, cerrado_por=$2, motivo_cierre='Carga masiva de plantilla' where id=$1", [r.id, usr.id]);
+      await hist(c, usr, 'puesto_relacion', r.id, 'cerrar', { puesto_id: String(r.puesto_id), funcional_de: String(r.funcional_de), origen: 'carga masiva' }); }
+  }
   // Ningún ciclo de reporte tras aplicar
   const { byP } = await (async () => { const r = await c.query('select p.*, pf.nombre perfil from puesto p join perfil pf on pf.id=p.perfil_id where p.activo'); const m = new Map(r.rows.map(x => [x.id, x])); resolver(m, g.by); return { byP: m }; })();
   for (const id of byP.keys()) if (cicla(byP, id)) throw E(400, 'Las líneas «Reporta a» del archivo forman un ciclo. Revísalas');
@@ -453,5 +510,5 @@ const analizar = filas => tx(c => procesar(c, filas, null, false));
 async function aplicarCarga(filas, usr) {
   return tx(async c => { const r = await procesar(c, filas, usr, true); if (r.errs.length) throw E(400, 'La plantilla cambió desde la vista previa. Vuelve a subir el archivo'); return r; });
 }
-module.exports = { moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
+module.exports = { agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
   diagramaPuestos, plantilla, leer, analizar, aplicarCarga };

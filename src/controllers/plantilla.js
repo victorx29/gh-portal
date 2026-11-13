@@ -27,7 +27,7 @@ r.post('/config/plantilla/puesto', w(async (req, res) => {
     res.redirect(e.puestoId ? '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + e.puestoId + '?agregar=1') : '/config/plantilla');
   }
 }));
-r.get('/config/plantilla/puesto/:id', w(async (req, res) => modal(req, res, 'puesto_detalle', { title: 'Puesto', nav: 'config', sub: 'plantilla', d: await PL.detalle(+req.params.id), agregar: req.query.agregar === '1', ...await datosForm() })));
+r.get('/config/plantilla/puesto/:id', w(async (req, res) => modal(req, res, 'puesto_detalle', { title: 'Puesto', nav: 'config', sub: 'plantilla', d: await PL.detalle(+req.params.id), agregar: req.query.agregar === '1', funcional: req.query.funcional === '1', ...await datosForm() })));
 r.post('/config/plantilla/puesto/:id/editar', hacer(req => PL.editarPuesto(req.user, +req.params.id, req.body), 'Puesto actualizado', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/puesto/:id/plazas', hacer(async req => { const c = await PL.agregarPlazas(req.user, +req.params.id, req.body); return aPuesto(req.params.id); }, 'Plazas agregadas', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/puesto/:id/mover', w(async (req, res) => {
@@ -40,6 +40,8 @@ r.post('/config/plantilla/puesto/:id/mover', w(async (req, res) => {
     res.redirect(e.puestoId ? '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + e.puestoId + '?agregar=1') : aPuesto(req.params.id));
   }
 }));
+r.post('/config/plantilla/puesto/:id/funcional', hacer(req => PL.agregarFuncional(req.user, +req.params.id, req.body.funcional_de, req.body.motivo), 'Dependencia funcional agregada', req => aPuesto(req.params.id)));
+r.post('/config/plantilla/funcional/:id/cerrar', hacer(async req => aPuesto(await PL.cerrarFuncional(req.user, +req.params.id, req.body.motivo)), 'Dependencia funcional cerrada con fecha de hoy', '/config/plantilla'));
 r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id), 'Puesto desactivado', req => aPuesto(req.params.id)));
 r.post('/config/plazas/:id/congelar', hacer(async req => aPuesto(await PL.congelar(req.user, +req.params.id, req.body.on === '1', req.body.motivo)), 'Plaza actualizada', '/config/plantilla'));
 r.post('/config/plazas/:id/empresa', hacer(async req => aPuesto(await PL.cambiarEmpresaPlaza(req.user, +req.params.id, req.body.empresa_id, req.body.motivo)), 'Empresa de la plaza actualizada', '/config/plantilla'));
