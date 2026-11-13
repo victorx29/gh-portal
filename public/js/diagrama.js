@@ -111,10 +111,12 @@
   }
   // ---- Vista: zoom y desplazamiento sobre el viewBox ----
   const base = { x: -PAD, y: -PAD, w: total.w + PAD * 2, h: total.h + PAD * 2 }; let vb = { ...base };
-  const aplica = () => svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  const qs = new URLSearchParams(location.search); qs.delete('panel'); const CLAVE = 'dg-vista:' + location.pathname + '?' + qs.toString();
+  try { const g = JSON.parse(sessionStorage.getItem(CLAVE) || 'null'); if (g && g.w > 0) vb = g; } catch (e) { /* sin almacenamiento: vista completa */ }
+  const aplica = () => { svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`); try { sessionStorage.setItem(CLAVE, JSON.stringify(vb)); } catch (e) { /* opcional */ } };
   const ajustar = () => { vb = { ...base }; aplica(); };
   const zoom = (k, fx = 0.5, fy = 0.5) => { const nw = Math.min(base.w * 4, Math.max(W * 1.5, vb.w / k)), nh = vb.h * nw / vb.w; vb.x += (vb.w - nw) * fx; vb.y += (vb.h - nh) * fy; vb.w = nw; vb.h = nh; aplica(); };
-  ajustar();
+  aplica();   // vista guardada (al volver de guardar) o la completa
   document.querySelectorAll('[data-z]').forEach(b => b.addEventListener('click', () => b.dataset.z === 'fit' ? ajustar() : zoom(+b.dataset.z)));
   cont.addEventListener('wheel', e => { e.preventDefault(); const r = cont.getBoundingClientRect(); zoom(e.deltaY < 0 ? 1.15 : 0.87, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height); }, { passive: false });
   let arr = null;
@@ -126,13 +128,54 @@
   cont.addEventListener('pointerup', e => {
     const fue = arr && arr.mov; arr = null; if (fue || !data.esHoy) return;
     const n = document.elementsFromPoint(e.clientX, e.clientY).map(x => x.closest && x.closest('.dg-n')).find(Boolean);
-    if (n && window.ghAbrir) window.ghAbrir('/config/estructura/' + n.dataset.id);
+    if (!n) return;
+    const url = (data.ver === 'puestos' ? '/config/plantilla/puesto/' : '/config/estructura/') + n.dataset.id;
+    if (data.editar) panel.abrir(url, by.get(+n.dataset.id)); else if (window.ghAbrir) window.ghAbrir(url);
   });
   cont.addEventListener('keydown', e => {
     const p = vb.w * 0.1, m = { ArrowLeft: [-p, 0], ArrowRight: [p, 0], ArrowUp: [0, -p], ArrowDown: [0, p] }[e.key];
     if (m) { e.preventDefault(); vb.x += m[0]; vb.y += m[1]; aplica(); } else if (e.key === '+' || e.key === '=') zoom(1.2); else if (e.key === '-') zoom(0.83); else if (e.key === '0') ajustar();
   });
   const dot = document.getElementById('dg-dot'); const verDot = () => { gF.style.display = dot && !dot.checked ? 'none' : ''; }; if (dot) { dot.addEventListener('change', verDot); verDot(); }
+  // ---- Modo edición: panel lateral con los formularios de siempre y acciones rápidas ----
+  const ed = document.getElementById('dg-editar');
+  if (ed) { const u = new URL(location.href); u.searchParams.delete('panel'); if (data.editar) u.searchParams.delete('editar'); else u.searchParams.set('editar', '1'); ed.href = u.pathname + u.search; }
+  const panel = (() => {
+    const el = document.getElementById('dg-panel'), c = document.getElementById('dg-panel-c'), acc = document.getElementById('dg-panel-acc'), t = document.getElementById('dg-panel-t');
+    if (!el) return { abrir() {} };
+    const volver = url => { const u = new URL(location.href); u.searchParams.set('panel', url); return u.pathname + u.search; };
+    const boton = (txt, url) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = txt; b.addEventListener('click', () => abrir(url, null, true)); return b; };
+    let nodoActual = null;
+    async function abrir(url, nodo, mantener) {
+      if (!/^\/config\/[a-z]/.test(url) || url.startsWith('//')) return;
+      if (nodo) nodoActual = nodo; else if (!mantener) nodoActual = null;
+      el.hidden = false; el.classList.add('abierto'); c.innerHTML = '<p class="sub">Cargando…</p>';
+      // Acciones rápidas según la caja
+      acc.innerHTML = ''; const n = nodoActual;
+      if (n && data.ver === 'puestos') {
+        t.textContent = n.nombre;
+        acc.append(boton('+ Cargo que le reporta', '/config/plantilla/puesto/nuevo?unidad=' + n.unidad_id + '&reporta=' + n.id), boton('+ Plazas', '/config/plantilla/puesto/' + n.id + '?agregar=1'), boton('Ficha del puesto', '/config/plantilla/puesto/' + n.id));
+      } else if (n) {
+        t.textContent = n.nombre;
+        acc.append(boton('+ Unidad dependiente', '/config/estructura/nueva?padre=' + n.id), boton('+ Puesto', '/config/plantilla/puesto/nuevo?unidad=' + n.id), boton('Ficha de la unidad', '/config/estructura/' + n.id));
+      } else t.textContent = 'Editar';
+      try {
+        const r = await fetch(url, { headers: { 'X-Modal': '1' } }); if (!r.ok) throw new Error(r.status);
+        c.innerHTML = await r.text();
+      } catch (e) { c.innerHTML = '<p class="flash err">No se pudo abrir (' + e.message + '). Puede que ya no exista.</p>'; return; }
+      c.querySelectorAll('.mh [data-close], .act [data-close]').forEach(b => b.remove());
+      c.querySelectorAll('form').forEach(f => { if ((f.method || '').toLowerCase() !== 'post') return; const h = document.createElement('input'); h.type = 'hidden'; h.name = '_volver'; h.value = volver(url); f.appendChild(h); });
+      if (window.ghIniciar) window.ghIniciar(c);
+      const foco = c.querySelector('input:not([type=hidden]),select,textarea'); if (foco && url.includes('/nuevo')) foco.focus();
+    }
+    // Enlaces de los fragmentos que abrirían otro modal: se abren en el panel
+    c.addEventListener('click', e => { const a = e.target.closest('a[data-modal]'); if (a && c.contains(a)) { e.preventDefault(); e.stopPropagation(); abrir(a.getAttribute('href'), null, true); } }, true);
+    document.getElementById('dg-panel-x').addEventListener('click', () => { el.hidden = true; el.classList.remove('abierto'); const u = new URL(location.href); u.searchParams.delete('panel'); history.replaceState(null, '', u.pathname + u.search); });
+    // Al volver de guardar, se reabre lo que mostraba el panel
+    const ini = new URLSearchParams(location.search).get('panel');
+    if (data.editar && ini) { const id = +(/\/(\d+)(?:\?|$)/.exec(ini) || [])[1]; const n = /\/(puesto|estructura)\/(\d+)/.test(ini) ? by.get(id) : null; abrir(ini, n && ((data.ver === 'puestos') === /puesto/.test(ini)) ? n : null); }
+    return { abrir };
+  })();
   // ---- Pantalla completa (con el respaldo webkit de Safari) ----
   const wrap = document.getElementById('dg-wrap'), fs = document.getElementById('dg-fs');
   const enFs = () => document.fullscreenElement || document.webkitFullscreenElement;

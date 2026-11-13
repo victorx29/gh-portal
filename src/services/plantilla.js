@@ -1,4 +1,4 @@
-const ExcelJS = require('exceljs'), { q, tx } = require('../db'), ES = require('./estructura'), { E } = require('../util');
+const ExcelJS = require('exceljs'), { q, tx } = require('../db'), ES = require('./estructura'), PF = require('./perfiles'), { E } = require('../util');
 const MODALIDADES = { nomina: 'Nómina propia', outsourcing: 'Outsourcing', pasante: 'Pasante', becario: 'Becario', aprendiz: 'Aprendiz' };
 const EXTERNAS = ['outsourcing', 'pasante', 'becario', 'aprendiz'];   // no forman parte de la nómina: se cuentan aparte
 const hist = (c, u, entidad, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u && u.id, entidad, String(id), accion, detalle || {}]);
@@ -122,9 +122,16 @@ async function validarReporte(c, id, reportaA, jefe) {
 }
 const dup = e => { if (e.code === '23505') return E(400, /jefe/.test(e.constraint) ? 'Esa unidad ya tiene un puesto jefe: desmárcalo primero' : 'Ese perfil ya tiene un puesto en esa unidad'); return e; };
 async function crearPuesto(u, b) {
-  const unidad = +b.unidad_id, perfil = +b.perfil_id, jefe = b.jefe === 'on', reportaA = b.reporta_a ? +b.reporta_a : null;
-  if (!unidad || !perfil) throw E(400, 'Elige la unidad y el perfil del puesto');
+  const unidad = +b.unidad_id, jefe = b.jefe === 'on', reportaA = b.reporta_a ? +b.reporta_a : null, nuevo = String(b.perfil_nuevo || '').trim();
+  let perfil = +b.perfil_id;
+  if (!unidad) throw E(400, 'Elige la unidad del puesto');
+  if (!perfil && !nuevo) throw E(400, 'Elige el perfil (cargo) o créalo con «¿No existe el cargo?»');
   return tx(async c => {
+    if (!perfil) {   // cargo nuevo creado desde el organigrama: perfil mínimo con alcance en la unidad
+      const ya = (await c.query("select codigo from perfil where activo and lower(translate(nombre,'áéíóúÁÉÍÓÚ','aeiouAEIOU'))=lower(translate($1,'áéíóúÁÉÍÓÚ','aeiouAEIOU'))", [nuevo])).rows[0];
+      if (ya) throw E(400, 'Ya existe el cargo «' + nuevo + '» (' + ya.codigo + '): elígelo de la lista (marca «Mostrar perfiles de otras áreas» si no aparece)');
+      perfil = await PF.crearC(c, u, { nombre: nuevo, nivel_jerarquico_id: b.perfil_nuevo_nivel || null, unidades: [unidad] });
+    }
     if (!(await c.query('select 1 from unidad where id=$1 and activa', [unidad])).rowCount) throw E(400, 'La unidad no existe o está inactiva');
     if (!(await c.query('select 1 from perfil where id=$1 and activo', [perfil])).rowCount) throw E(400, 'El perfil no existe o está inactivo');
     // El mismo cargo en la misma unidad es UN puesto: las demás empresas o modalidades son plazas de ese puesto

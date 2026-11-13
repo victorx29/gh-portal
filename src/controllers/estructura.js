@@ -27,6 +27,7 @@ r.get('/config/estructura/diagrama', gh, w(async (req, res) => {
   const extra = f.ver === 'unidades' ? await PL.unidadesConPlazas(empHC, f.fecha) : null;
   const [dg, empresas, divisiones, opciones, tipos] = await Promise.all([f.ver === 'puestos' ? PL.diagramaPuestos(f) : ES.diagrama({ ...f, extra }), ES.empresas(), ES.divisiones(), ES.opciones(), ES.tipos()]);
   if (f.ver === 'unidades') { const hc = await PL.resumenUnidades(f.fecha, empHC, f.mods); dg.nodes.forEach(n => { const k = hc.get(n.id); if (k && k.txt) n.hcTxt = k.txt; }); }
+  f.editar = req.query.editar === '1' && dg.esHoy;   // la ruta ya es solo para GH
   res.render('estructura_diagrama', { title: 'Diagrama de estructura', nav: 'config', sub: 'estructura', dg, f, empresas, divisiones, opciones, tipos, MODALIDADES: PL.MODALIDADES });
 }));
 r.get('/config/estructura/nueva', gh, w(async (req, res) => modal(req, res, 'unidad_form', { title: 'Nueva unidad', nav: 'config', sub: 'estructura', v: { padre_id: +req.query.padre || null }, ...await datosModal() })));

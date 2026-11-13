@@ -71,6 +71,7 @@
     target.innerHTML = await r.text(); buscadores(target); unidades(target); perfilesPuesto(target); cond(target); if (!target.open) target.showModal();
   }
   window.ghAbrir = url => abrir(url, dlg);   // lo usa el diagrama de estructura
+  window.ghIniciar = el => { buscadores(el); unidades(el); perfilesPuesto(el); cond(el); };   // panel de edición del diagrama
   d.addEventListener('click', e => {
     const a = e.target.closest('[data-modal],[data-modal2]');
     if (a) { e.preventDefault(); abrir(a.getAttribute('href'), a.hasAttribute('data-modal2') ? dlg2 : dlg); return; }

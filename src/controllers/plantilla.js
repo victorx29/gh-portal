@@ -13,7 +13,13 @@ r.get('/config/plantilla', w(async (req, res) => {
   const [L, d] = await Promise.all([PL.listar(f), datosForm()]);
   res.render('plantilla', { title: 'Plantilla de puestos', nav: 'config', sub: 'plantilla', f, L, ...d, esHoy: L.f === await ES.hoy() });
 }));
-r.get('/config/plantilla/puesto/nuevo', w(async (req, res) => modal(req, res, 'puesto_form', { title: 'Nuevo puesto', nav: 'config', sub: 'plantilla', v: { unidad_id: +req.query.unidad || null }, ...await datosForm() })));
+r.get('/config/plantilla/puesto/nuevo', w(async (req, res) => {
+  // «+ Cargo que le reporta»: si quien queda arriba es el jefe de esa misma unidad, basta la regla por defecto (sin excepción)
+  const uid = +req.query.unidad || null, rep = +req.query.reporta || null;
+  const jefe = rep ? (await q('select unidad_id, jefe from puesto where id=$1 and activo', [rep])).rows[0] : null;
+  const reporta_a = jefe && !(jefe.jefe && jefe.unidad_id === uid) ? rep : null;
+  modal(req, res, 'puesto_form', { title: 'Nuevo puesto', nav: 'config', sub: 'plantilla', v: { unidad_id: uid, reporta_a }, niveles: await PF.nivelesJ(), ...await datosForm() });
+}));
 r.post('/config/plantilla/puesto', w(async (req, res) => {
   try { const id = await PL.crearPuesto(req.user, req.body); flash(req, 'ok', 'Puesto creado'); res.redirect(aPuesto(id)); }
   catch (e) {
