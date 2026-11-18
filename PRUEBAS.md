@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.7.11), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.7.12), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -98,6 +98,7 @@ antes funcionaba.
 | PL-08 | Mover un puesto: conserva sus plazas y códigos, queda en el historial; mover un jefe a una unidad con jefe se rechaza. | C | 0.7.6 |
 | PL-09 | Línea punteada entre puestos: se crea con motivo, no cambia a quién reporta, no se repite ni apunta a sí misma; cerrada no se modifica. | C · A | 0.7.11 |
 | PL-10 | Un puesto con líneas punteadas vigentes no se desactiva sin cerrarlas. | C | 0.7.11 |
+| PL-12 | Línea punteada hacia el jefe directo se rechaza, tanto si es jefe por la regla de la unidad como por excepción; hacia otro puesto se acepta. | C · A | 0.7.12 |
 | PL-11 | Pasantes, becarios, aprendices y outsourcing no suman al HC de nómina. | C · A | 0.7 / 0.7.3 |
 
 ## 7. Perfiles y cargos
@@ -123,6 +124,7 @@ antes funcionaba.
 | CM-04 | Plantilla: menos plazas en el archivo cierra las sobrantes con fecha de hoy; los puestos ausentes del archivo no se tocan. | C · A | 0.7 |
 | CM-05 | Plantilla: columna «Funcional de» vacía cierra las líneas punteadas; un Excel antiguo sin esa columna no las toca. | C | 0.7.11 |
 | CM-06 | Archivo que no es .xlsx o mayor de 5 MB: se rechaza con mensaje. | C | 0.5 |
+| CM-07 | Plantilla: «Funcional de» con una referencia inexistente da error por fila mostrando la referencia como se escribió; hacia el jefe directo, el aplicar se rechaza («apunta a su jefe directo») y no queda nada aplicado. | C | 0.7.12 |
 
 ## 9. Diagrama de estructura
 
@@ -139,6 +141,7 @@ antes funcionaba.
 | DG-09 | Modo edición: «+ Cargo que le reporta» crea el cargo y vuelve al diagrama con el mismo zoom y la caja abierta en el panel. | C | 0.7.9 |
 | DG-10 | El panel de edición se desplaza hasta el historial en página normal, pantalla completa y móvil. | C | 0.7.10 |
 | DG-11 | Filtro por una empresa que solo tiene plazas en una unidad corporativa: la unidad y su puesto aparecen. | C | 0.7 |
+| DG-12 | Línea punteada entre dos cajas de la misma fila con otra caja en medio: va por el pasillo de arriba o de abajo, nunca por debajo de la caja intermedia (en Ver: Cargos y Ver: Unidades, las tres disposiciones). | H | 0.7.12 |
 
 ## 10. Pipelines y selección
 
@@ -179,4 +182,5 @@ antes funcionaba.
 
 | Versión | Fecha | Tipo (H/C) | Resultado | Fallos (ID) | Quién |
 |---|---|---|---|---|---|
-| | | | | | |
+| 0.7.11 | 17-11-2026 | H + críticas 0.7.11 + PL-09/10, CM-05 | Pasa con 1 fallo y 2 ajustes (corregidos en 0.7.12). Probado: INS-01/02/03, SEG-01/03, APR-01/02/05/06, REQ-02/04, PL-05/09/10, CM-01 (las tres cargas), CM-05, DG-01/06/10, UI-01/03/04. No probado: EasyPanel, n8n, imprimir/PDF, imagen, Safari. | Línea punteada bajo otra caja (DG-12); punteada hacia el jefe por regla aceptada (PL-12); referencia en minúsculas en el error (CM-07) | Claude (entorno aislado, PostgreSQL 16) |
+| 0.7.12 | 18-11-2026 | H + críticas 0.7.11 y 0.7.12 | Pasa. INS-01, INS-02 (0.7.11 → 0.7.12 sin migraciones), SEG-01/03, APR-01/02/05/06, REQ-02/04, EV-01 (con PORTAL_URL), PL-05/09/10/12, CM-01, CM-03, CM-05, CM-07, DG-01/06/12 (tres disposiciones, escritorio y móvil), sin errores JS. No probado: EasyPanel, envío real a n8n, imprimir/PDF, imagen, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |

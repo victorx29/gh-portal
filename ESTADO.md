@@ -1,11 +1,13 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 14-11-2026, contra el código `gh-portal` 0.7.11 (package.json 0.7.11, migraciones 001–012).
+Última revisión: 18-11-2026, contra el código `gh-portal` 0.7.12 (package.json 0.7.12, migraciones 001–012).
 
 ## Versión
-- **Última entregada:** 0.7.11 (13-11-2026).
-- **Desplegada en el entorno de desarrollo (EasyPanel):** (confirmar: ¿0.7.11 o anterior?)
-- **Probada completa:** (confirmar hasta qué versión pasaron las pruebas críticas)
+- **Última entregada:** 0.7.12 (18-11-2026).
+- **Desplegada en el entorno de desarrollo (EasyPanel):** (confirmar: ¿0.7.12 o anterior?)
+- **Probada:** 0.7.11 y 0.7.12 por Claude en entorno aislado (PostgreSQL 16 real, navegador de escritorio y móvil):
+  pruebas críticas de ambas versiones y humo. Falta la prueba en EasyPanel (despliegue real y eventos hacia n8n).
+  Ver «Registro de ejecuciones» en PRUEBAS.md.
 - **Producción:** no existe. Se crea con la 1.0.
 
 ## Hecho por versión
@@ -35,10 +37,22 @@
 - **0.7.10:** desplazamiento del panel de edición.
 - **0.7.11:** dependencia funcional (línea punteada) entre puestos; columna «Funcional de» en la carga
   masiva. Migración 012.
+- **0.7.12:** las líneas punteadas ya no pasan por debajo de otras cajas; no se acepta una línea punteada hacia
+  el jefe directo (tampoco cuando lo es por la regla del jefe de la unidad); el error de «Funcional de» muestra
+  la referencia como se escribió. Sin migración. **Cierra la 0.7:** a partir de aquí solo fallos.
 
 ## Pendiente para la siguiente entrega
 - Propuesto en 0.7.9 y sin clasificar: arrastrar y soltar cajas en el diagrama, con «Deshacer».
-  (confirmar si es Nuevo para el plan o entra antes de la 0.8)
+  Recomendación del asesor: dejarlo para después de la 1.0 (solo visual). (confirmar)
+
+## Requisitos antes de empezar la 0.8
+- Diagnóstico de código (revision-codigo-gh, modo diagnóstico).
+- Repo gh-portal en privado: el 17-11-2026 se pudo clonar sin credenciales (sigue público).
+- Autorización de la Directora de GH para usar el Listado de Activos; copia sin valores sensibles.
+- GH prepara la tabla de equivalencias departamento → unidad y decide qué hacer con los 71 cargos sin ficha y
+  los 7 supervisores no vinculables.
+- Decidir: empleado del Listado cuyo puesto no existe en la plantilla → ¿se rechaza la fila o se crea la plaza
+  «por regularizar»?
 
 ## Decisiones abiertas
 - **Siglas o razón social en espacios cortos:** el código ya aplica razón social como nombre principal y
@@ -51,6 +65,11 @@
   «organigrama» se reserva para el de empleados (ISO). Definir el nombre.
 
 ## Pendientes técnicos fuera de entrega
+- Consultas en paralelo sobre la misma transacción (aviso de pg en el log; dejará de funcionar con pg 9):
+  `requisiciones.js` (detalleEvento), `perfiles.js` (carga masiva), `plantilla.js` (carga masiva). Para la
+  versión de estabilización; no actualizar pg a la 9 antes.
+- Una excepción «Reporta a» puesta después de una línea punteada hacia ese mismo puesto deja las dos líneas
+  (redundante, no rompe nada). Para la versión de estabilización.
 - Pasar el repo gh-portal a privado; antes, revisar el historial completo en busca de claves y cambiar las
   que aparezcan. (La versión 0.7.11 no contiene claves; el historial no se revisó.)
 - Configurar token o deploy key de GitHub en EasyPanel para el repo privado.

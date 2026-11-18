@@ -84,18 +84,36 @@
     const px = n.x + W / 2, py = n.y + n.h, my = py + GY / 2;
     n.hijos.forEach(h => linea(`M${px} ${py}V${my}H${h.x + W / 2}V${h.y}`, h.salta));
   }
+  // Líneas punteadas rectas en ángulo, como en los organigramas de GH. Se prueban varias rutas y se usa la primera que no
+  // pasa por debajo de otra caja (si pasara, parecería salir de ese cargo); si ninguna está libre, la que cruza menos cajas.
+  const cajas = [...by.values()];
+  const cruza = (p, q, c) => {   // ¿el tramo recto p→q pasa por dentro de la caja c? (margen de 1px)
+    const x0 = Math.min(p[0], q[0]), x1 = Math.max(p[0], q[0]), y0 = Math.min(p[1], q[1]), y1 = Math.max(p[1], q[1]);
+    return x1 > c.x + 1 && x0 < c.x + W - 1 && y1 > c.y + 1 && y0 < c.y + c.h - 1;
+  };
+  const choques = (pts, a, b) => cajas.filter(c => c !== a && c !== b && pts.some((p, i) => i && cruza(pts[i - 1], p, c))).length;
+  const rutasPunteada = (a, b) => {
+    const r = [], xa = f => a.x + W * f, xb = f => b.x + W * f;
+    if (a.x + W < b.x || b.x + W < a.x) {   // no se solapan en horizontal: de lado a lado, girando junto al destino o junto al origen
+      const der = b.x > a.x, x1 = der ? a.x + W : a.x, x2 = der ? b.x : b.x + W, y1 = a.y + a.h / 2, y2 = b.y + b.h / 2;
+      for (const xm of [der ? x2 - 12 : x2 + 12, der ? x1 + 12 : x1 - 12]) r.push([[x1, y1], [xm, y1], [xm, y2], [x2, y2]]);
+    } else {   // se solapan en horizontal: de arriba abajo
+      const abajo = b.y > a.y, y1 = abajo ? a.y + a.h : a.y, y2 = abajo ? b.y : b.y + b.h, ym = abajo ? y2 - 12 : y2 + 12;
+      r.push([[xa(0.7), y1], [xa(0.7), ym], [xb(0.7), ym], [xb(0.7), y2]]);
+    }
+    // Por el pasillo de arriba o de abajo de las dos filas (entra por arriba o por abajo del destino)
+    const arriba = Math.min(a.y, b.y) - 14, abajo = Math.max(a.y + a.h, b.y + b.h) + 14;
+    for (const f of [0.7, 0.3]) {
+      r.push([[xa(f), a.y], [xa(f), arriba], [xb(f), arriba], [xb(f), b.y]]);
+      r.push([[xa(f), a.y + a.h], [xa(f), abajo], [xb(f), abajo], [xb(f), b.y + b.h]]);
+    }
+    let mejor = null, min = Infinity;
+    for (const pts of r) { const n = choques(pts, a, b); if (n < min) { min = n; mejor = pts; } if (!n) break; }
+    return 'M' + mejor.map(p => p[0] + ' ' + p[1]).join('L');
+  };
   for (const l of data.links) {
     const a = by.get(l.de), b = by.get(l.a); if (!a || !b) continue;
-    // Línea punteada recta en ángulo, como en los organigramas de GH: de lado a lado si no se solapan en horizontal; si no, de arriba abajo
-    let d;
-    if (a.x + W < b.x || b.x + W < a.x) {
-      const der = b.x > a.x, x1 = der ? a.x + W : a.x, x2 = der ? b.x : b.x + W, y1 = a.y + a.h / 2, y2 = b.y + b.h / 2, xm = der ? x2 - 12 : x2 + 12;   // gira junto al destino, por el pasillo entre cajas
-      d = `M${x1} ${y1}H${xm}V${y2}H${x2}`;
-    } else {
-      const abajo = b.y > a.y, y1 = abajo ? a.y + a.h : a.y, y2 = abajo ? b.y : b.y + b.h, x1 = a.x + W * 0.7, x2 = b.x + W * 0.7, ym = abajo ? y2 - 12 : y2 + 12;
-      d = `M${x1} ${y1}V${ym}H${x2}V${y2}`;
-    }
-    el('path', { d, fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
+    el('path', { d: rutasPunteada(a, b), fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
   }
   for (const n of by.values()) {
     const hcW = n.hcTxt ? mide(n.hcTxt, '600 ' + FE) + 10 : 0, e = empresa(n, MAX - hcW), g = el('g', { transform: `translate(${n.x},${n.y})`, 'data-id': n.id, class: 'dg-n', opacity: n.ctx ? 0.45 : 1 }, gN);

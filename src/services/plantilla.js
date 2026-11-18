@@ -185,8 +185,9 @@ async function agregarFuncional(u, puestoId, deId, motivo) {
   if (deId === +puestoId) throw E(400, 'Un puesto no puede depender funcionalmente de sí mismo');
   return tx(async c => {
     const n = (await c.query('select count(*)::int n from puesto where id = any($1) and activo', [[+puestoId, deId]])).rows[0].n; if (n !== 2) throw E(400, 'Los dos puestos deben existir y estar activos');
-    const p = (await c.query('select reporta_a from puesto where id=$1', [puestoId])).rows[0];
-    if (p.reporta_a === deId) throw E(400, 'Ya le reporta directamente (línea sólida): no hace falta la línea punteada');
+    // Jefe efectivo (excepción o regla por defecto): una punteada hacia él repetiría la línea sólida
+    const { byP } = await cargar(), p = byP.get(+puestoId);
+    if (p && p.reporta_id === deId) throw E(400, 'Ya le reporta directamente (línea sólida' + (p.regla === 'defecto' ? ', por ser el jefe de la unidad' : '') + '): no hace falta la línea punteada');
     await c.query('savepoint sp');
     try { const id = (await c.query('insert into puesto_relacion(puesto_id,funcional_de,motivo,creado_por) values($1,$2,$3,$4) returning id', [puestoId, deId, motivo, u.id])).rows[0].id;
       await hist(c, u, 'puesto_relacion', id, 'crear', { puesto_id: String(puestoId), funcional_de: String(deId), motivo }); }
@@ -412,7 +413,11 @@ async function procesar(c, filas, usr, aplicar) {
     const pl = plan.get(k) || { u, pf, ex: puestoDe.get(k) || null, jefe: null, reporta: null, grupos: [], fila: f.fila };
     if (f.jefe) { const j = jefe === 'si' || jefe === 's'; if (pl.jefe != null && pl.jefe !== j) err(f.fila, 'El mismo puesto tiene «Jefe» distinto en otra fila'); pl.jefe = j; }
     if (f.reporta) { if (pl.reporta != null && key(pl.reporta) !== key(f.reporta)) err(f.fila, 'El mismo puesto tiene «Reporta a» distinto en otra fila'); pl.reporta = f.reporta; }
-    if (f.funcional) { const lista = f.funcional.split(';').map(x => x.trim()).filter(Boolean).map(key).sort().join(';'); if (pl.funcional != null && pl.funcional !== lista) err(f.fila, 'El mismo puesto tiene «Funcional de» distinto en otra fila'); pl.funcional = lista; }
+    if (f.funcional) {
+      const refs = f.funcional.split(';').map(x => x.trim()).filter(Boolean), lista = refs.map(key).sort().join(';');
+      if (pl.funcional != null && pl.funcional !== lista) err(f.fila, 'El mismo puesto tiene «Funcional de» distinto en otra fila');
+      pl.funcional = lista; pl.funcionalRefs = refs;
+    }
     pl.grupos.push({ empId, mod, nP: nP || 0, nC: nC || 0, nY: nY || 0, fp: f.fecha_proy, fila: f.fila });
     plan.set(k, pl);
   }
@@ -431,7 +436,7 @@ async function procesar(c, filas, usr, aplicar) {
   // Funcional de: referencias «UNIDAD/PERFIL» → claves de puesto
   for (const pl of plan.values()) {
     pl.funcK = new Set();
-    for (const ref of (pl.funcional || '').split(';').filter(Boolean)) {
+    for (const ref of pl.funcionalRefs || []) {   // tal como vino en el archivo, para que el mensaje lo muestre igual
       const [uc, pc] = ref.split('/').map(s => (s || '').trim()), u2 = uRef.get(key(uc)), p2 = pfCod.get(key(pc)) || ((pfNom.get(key(pc)) || []).length === 1 ? pfNom.get(key(pc))[0] : null);
       if (!u2 || !p2) { err(pl.fila, `«Funcional de» = «${ref}»: usa UNIDAD/PERFIL con códigos existentes`); continue; }
       const k2 = pKey(u2.id, p2.id); if (k2 === pKey(pl.u.id, pl.pf.id)) { err(pl.fila, 'Un puesto no puede depender funcionalmente de sí mismo'); continue; }
@@ -503,6 +508,11 @@ async function procesar(c, filas, usr, aplicar) {
   // Ningún ciclo de reporte tras aplicar
   const { byP } = await (async () => { const r = await c.query('select p.*, pf.nombre perfil from puesto p join perfil pf on pf.id=p.perfil_id where p.activo'); const m = new Map(r.rows.map(x => [x.id, x])); resolver(m, g.by); return { byP: m }; })();
   for (const id of byP.keys()) if (cicla(byP, id)) throw E(400, 'Las líneas «Reporta a» del archivo forman un ciclo. Revísalas');
+  // Una línea punteada nueva no puede repetir la línea sólida (el jefe directo, por excepción o por regla)
+  for (const pl of plan.values()) {
+    const p = byP.get(idDe.get(pKey(pl.u.id, pl.pf.id)));
+    for (const k2 of pl.funAbrir || []) if (p && p.reporta_id === idDe.get(k2)) throw E(400, `Fila ${pl.fila}: «Funcional de» apunta a su jefe directo (línea sólida). Quita esa referencia`);
+  }
   await hist(c, usr, 'plantilla', 'carga', 'importar', resumen);
   return { errs, avisos, cambios, resumen };
 }
