@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.7.12), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.7.13), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -113,6 +113,7 @@ antes funcionaba.
 | PF-06 | Control documental: la fecha de aprobación no puede ser anterior a la de revisión. | C · A | 0.7.1 |
 | PF-07 | Filtros: «Activos sin descripción», «Alcance (área)» con y sin dependientes, «General» y «Sin alcance». | C | 0.7.3 / 0.7.4 |
 | PF-08 | Nivel jerárquico inexistente en el Excel de perfiles: error por fila. | C | 0.7.8 |
+| PF-09 | Perfiles: un Excel descargado (también uno anterior a la 0.7.13) subido sin cambios no crea versiones, aunque una función tenga «;» dentro; editar una función crea una sola versión y deja las demás enteras; una línea escrita a mano «A; B; C» da tres funciones. | H · A | 0.7.13 |
 
 ## 8. Cargas masivas (estructura, perfiles, plantilla)
 
@@ -184,3 +185,4 @@ antes funcionaba.
 |---|---|---|---|---|---|
 | 0.7.11 | 17-11-2026 | H + críticas 0.7.11 + PL-09/10, CM-05 | Pasa con 1 fallo y 2 ajustes (corregidos en 0.7.12). Probado: INS-01/02/03, SEG-01/03, APR-01/02/05/06, REQ-02/04, PL-05/09/10, CM-01 (las tres cargas), CM-05, DG-01/06/10, UI-01/03/04. No probado: EasyPanel, n8n, imprimir/PDF, imagen, Safari. | Línea punteada bajo otra caja (DG-12); punteada hacia el jefe por regla aceptada (PL-12); referencia en minúsculas en el error (CM-07) | Claude (entorno aislado, PostgreSQL 16) |
 | 0.7.12 | 18-11-2026 | H + críticas 0.7.11 y 0.7.12 | Pasa. INS-01, INS-02 (0.7.11 → 0.7.12 sin migraciones), SEG-01/03, APR-01/02/05/06, REQ-02/04, EV-01 (con PORTAL_URL), PL-05/09/10/12, CM-01, CM-03, CM-05, CM-07, DG-01/06/12 (tres disposiciones, escritorio y móvil), sin errores JS. No probado: EasyPanel, envío real a n8n, imprimir/PDF, imagen, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.7.13 | 19-11-2026 | PF-09, CM-01 (perfiles) con la base copiada de EasyPanel + carga de organigramas | Pasa. Instalación desde cero (12 migraciones) y actualización sin migraciones; PF-04 (Word, vista previa); carga de organigramas aplicada en la copia: 214 plazas, 0 cierres. No probado: EasyPanel, formulario de perfil con una sola línea que lleva «;». | — | Claude (entorno aislado, PostgreSQL 16) |

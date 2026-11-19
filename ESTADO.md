@@ -1,10 +1,11 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 18-11-2026, contra el código `gh-portal` 0.7.12 (package.json 0.7.12, migraciones 001–012).
+Última revisión: 19-11-2026, contra el código `gh-portal` 0.7.13 (package.json 0.7.13, migraciones 001–012).
 
 ## Versión
-- **Última entregada:** 0.7.12 (18-11-2026).
-- **Desplegada en el entorno de desarrollo (EasyPanel):** (confirmar: ¿0.7.12 o anterior?)
+- **Última entregada:** 0.7.13 (19-11-2026).
+- **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
+  0.7.12 subida a GitHub (commit «Update 0.7.12»). (confirmar despliegue de 0.7.12 y 0.7.13)
 - **Probada:** 0.7.11 y 0.7.12 por Claude en entorno aislado (PostgreSQL 16 real, navegador de escritorio y móvil):
   pruebas críticas de ambas versiones y humo. Falta la prueba en EasyPanel (despliegue real y eventos hacia n8n).
   Ver «Registro de ejecuciones» en PRUEBAS.md.
@@ -39,7 +40,16 @@
   masiva. Migración 012.
 - **0.7.12:** las líneas punteadas ya no pasan por debajo de otras cajas; no se acepta una línea punteada hacia
   el jefe directo (tampoco cuando lo es por la regla del jefe de la unidad); el error de «Funcional de» muestra
-  la referencia como se escribió. Sin migración. **Cierra la 0.7:** a partir de aquí solo fallos.
+  la referencia como se escribió. Sin migración.
+- **0.7.13:** corrige la carga masiva de perfiles: subir sin cambios el Excel descargado ya no crea versiones nuevas
+  (funciones con «;» dentro y saltos de línea de Windows). El Excel lista funciones, competencias y criterios uno por
+  línea. Sin migración. **Cierra la 0.7:** a partir de aquí solo fallos.
+
+## Carga de datos de prueba (19-11-2026)
+- Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
+  1 unidad nueva (UO-0061, Gerencia de Ventas de IM), 50 perfiles mínimos y la plantilla (214 plazas, 9 vacantes).
+  Probados en una copia de la base de EasyPanel. Son para validar el sistema con GH: la plantilla 2027 cambiará.
+- Fuera de esta carga: Silos de Portuguesa, Corpomax y F21 (sin organigrama ni unidades).
 
 ## Pendiente para la siguiente entrega
 - Propuesto en 0.7.9 y sin clasificar: arrastrar y soltar cajas en el diagrama, con «Deshacer».
@@ -51,8 +61,11 @@
 - Autorización de la Directora de GH para usar el Listado de Activos; copia sin valores sensibles.
 - GH prepara la tabla de equivalencias departamento → unidad y decide qué hacer con los 71 cargos sin ficha y
   los 7 supervisores no vinculables.
-- Decidir: empleado del Listado cuyo puesto no existe en la plantilla → ¿se rechaza la fila o se crea la plaza
-  «por regularizar»?
+- **Decidido (18-11-2026):** empleado del Listado cuyo puesto no existe en la plantilla → se crea la plaza
+  «por regularizar» (origen «carga inicial»), que no cuenta en el HC autorizado. GH la regulariza (perfil con
+  sus datos y plaza autorizada; si es cargo nuevo, pasa por aprobación). Mientras no esté regularizada, no se
+  puede pedir su reemplazo ni confirmar un ingreso en ella. Se rechaza la fila si la unidad o la empresa no se
+  reconocen. Solo aplica a la carga inicial: después, todo ingreso entra por requisición.
 
 ## Decisiones abiertas
 - **Siglas o razón social en espacios cortos:** el código ya aplica razón social como nombre principal y

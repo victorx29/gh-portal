@@ -6,22 +6,26 @@ const codigoV = (codigo, v) => codigo + '-' + pad(v, 2);
 // «Departamento», «Reporta a» y «Trabajador ocupante» NO viven aquí: salen de la plantilla (puesto) y de los empleados.
 const TEXTOS = ['objetivo', 'educacion', 'experiencia', 'conocimientos', 'certificaciones', 'idiomas'];
 const RESP = { dinero: 'Dinero', informacion: 'Información confidencial', decisiones: 'Toma de decisiones', supervision: 'Supervisión' };
-const lineas = v => (Array.isArray(v) ? v : String(v || '').split(/\n|;/)).map(x => String(typeof x === 'object' && x ? (x.nombre + (x.descripcion ? ': ' + x.descripcion : '')) : x).replace(/^[\s•\-–·*\d.)]+/, '').trim()).filter(Boolean);
+// Texto de una lista (funciones, competencias, criterios): si trae saltos de línea, cada línea es un elemento y el «;»
+// dentro de una línea se respeta; si es una sola línea, se separa por «;» (o por «,» en las conductuales).
+const sinCR = v => String(v == null ? '' : v).replace(/\r\n?/g, '\n');
+const partes = (v, sep) => { const t = sinCR(v); return t.includes('\n') ? t.split('\n') : t.split(sep); };
+const lineas = v => (Array.isArray(v) ? v : partes(v, ';')).map(x => String(typeof x === 'object' && x ? (x.nombre + (x.descripcion ? ': ' + x.descripcion : '')) : x).replace(/^[\s•\-–·*\d.)]+/, '').trim()).filter(Boolean);
 const competencia = t => { const m = /^([^:]{2,60}):\s*(.+)$/.exec(t); return m ? { nombre: m[1].trim(), descripcion: m[2].trim() } : { nombre: t }; };
 const entero = v => { const n = parseInt(v, 10); return Number.isInteger(n) && n >= 0 && n <= 60 ? n : null; };
 // Años de experiencia a partir del texto: «entre 4 y 5» → 4–5; «Más de 6» / «Mínimo 15» / «3 años» → mínimo
 const anios = t => { const s = String(t || '').toLowerCase(), m = /entre\s+(\d+)\s*(?:y|a|-)\s*(\d+)/.exec(s) || /(\d+)\s*(?:a|-)\s*(\d+)\s*a[ñn]os/.exec(s); if (m) return [+m[1], +m[2]]; const k = /(\d+)\s*a[ñn]os|(?:m[aá]s de|m[ií]nimo|al menos)\s*(\d+)/.exec(s); return k ? [+(k[1] || k[2]), null] : [null, null]; };
 const contenidoDe = b => {
   b = b || {}; const c = {};
-  TEXTOS.forEach(k => { c[k] = String(b[k] || '').trim(); });
-  if (!c.educacion && b.requisitos) c.educacion = String(b.requisitos).trim();          // versiones anteriores a 0.7.1: «Requisitos» pasa a «Educación»
+  TEXTOS.forEach(k => { c[k] = sinCR(b[k] || '').trim(); });   // los saltos de línea de Windows (\r\n) no son un cambio
+  if (!c.educacion && b.requisitos) c.educacion = sinCR(b.requisitos).trim();          // versiones anteriores a 0.7.1: «Requisitos» pasa a «Educación»
   c.funciones = lineas(b.funciones);
   const [mn, mx] = anios(c.experiencia);
   c.experiencia_min = entero(b.experiencia_min) != null ? entero(b.experiencia_min) : mn;
   c.experiencia_max = entero(b.experiencia_max) != null ? entero(b.experiencia_max) : mx;
-  c.competencias_conductuales = (Array.isArray(b.competencias_conductuales) ? b.competencias_conductuales : String(b.competencias_conductuales || '').split(/\n|;|,/)).map(x => String(x).replace(/\.$/, '').trim()).filter(Boolean);
+  c.competencias_conductuales = (Array.isArray(b.competencias_conductuales) ? b.competencias_conductuales : partes(b.competencias_conductuales, /;|,/)).map(x => String(x).replace(/\.$/, '').trim()).filter(Boolean);
   c.competencias = lineas(b.competencias).map(competencia);
-  const r = b.responsabilidades || {}; c.responsabilidades = {}; Object.keys(RESP).forEach(k => { c.responsabilidades[k] = String(r[k] != null ? r[k] : b['resp_' + k] || '').trim(); });
+  const r = b.responsabilidades || {}; c.responsabilidades = {}; Object.keys(RESP).forEach(k => { c.responsabilidades[k] = sinCR(r[k] != null ? r[k] : b['resp_' + k] || '').trim(); });
   c.criterios = lineas(b.criterios);
   return c;
 };
@@ -131,10 +135,23 @@ const COLS = [['Código', 'codigo', 14], ['Cargo *', 'nombre', 34], ['Nivel', 'n
   ['Objetivo', 'objetivo', 40], ['Funciones', 'funciones', 50], ['Educación', 'educacion', 30], ['Experiencia', 'experiencia', 30], ['Años mín.', 'experiencia_min', 9], ['Años máx.', 'experiencia_max', 9],
   ['Conocimientos', 'conocimientos', 40], ['Certificaciones', 'certificaciones', 20], ['Idiomas', 'idiomas', 14], ['Competencias conductuales', 'competencias_conductuales', 30], ['Competencias', 'competencias', 40],
   ['Dinero', 'resp_dinero', 20], ['Información confidencial', 'resp_informacion', 26], ['Toma de decisiones', 'resp_decisiones', 30], ['Supervisión', 'resp_supervision', 30], ['Criterios', 'criterios', 30]];
-const aFila = c => ({ objetivo: c.objetivo || '', funciones: (c.funciones || []).join('; '), educacion: c.educacion || c.requisitos || '', experiencia: c.experiencia || '', experiencia_min: c.experiencia_min ?? '', experiencia_max: c.experiencia_max ?? '',
-  conocimientos: c.conocimientos || '', certificaciones: c.certificaciones || '', idiomas: c.idiomas || '', competencias_conductuales: (c.competencias_conductuales || []).join('; '),
-  competencias: (c.competencias || []).map(x => x.nombre + (x.descripcion ? ': ' + x.descripcion : '')).join('; '), resp_dinero: (c.responsabilidades || {}).dinero || '', resp_informacion: (c.responsabilidades || {}).informacion || '',
-  resp_decisiones: (c.responsabilidades || {}).decisiones || '', resp_supervision: (c.responsabilidades || {}).supervision || '', criterios: (c.criterios || []).join('; ') });
+// Listas una por línea (Alt+Enter en Excel): así un «;» dentro de una función no la parte en dos al volver a subir el archivo
+const LISTAS = { funciones: c => c.funciones || [], competencias_conductuales: c => c.competencias_conductuales || [],
+  competencias: c => (c.competencias || []).map(x => x.nombre + (x.descripcion ? ': ' + x.descripcion : '')), criterios: c => c.criterios || [] };
+const aFila = c => ({ objetivo: c.objetivo || '', funciones: LISTAS.funciones(c).join('\n'), educacion: c.educacion || c.requisitos || '', experiencia: c.experiencia || '', experiencia_min: c.experiencia_min ?? '', experiencia_max: c.experiencia_max ?? '',
+  conocimientos: c.conocimientos || '', certificaciones: c.certificaciones || '', idiomas: c.idiomas || '', competencias_conductuales: LISTAS.competencias_conductuales(c).join('\n'),
+  competencias: LISTAS.competencias(c).join('\n'), resp_dinero: (c.responsabilidades || {}).dinero || '', resp_informacion: (c.responsabilidades || {}).informacion || '',
+  resp_decisiones: (c.responsabilidades || {}).decisiones || '', resp_supervision: (c.responsabilidades || {}).supervision || '', criterios: LISTAS.criterios(c).join('\n') });
+// Si la celda dice lo mismo que la versión activa (con el formato nuevo, una por línea, o con el anterior, separada por «; »),
+// se usa la lista guardada tal cual: un Excel descargado antes de la 0.7.13 no crea versiones nuevas por un «;» dentro de una función.
+const conservarListas = (actual, f) => {
+  const c = contenidoDe(actual || {});
+  for (const [k, de] of Object.entries(LISTAS)) {
+    const t = sinCR(f[k]).trim(), l = de(c);
+    if (l.length && (t === l.join('\n') || t === l.join('; '))) f[k] = k === 'competencias' ? c.competencias : l;
+  }
+  return f;
+};
 async function plantilla() {
   const ps = await listar(), wb = new ExcelJS.Workbook(); wb.creator = 'Portal de Gestión Humana';
   const ins = wb.addWorksheet('Instrucciones'); ins.getColumn(1).width = 110;
@@ -143,10 +160,10 @@ async function plantilla() {
     '3. Si cambias Objetivo, Funciones, Requisitos, Competencias, Conocimientos o Criterios, se crea una versión nueva y queda activa. Las requisiciones ya hechas conservan la suya.',
     '4. General = Sí: lo ven todas las empresas y unidades. Si es No, indica Empresas (siglas o razón social) y/o Unidades (código o nombre exacto), separadas por coma.',
     '4b. «Nivel jerárquico» = nombre de un nivel de Configuración › Niveles jerárquicos (fila del cargo en el organigrama). Vacío = sin nivel.',
-    '5. Una unidad incluye a todas las que dependen de ella. Funciones, competencias y criterios: separados por punto y coma. Competencias con descripción: «Nombre: descripción».',
+    '5. Una unidad incluye a todas las que dependen de ella. Funciones, competencias y criterios: uno por línea (Alt+Enter en la celda); en una sola línea, separados por punto y coma. Competencias con descripción: «Nombre: descripción».',
     '6. Lo que no está en el archivo no se modifica ni se borra. Antes de aplicar verás una vista previa con errores y advertencias.'].forEach((t, i) => { const c = ins.getCell(i + 1, 1); c.value = t; if (!i) c.font = { bold: true, size: 14 }; });
   const ws = wb.addWorksheet('Cargos', { views: [{ state: 'frozen', ySplit: 1 }] });
-  ws.columns = COLS.map(([header, k, width]) => ({ header, key: k, width }));
+  ws.columns = COLS.map(([header, k, width]) => ({ header, key: k, width, style: LISTAS[k] ? { alignment: { wrapText: true, vertical: 'top' } } : undefined }));
   const h = ws.getRow(1); h.font = { bold: true }; h.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F0FD' } };
   for (const p of ps) { const c = p.contenido || {};
     ws.addRow({ codigo: p.codigo, nombre: p.nombre, nivel: p.nivel || '', nivel_j: p.nivel_j || '', general: p.general ? 'Sí' : 'No', empresas: p.alcance.filter(a => a.empresa_id).map(a => a.empresa).join(', '),
@@ -172,7 +189,7 @@ async function procesar(c, filas, usr, aplicar) {
   const njs = (await c.query('select id, nombre from nivel_jerarquico where activo')).rows, njRef = new Map(njs.map(n => [norm(n.nombre), n.id]));
   for (const f of filas) {
     const n0 = errs.length; if (!f.nombre) err(f.fila, 'Falta el nombre del cargo');
-    const ex = f.codigo ? porCod.get(key(f.codigo)) : null; if (f.codigo && !ex) err(f.fila, `El código «${f.codigo}» no existe. Déjalo vacío para crear un perfil nuevo`);
+    const ex = f.codigo ? porCod.get(key(f.codigo)) : null; if (ex) conservarListas(ex.contenido, f); if (f.codigo && !ex) err(f.fila, `El código «${f.codigo}» no existe. Déjalo vacío para crear un perfil nuevo`);
     if (ex) { if (vistos.has(ex.id)) err(f.fila, `El código «${f.codigo}» está repetido en el archivo`); vistos.add(ex.id); }
     const g = norm(f.general); if (g && !['si', 'no', 's', 'n'].includes(g)) err(f.fila, `«General» debe ser Sí o No (vino «${f.general}»)`);
     const empresas = lista(f.empresas).map(x => { const e = empRef.get(key(x)); if (!e) err(f.fila, `La empresa «${x}» no existe`); return e && e.id; }).filter(Boolean);
