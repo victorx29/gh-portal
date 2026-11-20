@@ -62,7 +62,9 @@ r.get('/perfiles/:id/descripcion', gh, w(async (req, res) => {
     const r = byP.get(x.reporta_id); return { id: x.id, unidad: x.unidad, direccion: dir ? dir.nombre : null, reporta: r ? r.perfil : null };
   });
   const sel = puestos.find(x => String(x.id) === String(req.query.puesto)) || puestos[0] || null;
-  res.render('perfil_descripcion', { title: 'Descripción de cargo · ' + p.nombre, p, v, ctl: (await PF.controles([v.id])).get(v.id) || {}, puestos, sel, codigoV: PF.codigoV, RESP: PF.RESP });
+  // Nombre del grupo de esta instalación (APB o ARO): sale de la base, no del código
+  const grupo = ((await q('select nombre from grupo where activo order by id limit 1')).rows[0] || {}).nombre || '';
+  res.render('perfil_descripcion', { title: 'Descripción de cargo · ' + p.nombre, p, v, grupo, ctl: (await PF.controles([v.id])).get(v.id) || {}, puestos, sel, codigoV: PF.codigoV, RESP: PF.RESP });
 }));
 r.post('/perfiles/:id/versiones/:vid/control', gh, hacer(req => PF.guardarControl(req.user, +req.params.id, +req.params.vid, req.body), 'Control documental guardado', req => aPerfil(req.params.id)));
 r.get('/perfiles/:id', gh, w(async (req, res) => { const p = await PF.detalle(+req.params.id); modal(req, res, 'perfil_detalle', { title: 'Perfil', nav: 'config', sub: 'cargos', p, ctl: await PF.controles(p.versiones.map(v => v.id)), NIVELES, codigoV: PF.codigoV, RESP: PF.RESP, ...await opciones() }); }));

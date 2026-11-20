@@ -1,4 +1,4 @@
-const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), { E } = require('../util');
+const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), { E } = require('../util');
 const ghOnly = u => { if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana gestiona la selección'); };
 const histC = (c, u, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(id), accion, detalle || {}]);
 const evento = (c, tipo, p) => c.query('insert into evento_outbox(tipo,payload) values($1,$2)', [tipo, p]);
@@ -14,10 +14,17 @@ async function tablero(u, reqId) {
 }
 async function crearCandidato(u, reqId, b) {
   ghOnly(u); const nombre = String(b.nombre || '').trim(); if (!nombre) throw E(400, 'El nombre es obligatorio');
+  const cedula = EM.cedulaNorm(b.cedula); if (!cedula) throw E(400, 'La cédula es obligatoria: identifica al candidato en todas sus postulaciones');
+  const t = k => String(b[k] || '').trim() || null;
   return tx(async c => {
     const r = await RS.lock(c, reqId); if (r.estado !== 'seleccion') throw E(400, 'La requisición no está en Selección');
     const pl = await PL.resolver(r.empresa_id, 'seleccion', c);
-    const cd = (await c.query('insert into candidato(nombre,email,telefono,cedula) values($1,$2,$3,$4) returning id', [nombre, b.email || null, b.telefono || null, b.cedula || null])).rows[0];
+    // Un candidato por cédula: si ya existe se reutiliza su ficha (se actualizan correo y teléfono si vienen)
+    let cd = (await c.query('select id from candidato where cedula=$1 for update', [cedula])).rows[0];
+    if (cd) {
+      if ((await c.query('select 1 from candidatura where requisicion_id=$1 and candidato_id=$2', [reqId, cd.id])).rowCount) throw E(400, 'Esa cédula ya está postulada en esta requisición');
+      await c.query('update candidato set email=coalesce($2,email), telefono=coalesce($3,telefono) where id=$1', [cd.id, t('email'), t('telefono')]);
+    } else cd = (await c.query('insert into candidato(nombre,email,telefono,cedula) values($1,$2,$3,$4) returning id', [nombre, t('email'), t('telefono'), cedula])).rows[0];
     const ca = (await c.query('insert into candidatura(requisicion_id,candidato_id,etapa) values($1,$2,$3) returning id', [reqId, cd.id, pl.flujo[0].clave])).rows[0];
     await histC(c, u, ca.id, 'crear', { requisicion: reqId }); return ca.id;
   });
@@ -28,7 +35,13 @@ async function detalle(u, id) {
   const activa = i >= 0 && et.clase !== 'exito', nxt = activa ? pl.flujo[i + 1] : null;
   const registro = activa ? (await q('select * from etapa_registro where tipo=$1 and entidad_id=$2 and etapa=$3', ['candidatura', id, et.clave])).rows[0] || null : null;
   const bloqueos = nxt ? await PL.problemas({ query: q }, 'candidatura', id, et) : [];
-  return { ca, et, activa, siguiente: nxt, registro, bloqueos };
+  // Otras postulaciones de la misma persona y si ya es empleado (movimiento interno)
+  const otras = (await q(`select ca.id, ca.etapa, r.codigo, pf.nombre cargo, ca.actualizada_en from candidatura ca join requisicion r on r.id=ca.requisicion_id
+    join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id where ca.candidato_id=$1 and ca.id<>$2 order by ca.id desc`, [ca.candidato_id, id])).rows;
+  const empleado = ca.cedula ? (await q(`select rl.cargo, un.nombre unidad, rl.fecha_ingreso from relacion_laboral rl join trabajador t on t.id=rl.trabajador_id left join unidad un on un.id=rl.unidad_id
+    where t.cedula=$1 and rl.estado='activo' order by rl.fecha_ingreso desc limit 1`, [ca.cedula])).rows[0] || null : null;
+  const ingreso = et && et.clase === 'exito' ? await EM.deCandidatura(id) : null;
+  return { ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso };
 }
 async function registrar(u, id, b) { const d = await detalle(u, id); if (!d.activa) throw E(400, 'Esta etapa no admite registro'); await PL.registrar(u, 'candidatura', id, d.et, b); }
 
@@ -44,10 +57,8 @@ async function avanzar(u, id) {
     await histC(c, u, id, 'avanzar', { de: ca.etapa, a: nxt.clave });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
     await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, etapa_anterior: ca.etapa, candidato: cd.nombre, email: cd.email, candidato_datos: cd, url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
-    if (nxt.clase === 'exito') {   // ingreso: se crea la persona y su relación laboral pendiente de formalizar
-      let t = cd.cedula ? (await c.query('select id from trabajador where cedula=$1', [cd.cedula])).rows[0] : null;
-      if (!t) t = (await c.query('insert into trabajador(cedula,nombres,email,telefono) values($1,$2,$3,$4) returning id', [cd.cedula || null, cd.nombre, cd.email, cd.telefono])).rows[0];
-      await c.query('insert into relacion_laboral(trabajador_id,empresa_id,unidad_id,cargo,requisicion_id) values($1,$2,$3,$4,$5)', [t.id, r.empresa_id, r.unidad_id, r.cargo, r.id]);
+    if (nxt.clase === 'exito') {   // ingreso: la persona queda «por ingresar» en la plaza; GH confirma después la fecha real
+      await EM.porIngresarC(c, u, { id }, cd, r);
       const n = (await c.query('select count(*)::int n from candidatura where requisicion_id=$1 and etapa=$2', [r.id, nxt.clave])).rows[0].n;
       const rpl = await PL.resolver(r.empresa_id, 'requisicion', c);
       if (n >= r.plazas && r.estado !== rpl.exito.clave) await RS.cambiar(c, u, r, rpl.exito.clave, 'plazas_cubiertas');

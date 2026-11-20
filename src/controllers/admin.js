@@ -1,4 +1,10 @@
-const r = require('express').Router(), bcrypt = require('bcryptjs'), P = require('../services/perm'), ES = require('../services/estructura'), { q, tx } = require('../db'), { w, E, flash, modal } = require('../util');
+const r = require('express').Router(), bcrypt = require('bcryptjs'), P = require('../services/perm'), ES = require('../services/estructura'), { q, tx } = require('../db'), { w, E, flash, modal, hacer } = require('../util');
+// Cada cambio de usuarios y roles queda en el historial (quién, cuándo, qué)
+const hist = (u, id, accion, detalle) => q('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'usuario', String(id), accion, detalle || {}]);
+const esSuperId = async id => (await q("select 1 from usuario_rol where usuario_id=$1 and rol='superadmin'", [id])).rowCount > 0;
+const superActivos = async () => +(await q("select count(distinct ur.usuario_id) n from usuario_rol ur join usuario u on u.id=ur.usuario_id where ur.rol='superadmin' and u.activo")).rows[0].n;
+// Solo un superadmin modifica (roles o estado) a otro superadmin: Gestión Humana no puede dejar al portal sin administrador
+const tocaSuper = async (yo, id) => { if (await esSuperId(id) && !P.esSuper(yo)) throw E(403, 'Solo un superadmin puede modificar a un superadmin'); };
 r.use('/usuarios', (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana')));
 const ROLES = ['gerente', 'director', 'presidencia', 'gh', 'superadmin'];
 
@@ -8,12 +14,14 @@ r.get('/usuarios', w(async (req, res) => {
   res.render('usuarios', { title: 'Usuarios y roles', nav: 'config', sub: 'usuarios', us, isSuper: P.esSuper(req.user), ROLES: ROLES.filter(x => x !== 'superadmin' || P.esSuper(req.user)),
     empresas: (await q('select id,coalesce(razon_social,nombre) nombre,siglas from empresa where activa order by 2')).rows, unidades: await ES.opciones() });
 }));
-r.post('/usuarios', w(async (req, res) => {
+r.post('/usuarios', hacer(async req => {
   const { nombre, email, password } = req.body;
   if (!nombre || !email || String(password || '').length < 10) throw E(400, 'Nombre, correo y clave de al menos 10 caracteres');
-  await q('insert into usuario(nombre,email,pass_hash) values($1,$2,$3)', [nombre.trim(), email.toLowerCase().trim(), await bcrypt.hash(password, 10)]);
-  flash(req, 'ok', 'Usuario creado'); res.redirect('/usuarios');
-}));
+  let id;
+  try { id = (await q('insert into usuario(nombre,email,pass_hash) values($1,$2,$3) returning id', [nombre.trim(), email.toLowerCase().trim(), await bcrypt.hash(password, 10)])).rows[0].id; }
+  catch (e) { if (e.code === '23505') throw E(400, 'Ya existe un usuario con ese correo'); throw e; }
+  await hist(req.user, id, 'crear', { email: email.toLowerCase().trim() });
+}, 'Usuario creado', '/usuarios'));
 r.get('/usuarios/:id/rol', w(async (req, res) => {
   const u = (await q('select id,nombre,email from usuario where id=$1', [+req.params.id])).rows[0]; if (!u) throw E(404, 'Usuario no encontrado');
   modal(req, res, 'usuario_rol', { title: 'Asignar rol', nav: 'config', sub: 'usuarios', u, ROLES: ROLES.filter(x => x !== 'superadmin' || P.esSuper(req.user)),
@@ -23,19 +31,33 @@ r.get('/usuarios/:id/rol', w(async (req, res) => {
 r.post('/usuarios/:id/rol', w(async (req, res) => {
   const rol = req.body.rol; if (!ROLES.includes(rol)) throw E(400, 'Rol inválido');
   if (rol === 'superadmin' && !P.esSuper(req.user)) throw E(403, 'Solo un superadmin asigna ese rol');
+  await tocaSuper(req.user, +req.params.id);
   const global = ['gh', 'superadmin'].includes(rol), porUnidad = ['gerente', 'director'].includes(rol) && req.body.unidad_id;
   const uni = porUnidad ? +req.body.unidad_id : null, emp = global || porUnidad || !req.body.empresa_id ? null : +req.body.empresa_id;
+  if (uni && !(await q('select 1 from unidad where id=$1', [uni])).rowCount) throw E(400, 'La unidad no existe');
   const ins = await q('insert into usuario_rol(usuario_id,rol,empresa_id,unidad_id) values($1,$2,$3,$4) on conflict do nothing', [+req.params.id, rol, emp, uni]);
   let msg = ins.rowCount ? 'Rol asignado' : 'Ese rol ya estaba asignado';
+  if (ins.rowCount) await hist(req.user, +req.params.id, 'rol.asignar', { rol, empresa_id: emp, unidad_id: uni });
   if (ins.rowCount && rol === 'director' && uni && !(await q('select aprueba from unidad where id=$1', [uni])).rows[0].aprueba)
     msg += '. Ojo: esa unidad no está marcada como «aprueba»; márcala en Estructura para que sus requisiciones lleguen a este director';
   flash(req, 'ok', msg); res.redirect('/usuarios');
 }));
-r.post('/usuarios/rol/:rid/borrar', w(async (req, res) => { await q('delete from usuario_rol where id=$1', [+req.params.rid]); flash(req, 'ok', 'Rol retirado'); res.redirect('/usuarios'); }));
-r.post('/usuarios/:id/activo', w(async (req, res) => {
-  if (+req.params.id === req.user.id) throw E(400, 'No puedes desactivarte a ti mismo');
-  await q('update usuario set activo = not activo where id=$1', [+req.params.id]); res.redirect('/usuarios');
-}));
+r.post('/usuarios/rol/:rid/borrar', hacer(async req => {
+  const ro = (await q('select * from usuario_rol where id=$1', [+req.params.rid])).rows[0]; if (!ro) throw E(404, 'Rol no encontrado');
+  await tocaSuper(req.user, ro.usuario_id);
+  const activo = (await q('select activo from usuario where id=$1', [ro.usuario_id])).rows[0].activo;
+  if (ro.rol === 'superadmin' && activo && await superActivos() <= 1) throw E(400, 'Es el último superadmin activo: asigna otro antes de retirar este rol');
+  await q('delete from usuario_rol where id=$1', [ro.id]);
+  await hist(req.user, ro.usuario_id, 'rol.retirar', { rol: ro.rol, empresa_id: ro.empresa_id, unidad_id: ro.unidad_id });
+}, 'Rol retirado', '/usuarios'));
+r.post('/usuarios/:id/activo', hacer(async req => {
+  const id = +req.params.id; if (id === req.user.id) throw E(400, 'No puedes desactivarte a ti mismo');
+  const u = (await q('select activo from usuario where id=$1', [id])).rows[0]; if (!u) throw E(404, 'Usuario no encontrado');
+  await tocaSuper(req.user, id);
+  if (u.activo && await esSuperId(id) && await superActivos() <= 1) throw E(400, 'Es el último superadmin activo: no se puede desactivar');
+  await q('update usuario set activo = not activo where id=$1', [id]);
+  await hist(req.user, id, u.activo ? 'desactivar' : 'activar');
+}, 'Estado del usuario actualizado', '/usuarios'));
 
 // Eliminar (solo superadmin): se borra si no tiene actividad; si la tiene, se anonimiza y el historial se conserva
 r.get('/usuarios/:id/eliminar', w(async (req, res) => {

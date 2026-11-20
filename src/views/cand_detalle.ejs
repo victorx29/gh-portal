@@ -1,10 +1,21 @@
+<% const fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—'; %>
 <div class="mh"><div><h2><%= ca.nombre %></h2><p class="sub"><%= ca.codigo %> · <%= ca.cargo %> · <span class="chip"><%= et ? et.nombre : ca.etapa %></span></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 <table class="kv"><tr><th>Correo</th><td><%= ca.email || '—' %></td></tr><tr><th>Teléfono</th><td><%= ca.telefono || '—' %></td></tr><tr><th>Cédula</th><td><%= ca.cedula || '—' %></td></tr>
 <% if (ca.motivo_rechazo) { %><tr><th>Motivo de rechazo</th><td><%= ca.motivo_rechazo %></td></tr><% } %></table>
+<% if (empleado) { %><p class="flash" role="status"><b>Ya es empleado:</b> <%= empleado.cargo %><%= empleado.unidad ? ' · ' + empleado.unidad : '' %>. Si ingresa, es un movimiento interno: su plaza actual se libera al confirmar el ingreso.</p><% } %>
+<% if (otras.length) { %><details class="blk"><summary>Otras postulaciones (<%= otras.length %>)</summary><ul><% otras.forEach(o => { %><li><%= o.codigo %> · <%= o.cargo %> · <%= o.etapa %></li><% }) %></ul></details><% } %>
+<% if (ingreso) { %><section class="blk"><h3>Ingreso</h3>
+<% if (ingreso.estado === 'por_ingresar') { %><p class="sub">Por ingresar<%= ingreso.plaza_codigo ? ' en la plaza ' + ingreso.plaza_codigo : '' %>. Confirma la fecha real cuando la persona empiece: entonces ocupa la plaza.</p>
+<form method="post" action="/ingresos/<%= ingreso.id %>/confirmar" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<div><label for="fi-<%= ingreso.id %>">Fecha de ingreso</label><input id="fi-<%= ingreso.id %>" name="fecha" type="date" required></div><p class="act"><button class="btn p">Confirmar ingreso</button></p></form>
+<details><summary>No se presentó</summary><form method="post" action="/ingresos/<%= ingreso.id %>/no-ingreso" data-confirm="La plaza queda libre. La requisición no se reabre: si hace falta, pide otra." data-ok="Registrar" data-peligro><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<label for="ni-<%= ingreso.id %>">Motivo</label><input id="ni-<%= ingreso.id %>" name="motivo" required><p class="act"><button class="btn d">Registrar</button></p></form></details>
+<% } else if (ingreso.estado === 'activo') { %><p>Ingresó el <b><%= fd(ingreso.fecha_ingreso) %></b><%= ingreso.plaza_codigo ? ' en la plaza ' + ingreso.plaza_codigo : '' %>. Confirmó: <%= ingreso.confirmado_por_nombre || '—' %>.</p>
+<% } else { %><p class="mu">Ingreso cerrado (<%= ingreso.estado === 'no_ingreso' ? 'no se presentó' : ingreso.estado %>)<%= ingreso.motivo_cierre ? ': ' + ingreso.motivo_cierre : '' %>.</p><% } %></section><% } %>
 <% if (activa) { %>
 <%- include('partials/registro', { action: '/candidaturas/' + ca.id + '/registro', reg: registro, et: et, reqId: ca.requisicion_id }) %>
 <% if (siguiente) { %><div class="blk"><% if (bloqueos.length) { %><div class="flash err" role="alert"><b>No puede avanzar todavía</b><ul><% bloqueos.forEach(b => { %><li><%= b %></li><% }) %></ul></div><% } %>
 <form method="post" action="/candidaturas/<%= ca.id %>/avanzar" class="inl"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><button class="btn p">Avanzar a <%= siguiente.nombre %></button></form></div><% } %>
 <form method="post" action="/candidaturas/<%= ca.id %>/rechazar" class="blk"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
 <label for="mv">Rechazar candidatura (motivo obligatorio; no cierra la requisición)</label><input id="mv" name="motivo"><p class="act"><button class="btn d">Rechazar</button></p></form>
-<% } else { %><p class="empty">Esta candidatura está cerrada.</p><% } %>
+<% } else if (!ingreso) { %><p class="empty">Esta candidatura está cerrada.</p><% } %>

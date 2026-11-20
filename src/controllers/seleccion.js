@@ -1,4 +1,4 @@
-const r = require('express').Router(), S = require('../services/seleccion'), { w, E, flash, modal } = require('../util');
+const r = require('express').Router(), S = require('../services/seleccion'), EM = require('../services/empleados'), { w, E, flash, modal } = require('../util');
 const hacer = (fn, ok) => w(async (req, res) => {
   const id = +req.params.id; let reqId = req.body.req;
   try { await fn(req.user, id, req.body); flash(req, 'ok', ok); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
@@ -14,4 +14,7 @@ r.get('/candidaturas/:id', w(async (req, res) => modal(req, res, 'cand_detalle',
 r.post('/candidaturas/:id/registro', hacer((u, id, b) => S.registrar(u, id, b), 'Registro guardado'));
 r.post('/candidaturas/:id/avanzar', hacer((u, id) => S.avanzar(u, id), 'Candidato avanzó de etapa'));
 r.post('/candidaturas/:id/rechazar', hacer((u, id, b) => S.rechazar(u, id, b.motivo), 'Candidatura rechazada'));
+// Ingreso: GH confirma la fecha real (la persona ocupa la plaza) o registra que no se presentó
+r.post('/ingresos/:id/confirmar', hacer((u, id, b) => EM.confirmarIngreso(u, id, b.fecha), 'Ingreso confirmado: la persona ocupa la plaza'));
+r.post('/ingresos/:id/no-ingreso', hacer((u, id, b) => EM.noIngreso(u, id, b.motivo), 'Registrado: no se presentó. La plaza queda libre'));
 module.exports = r;

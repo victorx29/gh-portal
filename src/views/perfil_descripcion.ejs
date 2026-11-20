@@ -8,7 +8,7 @@
 <button class="btn p" type="button" data-print>Imprimir o PDF</button></div>
 <% if (!sel) { %><p class="flash noprint">Este perfil todavía no tiene puesto en la plantilla: «Departamento» y «Reporta a» quedan en blanco hasta que GH lo agregue.</p><% } %>
 <article class="desc">
-<table class="desc-t"><tr><td class="desc-logo" rowspan="2">Grupo APB</td><td class="desc-tit">DESCRIPCIÓN DE CARGO</td><td><b>Departamento:</b> <%= dep %></td></tr>
+<table class="desc-t"><tr><td class="desc-logo" rowspan="2"><%= grupo %></td><td class="desc-tit">DESCRIPCIÓN DE CARGO</td><td><b>Departamento:</b> <%= dep %></td></tr>
 <tr><td class="desc-cargo"><%= p.nombre.toUpperCase() %><br><small><%= codigoV(p.codigo, v.version) %><%= p.nivel ? ' · Nivel ' + p.nivel : '' %></small></td><td><b>Reporta a:</b> <%= sel && sel.reporta ? sel.reporta : '' %><% if (sel && sel.direccion && sel.direccion !== sel.unidad) { %><br><small>Unidad: <%= sel.unidad %></small><% } %></td></tr>
 </table>
 <section class="desc-s"><h4>Objetivo:</h4><p class="pre"><%= c.objetivo || '' %></p></section>

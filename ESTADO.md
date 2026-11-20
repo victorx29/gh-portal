@@ -1,9 +1,9 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 19-11-2026, contra el código `gh-portal` 0.7.13 (package.json 0.7.13, migraciones 001–012).
+Última revisión: 20-11-2026, contra el código `gh-portal` 0.8.0 (package.json 0.8.0, migraciones 001–013).
 
 ## Versión
-- **Última entregada:** 0.7.13 (19-11-2026).
+- **Última entregada:** 0.8.0 (20-11-2026).
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
   0.7.12 subida a GitHub (commit «Update 0.7.12»). (confirmar despliegue de 0.7.12 y 0.7.13)
 - **Probada:** 0.7.11 y 0.7.12 por Claude en entorno aislado (PostgreSQL 16 real, navegador de escritorio y móvil):
@@ -44,6 +44,11 @@
 - **0.7.13:** corrige la carga masiva de perfiles: subir sin cambios el Excel descargado ya no crea versiones nuevas
   (funciones con «;» dentro y saltos de línea de Windows). El Excel lista funciones, competencias y criterios uno por
   línea. Sin migración. **Cierra la 0.7:** a partir de aquí solo fallos.
+- **0.8.0:** ingreso ligado a la plaza (GH confirma la fecha real; «no se presentó»; movimiento interno; la plaza
+  muestra su ocupante); candidatos únicos por cédula; plaza «por regularizar» bloquea reemplazo e ingreso;
+  GH ya no puede modificar a un superadmin y los cambios de usuarios quedan en el historial; el nombre del grupo
+  en la descripción de cargo sale de la base; script de limpieza de datos de prueba (`npm run limpiar`).
+  Migración 013.
 
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
@@ -55,9 +60,14 @@
 - Propuesto en 0.7.9 y sin clasificar: arrastrar y soltar cajas en el diagrama, con «Deshacer».
   Recomendación del asesor: dejarlo para después de la 1.0 (solo visual). (confirmar)
 
-## Requisitos antes de empezar la 0.8
-- Diagnóstico de código (revision-codigo-gh, modo diagnóstico).
-- Repo gh-portal en privado: el 17-11-2026 se pudo clonar sin credenciales (sigue público).
+## Después de desplegar la 0.8.0
+- Limpiar los datos de prueba en EasyPanel con `npm run limpiar -- transacciones` y `npm run limpiar -- perfil GH-PF-001`
+  (ver UPDATE_0.8.0.md). Antes, respaldo de la base.
+
+## Requisitos de la 0.8.1 (importación del Listado)
+- Diagnóstico de código: hecho el 19-11-2026 (hallazgos «Después» en «Pendientes técnicos»).
+- Repo gh-portal en privado: el historial se revisó el 19-11-2026 y no tiene claves ni datos personales (solo el
+  correo del autor de los commits); se puede pasar a privado sin reescribirlo.
 - Autorización de la Directora de GH para usar el Listado de Activos; copia sin valores sensibles.
 - GH prepara la tabla de equivalencias departamento → unidad y decide qué hacer con los 71 cargos sin ficha y
   los 7 supervisores no vinculables.
@@ -92,8 +102,11 @@
   versión de estabilización; no actualizar pg a la 9 antes.
 - Una excepción «Reporta a» puesta después de una línea punteada hacia ese mismo puesto deja las dos líneas
   (redundante, no rompe nada). Para la versión de estabilización.
-- Pasar el repo gh-portal a privado; antes, revisar el historial completo en busca de claves y cambiar las
-  que aparezcan. (La versión 0.7.11 no contiene claves; el historial no se revisó.)
+- Diagnóstico 19-11-2026, para la versión de estabilización: el resultado de cada etapa de selección se
+  sobrescribe sin historial; los eventos de selección envían a n8n todos los datos del candidato (cédula,
+  teléfono); el envío a n8n mantiene la transacción abierta y un aviso que falla 10 veces se pierde sin alerta;
+  `multer` 1.x → 2.x; Dockerfile con `npm ci`; ayudante `hacer` y normalizaciones duplicados.
+- Pasar el repo gh-portal a privado (historial revisado: sin claves).
 - Configurar token o deploy key de GitHub en EasyPanel para el repo privado.
 - README desactualizado: sitúa el SSO «antes de abrir el portal a todos los gerentes»; la decisión vigente es
   SSO dentro de la 1.0.
@@ -102,12 +115,12 @@
 - Antes de producción: backups programados de PostgreSQL y prueba de restauración.
 
 ## Plan
-- Diagnóstico de código (revision-codigo-gh, modo diagnóstico): antes de empezar la 0.8.
 - 0.9.x Estabilización: sin funciones nuevas; hallazgos «Ahora» pendientes y pruebas automáticas mínimas
   (aprobación por estructura, reserva de plazas, nada se borra, rechazo de usuarios no registrados).
-- **0.8** Empleados: importar Listado de Activos (equivalencias departamento → unidad, supervisor inmediato,
-  ocupadas y vacantes por plaza); enlace usuario ↔ ficha de empleado; organigrama de empleados (ISO) por
-  división, empresa y unidad.
+- **0.8** Empleados. 0.8.0 (hecha): ingreso ligado a la plaza y candidatos por cédula. 0.8.1: importar el
+  Listado de Activos (todos sus datos; los personales solo GH) con equivalencias departamento → unidad, supervisor
+  inmediato y plazas «por regularizar»; regularización por GH; egreso. 0.8.2: organigrama de empleados (ISO) por
+  división, empresa y unidad; enlace usuario ↔ ficha de empleado.
 - **0.9** Postulados con IA (análisis de CV con la rúbrica del perfil).
 - **1.0** Notificaciones, plantillas y SSO Microsoft 365 (enlace por `oid`, sin alta automática, rechazo de
   cuentas no registradas) = salida a producción.

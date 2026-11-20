@@ -80,7 +80,10 @@ async function detalle(id, fecha) {
   const plazas = (await q(`select z.*, e.siglas, coalesce(e.razon_social,e.nombre) empresa, uc.nombre creado_por_nombre, ux.nombre cerrado_por_nombre
     from plaza z left join empresa e on e.id=z.empresa_id left join usuario uc on uc.id=z.creado_por left join usuario ux on ux.id=z.cerrado_por where z.puesto_id=$1 order by z.id`, [id])).rows;
   const rq = (await q(`select r.plaza_id, r.id, r.codigo, r.estado, (${ABIERTA}) abierta from requisicion r where r.plaza_id = any($1) order by r.id desc`, [plazas.map(z => z.id)])).rows;
-  plazas.forEach(z => { z.estado = estado(z, f); z.reqs = rq.filter(r => r.plaza_id === z.id); z.req = z.reqs.find(r => r.abierta) || null; });
+  // Quién ocupa cada plaza (activo) o está por ingresar en ella
+  const oc = (await q(`select rl.plaza_id, rl.estado, rl.fecha_ingreso, trim(t.nombres || ' ' || coalesce(t.apellidos, '')) nombre from relacion_laboral rl join trabajador t on t.id=rl.trabajador_id
+    where rl.plaza_id = any($1) and rl.estado in ('activo', 'por_ingresar') order by rl.estado`, [plazas.map(z => z.id)])).rows;
+  plazas.forEach(z => { z.estado = estado(z, f); z.reqs = rq.filter(r => r.plaza_id === z.id); z.req = z.reqs.find(r => r.abierta) || null; z.ocupantes = oc.filter(o => o.plaza_id === z.id); });
   const historial = (await q(`select h.*, u.nombre autor from historial h left join usuario u on u.id=h.usuario_id
     where (h.entidad='puesto' and h.entidad_id=$1) or (h.entidad='plaza' and h.entidad_id = any($2)) or (h.entidad='puesto_relacion' and (h.detalle->>'puesto_id'=$1 or h.detalle->>'funcional_de'=$1)) order by h.id desc limit 100`, [String(id), plazas.map(z => String(z.id))])).rows;
   const rel = (await q(`select r.*, pf.nombre perfil, u.nombre unidad, ps.id otro from puesto_relacion r join puesto ps on ps.id = case when r.puesto_id=$1 then r.funcional_de else r.puesto_id end
@@ -263,7 +266,7 @@ async function plazasParaSolicitud(unidadIds, reqId) {
   const rows = (await q(`select z.id, z.codigo, z.empresa_id, z.desde, z.hasta, z.congelada, z.modalidad, e.siglas, coalesce(e.razon_social,e.nombre) empresa, p.id puesto_id, p.unidad_id, pf.id perfil_id, pf.nombre perfil, pf.codigo perfil_codigo,
       (select r.codigo from requisicion r where r.plaza_id=z.id and ${ABIERTA} and r.id <> coalesce($2, 0) limit 1) ocupada_por
     from plaza z join puesto p on p.id=z.puesto_id join perfil pf on pf.id=p.perfil_id left join empresa e on e.id=z.empresa_id
-    where p.activo and pf.activo and pf.version_activa_id is not null and p.unidad_id = any($1) order by pf.nombre, z.codigo`, [unidadIds, reqId || null])).rows;
+    where p.activo and pf.activo and pf.version_activa_id is not null and not z.por_regularizar and p.unidad_id = any($1) order by pf.nombre, z.codigo`, [unidadIds, reqId || null])).rows;
   return rows.filter(z => { const e = estado(z, f); return e === 'vigente' || e === 'proyectada'; });
 }
 // Validación al guardar una requisición de reemplazo (dentro de su transacción; bloquea la plaza para que no la tomen dos a la vez)
@@ -273,6 +276,7 @@ async function validarPlazaC(c, plazaId, unidadId, empresaId, reqId) {
   if (!z || !z.puesto_activo) throw E(400, 'Elige una plaza de la plantilla');
   if (z.unidad_id !== unidadId) throw E(400, 'Esa plaza no pertenece a la unidad elegida');
   const e = estado(z, (await c.query('select current_date::text d')).rows[0].d);
+  if (z.por_regularizar) throw E(400, 'Esa plaza está «por regularizar»: Gestión Humana debe regularizarla antes de pedir su reemplazo');
   if (e === 'cerrada') throw E(400, 'Esa plaza está cerrada'); if (e === 'congelada') throw E(400, 'Esa plaza está congelada: GH debe descongelarla antes de pedirla');
   if (!z.perfil_activo || !z.version_activa_id) throw E(400, 'El perfil de ese puesto está inactivo o sin versión activa');
   if (z.empresa_id && z.empresa_id !== empresaId) throw E(400, `Esa plaza es de nómina ${z.siglas || 'de otra empresa'}: elige esa empresa (Gestión Humana puede cambiarla después)`);

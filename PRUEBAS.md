@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.7.13), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.8.0), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -37,6 +37,7 @@ antes funcionaba.
 | SEG-02 | Un POST sin el token `_csrf` correcto es rechazado. | C · A | 0.3 |
 | SEG-03 | Un gerente no puede abrir rutas de Configuración (estructura, plantilla, perfiles, usuarios) aunque escriba la URL: «Solo Gestión Humana». | H · A | 0.5 |
 | SEG-04 | Un usuario desactivado no puede entrar. | C · A | 0.3 |
+| SEG-08 | GH no puede desactivar a un superadmin ni quitarle roles; nadie retira ni desactiva al último superadmin activo; crear usuario, asignar o retirar rol y activar o desactivar quedan en el historial. | H · A | 0.8.0 |
 | SEG-05 | APB no muestra datos de ARO y viceversa (filtros, listas, eventos). Solo aplica cuando exista la instalación ARO. | C | Instrucciones |
 | SEG-06 | **(1.0)** Una cuenta del tenant que no está dada de alta en el portal es rechazada con «No tienes acceso» y queda registrado el intento. | H · A | 1.0, pendiente |
 | SEG-07 | **(1.0)** Un usuario desactivado en Entra ID no puede entrar al portal. | C | 1.0, pendiente |
@@ -114,6 +115,7 @@ antes funcionaba.
 | PF-07 | Filtros: «Activos sin descripción», «Alcance (área)» con y sin dependientes, «General» y «Sin alcance». | C | 0.7.3 / 0.7.4 |
 | PF-08 | Nivel jerárquico inexistente en el Excel de perfiles: error por fila. | C | 0.7.8 |
 | PF-09 | Perfiles: un Excel descargado (también uno anterior a la 0.7.13) subido sin cambios no crea versiones, aunque una función tenga «;» dentro; editar una función crea una sola versión y deja las demás enteras; una línea escrita a mano «A; B; C» da tres funciones. | H · A | 0.7.13 |
+| PF-10 | Descripción de cargo imprimible: el nombre del grupo sale de la base (Configuración › Empresas › Grupo), no del código. | C | 0.8.0 |
 
 ## 8. Cargas masivas (estructura, perfiles, plantilla)
 
@@ -151,6 +153,19 @@ antes funcionaba.
 | SEL-01 | Pipeline personalizado con columna «Requiere resultado Apto»: GH no puede mover la tarjeta sin registrar el resultado. | C · A | 0.3 |
 | SEL-02 | Cambiar la empresa de una requisición a una cuyo pipeline no tiene su etapa: se bloquea. | C | 0.7.2 |
 | SEL-03 | El tablero, Pipelines y Selección muestran la razón social, no el nombre comercial. | C | 0.6.1 |
+| SEL-04 | Candidato: la cédula es obligatoria; «V-12.345.678» y «12345678» son la misma persona; la misma cédula en la misma requisición se rechaza y en otra reutiliza la ficha y muestra sus postulaciones anteriores. | H · A | 0.8.0 |
+
+## 10b. Ingreso y empleados
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| ING-01 | Candidato llega a «Ingreso»: queda «por ingresar» en la plaza de la requisición; la ficha del puesto lo muestra. Un segundo candidato a la misma plaza se rechaza. | H · A | 0.8.0 |
+| ING-02 | «Confirmar ingreso»: solo GH; fecha futura se rechaza; con la fecha real la persona ocupa la plaza (aparece en la ficha del puesto con su fecha) y sale el evento `ingreso.confirmado` sin cédula. | H · A | 0.8.0 |
+| ING-03 | Reemplazo de una plaza ocupada: el nuevo queda «por ingresar», pero no se confirma mientras el ocupante siga activo. | C · A | 0.8.0 |
+| ING-04 | «No se presentó» exige motivo y libera la plaza; una relación cerrada no se modifica ni se borra (también en la base). | C · A | 0.8.0 |
+| ING-05 | Movimiento interno: un empleado que ingresa a otra plaza deja la anterior como «movido»; nunca hay dos relaciones activas para la misma persona. | C · A | 0.8.0 |
+| ING-06 | Plaza «por regularizar»: no se puede pedir su reemplazo ni confirmar un ingreso en ella. | C · A | 0.8.0 |
+| LIM-01 | `npm run limpiar -- transacciones` sin `--aplicar` solo muestra; con `--aplicar` exige PERMITIR_LIMPIEZA=si; borra requisiciones, selección e ingresos de selección; no toca estructura, perfiles, plantilla ni usuarios; el historial queda encadenado y registra la limpieza. | C | 0.8.0 |
 
 ## 11. Eventos hacia n8n
 
@@ -186,3 +201,4 @@ antes funcionaba.
 | 0.7.11 | 17-11-2026 | H + críticas 0.7.11 + PL-09/10, CM-05 | Pasa con 1 fallo y 2 ajustes (corregidos en 0.7.12). Probado: INS-01/02/03, SEG-01/03, APR-01/02/05/06, REQ-02/04, PL-05/09/10, CM-01 (las tres cargas), CM-05, DG-01/06/10, UI-01/03/04. No probado: EasyPanel, n8n, imprimir/PDF, imagen, Safari. | Línea punteada bajo otra caja (DG-12); punteada hacia el jefe por regla aceptada (PL-12); referencia en minúsculas en el error (CM-07) | Claude (entorno aislado, PostgreSQL 16) |
 | 0.7.12 | 18-11-2026 | H + críticas 0.7.11 y 0.7.12 | Pasa. INS-01, INS-02 (0.7.11 → 0.7.12 sin migraciones), SEG-01/03, APR-01/02/05/06, REQ-02/04, EV-01 (con PORTAL_URL), PL-05/09/10/12, CM-01, CM-03, CM-05, CM-07, DG-01/06/12 (tres disposiciones, escritorio y móvil), sin errores JS. No probado: EasyPanel, envío real a n8n, imprimir/PDF, imagen, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.7.13 | 19-11-2026 | PF-09, CM-01 (perfiles) con la base copiada de EasyPanel + carga de organigramas | Pasa. Instalación desde cero (12 migraciones) y actualización sin migraciones; PF-04 (Word, vista previa); carga de organigramas aplicada en la copia: 214 plazas, 0 cierres. No probado: EasyPanel, formulario de perfil con una sola línea que lleva «;». | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.8.0 | 20-11-2026 | H + nuevas (SEG-08, SEL-04, ING-01 a 06, LIM-01, PF-10) | Pasa. Copia de la base de EasyPanel con los Excel de organigramas cargados: migración 013 sin errores, limpieza de prueba (5 requisiciones, 3 candidatos, 1 ingreso, avisos) con historial encadenado intacto, flujo completo de ingreso; instalación desde cero (13 migraciones); humo 0.7.12 sin regresiones; escritorio y móvil sin errores JS. No probado: EasyPanel, envío real a n8n. | — | Claude (entorno aislado, PostgreSQL 16) |

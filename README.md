@@ -9,6 +9,7 @@ src/controllers/ rutas HTTP (auth, pipeline, requisiciones, admin)
 src/services/    reglas de negocio (requisiciones, permisos, outbox hacia n8n)
 src/views/       plantillas EJS (modales como fragmentos)
 scripts/seed.js  catálogos iniciales y usuario administrador
+scripts/limpiar.js  limpieza de datos de prueba (vista previa; borra solo con --aplicar y PERMITIR_LIMPIEZA=si)
 ```
 
 ## Roles y alcance
@@ -69,6 +70,17 @@ y control documental ISO simple por versión (`perfil_version_control`).
 Código automático `GH-PF-NNN` y versiones inmutables `GH-PF-NNN-VV`; el perfil marca su versión activa (`perfil.version_activa_id`).
 Alcance en `perfil_alcance`: general, empresas, unidades (incluye dependientes) o ambas. La requisición guarda la versión activa al crearse.
 
+## Ingreso y empleados (0.8)
+Cuando un candidato llega a «Ingreso» queda «por ingresar» en la plaza de la requisición (`relacion_laboral`). GH confirma la fecha real
+y entonces la persona ocupa la plaza; o registra que no se presentó. Una plaza tiene a lo sumo una persona activa y una por ingresar; una
+persona, una relación activa (el ingreso a otra plaza cierra la anterior como «movido»). Las relaciones no se borran. Candidatos y
+trabajadores se identifican por cédula normalizada (solo dígitos). Una plaza «por regularizar» no admite reemplazo ni ingreso.
+
+## Limpieza de datos de prueba
+En la consola del servicio, con respaldo previo: `npm run limpiar -- transacciones` muestra qué borraría; para borrar, define
+`PERMITIR_LIMPIEZA=si`, ejecuta con `--aplicar` y quita la variable. `npm run limpiar -- perfil GH-PF-NNN` borra un perfil sin uso.
+El historial no se borra: queda encadenado y registra la limpieza.
+
 ## Pendiente (siguientes entregas)
-0.8 Empleados (importación del Excel) y organigrama por división, empresa y unidad.
-0.9 Postulados con IA. 1.0 Notificaciones. SSO Microsoft 365 antes de abrir el portal a todos los gerentes.
+0.8.1 Importación del Listado de Activos. 0.8.2 Organigrama de empleados (ISO). 0.9 Postulados con IA.
+1.0 Notificaciones, plantillas y SSO Microsoft 365 (salida a producción).
