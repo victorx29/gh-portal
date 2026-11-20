@@ -67,6 +67,15 @@
   puede pedir su reemplazo ni confirmar un ingreso en ella. Se rechaza la fila si la unidad o la empresa no se
   reconocen. Solo aplica a la carga inicial: después, todo ingreso entra por requisición.
 
+## Decisiones de alcance de la 0.8 (19-11-2026)
+- Se importan solo los empleados de empresas con estructura cargada. Silos de Portuguesa, Corpomax y F21 quedan en un
+  informe «pendientes por estructura» hasta que GH entregue sus organigramas.
+- La ficha del empleado guarda **todos** los datos del Listado de Activos: será la base de empleados de la empresa.
+  Los datos personales (cédula, nacimiento, hijos y similares) solo los ve GH.
+- La ficha completa es solo de GH; gerentes y directores ven nombre y cargo de quien ocupa cada plaza en el organigrama.
+- Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
+  nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
+
 ## Decisiones abiertas
 - **Siglas o razón social en espacios cortos:** el código ya aplica razón social como nombre principal y
   siglas donde el espacio es corto (0.6, 0.6.1). Confirmar que es la decisión aprobada.
