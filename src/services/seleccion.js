@@ -1,14 +1,17 @@
-const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), { E } = require('../util');
+const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), IA = require('./ia'), { E } = require('../util');
 const ghOnly = u => { if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana gestiona la selección'); };
 const histC = (c, u, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(id), accion, detalle || {}]);
 const evento = (c, tipo, p) => c.query('insert into evento_outbox(tipo,payload) values($1,$2)', [tipo, p]);
-const CA = `select ca.*, c.nombre, c.email, c.telefono, c.cedula, r.empresa_id, r.codigo, r.plazas, r.estado req_estado, pf.nombre cargo
-  from candidatura ca join candidato c on c.id=ca.candidato_id join requisicion r on r.id=ca.requisicion_id
+const CA = `select ca.*, c.nombre, c.email, c.telefono, c.cedula, c.consentimiento_en, c.consentimiento_ref, cv.nombre_original cv_nombre, cv.subido_en cv_subido_en, r.empresa_id, r.codigo, r.plazas, r.estado req_estado, pf.nombre cargo
+  from candidatura ca join candidato c on c.id=ca.candidato_id join requisicion r on r.id=ca.requisicion_id left join cv_archivo cv on cv.id=ca.cv_archivo_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id`;
 
 async function tablero(u, reqId) {
   ghOnly(u); const req = await RS.obtener(u, reqId), pl = await PL.resolver(req.empresa_id, 'seleccion');
   const cands = (await q('select ca.*, c.nombre, c.email from candidatura ca join candidato c on c.id=ca.candidato_id where ca.requisicion_id=$1 order by ca.id', [reqId])).rows;
+  // Puntaje orientativo de la IA: ordena las tarjetas de cada columna (mayor primero); GH decide
+  const pts = await IA.puntajes(reqId); cands.forEach(x => { const a = pts.get(x.id); x.ia = a || null; });
+  cands.sort((a, b) => ((b.ia && b.ia.estado === 'listo' ? +b.ia.puntaje : -1) - (a.ia && a.ia.estado === 'listo' ? +a.ia.puntaje : -1)) || a.id - b.id);
   const ing = cands.filter(x => pl.exito && x.etapa === pl.exito.clave).length;
   return { req, pl, cands, ing };
 }
@@ -41,7 +44,7 @@ async function detalle(u, id) {
   const empleado = ca.cedula ? (await q(`select rl.cargo, un.nombre unidad, rl.fecha_ingreso from relacion_laboral rl join trabajador t on t.id=rl.trabajador_id left join unidad un on un.id=rl.unidad_id
     where t.cedula=$1 and rl.estado='activo' order by rl.fecha_ingreso desc limit 1`, [ca.cedula])).rows[0] || null : null;
   const ingreso = et && et.clase === 'exito' ? await EM.deCandidatura(id) : null;
-  return { ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso };
+  return { ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso, ia: await IA.ultimo(id) };
 }
 async function registrar(u, id, b) { const d = await detalle(u, id); if (!d.activa) throw E(400, 'Esta etapa no admite registro'); await PL.registrar(u, 'candidatura', id, d.et, b); }
 

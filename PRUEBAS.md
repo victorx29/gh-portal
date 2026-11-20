@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.8.0), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.0), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -167,6 +167,39 @@ antes funcionaba.
 | ING-06 | Plaza «por regularizar»: no se puede pedir su reemplazo ni confirmar un ingreso en ella. | C · A | 0.8.0 |
 | LIM-01 | `npm run limpiar -- transacciones` sin `--aplicar` solo muestra; con `--aplicar` exige PERMITIR_LIMPIEZA=si; borra requisiciones, selección e ingresos de selección; no toca estructura, perfiles, plantilla ni usuarios; el historial queda encadenado y registra la limpieza. | C | 0.8.0 |
 
+## 10c. Base de empleados, importación del Listado y organigrama (0.9.0)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| EMP-01 | `/empleados`, la ficha y el egreso son solo de GH: un gerente recibe 403 (también por URL directa). | H · A | 0.9.0 |
+| EMP-02 | Abrir una ficha registra la consulta (quién y cuándo) y la ficha muestra las últimas consultas. | C · A | 0.9.0 |
+| EMP-03 | Búsqueda por cédula con o sin puntos y «V-» encuentra a la persona; por nombre, por coincidencia parcial. | C | 0.9.0 |
+| IMP-01 | Importar el Listado: vista previa con resumen, pendientes por estructura y por equivalencia, advertencias; los títulos de sección y los encabezados repetidos de una hoja no son errores; socios y «APB/ARO GROUP» excluidos. | H | 0.9.0 |
+| IMP-02 | Aplicar y volver a subir el mismo Listado: «Sin cambios» para todos, nada que aplicar. | H · A | 0.9.0 |
+| IMP-03 | Persona sin plaza autorizada: queda en una plaza «por regularizar» (no cuenta en el HC, ⚑ en el diagrama); con plaza libre del mismo cargo, la ocupa. | C · A | 0.9.0 |
+| IMP-04 | Equivalencias: descargar (trae lo que falta del último Listado), subir, vista previa, aplicar; unidad o perfil inexistente es error; queda en el historial con el valor anterior. | C | 0.9.0 |
+| IMP-05 | Supervisor inmediato: se vincula por nombre cuando es único; si no, se guarda el texto. | C | 0.9.0 |
+| REG-01 | Regularizar exige el soporte (quién autorizó) y un perfil con descripción; después cuenta en el HC y admite reemplazo; no se regulariza dos veces; queda en el historial. | H · A | 0.9.0 |
+| EGR-01 | Egreso: solo GH; fecha futura, anterior al ingreso o sin tipo se rechazan; la plaza queda libre; el evento `egreso.registrado` no lleva tipo ni motivo; no se egresa dos veces. | H · A | 0.9.0 |
+| EGR-02 | Reemplazo pedido con el ocupante activo (preaviso): el ingreso del nuevo se bloquea hasta registrar el egreso; después se confirma. | C · A | 0.9.0 |
+| ORG-01 | Diagrama «Ver: Cargos» + «Personas»: nombre de quien ocupa cada plaza, «Vacante», Ocupadas y Vacantes en el título, bloque de control (elaborado, revisado, aprobado) al imprimir. | H | 0.9.0 |
+| ORG-02 | `/organigrama`: GH y Presidencia ven todo; director o gerente con rol de empresa, solo las plazas de su empresa; con rol de unidad, solo su rama (una raíz ajena por URL vuelve a la suya); sin rol, aviso. Solo nombre y cargo. | H · A | 0.9.0 |
+| ORG-03 | El día del relevo (egreso y nuevo ingreso en la misma fecha) la plaza muestra solo a quien queda. | C | 0.9.0 |
+| LIM-02 | `npm run limpiar -- transacciones` también borra análisis de IA y CV; conserva los empleados importados y sus plazas. | C | 0.9.0 |
+
+## 10d. Postulados con análisis de CV por IA (0.9.0)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| IA-01 | Sin consentimiento registrado no se analiza; el consentimiento exige indicar cómo se obtuvo; retirarlo impide análisis nuevos. | H · A | 0.9.0 |
+| IA-02 | Subir CV: solo GH (un gerente recibe 403 y no se escribe nada en el disco); PDF, Word o texto hasta 5 MB; otro tipo se rechaza; el enlace descarga el archivo. | H · A | 0.9.0 |
+| IA-03 | «Analizar con IA»: crea el evento `cv.analizar` sin datos personales; un segundo pedido en curso se rechaza; sin respuesta en 30 minutos vence y se puede pedir de nuevo. | H · A | 0.9.0 |
+| IA-04 | API: sin `x-api-key` 401; token equivocado 404; datos del CV con fecha de nacimiento, estado civil y cédula tachados; reglas para el modelo incluidas. | H · A | 0.9.0 |
+| IA-05 | Resultado: puntaje fuera de 0–5 o sin resumen → 400; válido → puntaje 0–100 ponderado por la rúbrica; repetido → 409; el análisis no se modifica ni se borra (base). | H · A | 0.9.0 |
+| IA-06 | La ficha del postulado muestra puntaje, criterios con evidencia, resumen, brechas, preguntas y alertas, con el aviso de que la IA no decide; la tarjeta muestra «IA n/100». La IA no mueve al postulado. | H | 0.9.0 |
+| IA-07 | Configuración › Análisis de CV con IA: pesos 0–100 (el servidor rechaza otros valores); al menos una dimensión activa con peso; cada análisis guarda la rúbrica con la que se hizo. | C | 0.9.0 |
+| IA-08 | Flujo de n8n importado: con un CV en Word y otro en PDF, el resultado llega al portal; con un PDF escaneado, llega el error «sin texto legible». | H | 0.9.0 |
+
 ## 11. Eventos hacia n8n
 
 | ID | Prueba | Tipo | Origen |
@@ -175,6 +208,7 @@ antes funcionaba.
 | EV-02 | Con n8n caído, el portal sigue funcionando y los eventos se envían al volver (reintentos hasta 10). | C | 0.3 |
 | EV-03 | Cambiar la empresa de una requisición emite `requisicion.empresa_cambiada`; el evento lleva `detalle.plaza`. | C | 0.7.2 |
 | EV-04 | Un evento no se envía dos veces con el mismo `id`. | C · A | 0.3 |
+| EV-05 | Con `N8N_WEBHOOK_IA_URL` definida, `cv.analizar` va a ese webhook y el resto al general; sin ella, todo al general. | C | 0.9.0 |
 
 ## 12. Interfaz común
 
@@ -202,3 +236,4 @@ antes funcionaba.
 | 0.7.12 | 18-11-2026 | H + críticas 0.7.11 y 0.7.12 | Pasa. INS-01, INS-02 (0.7.11 → 0.7.12 sin migraciones), SEG-01/03, APR-01/02/05/06, REQ-02/04, EV-01 (con PORTAL_URL), PL-05/09/10/12, CM-01, CM-03, CM-05, CM-07, DG-01/06/12 (tres disposiciones, escritorio y móvil), sin errores JS. No probado: EasyPanel, envío real a n8n, imprimir/PDF, imagen, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.7.13 | 19-11-2026 | PF-09, CM-01 (perfiles) con la base copiada de EasyPanel + carga de organigramas | Pasa. Instalación desde cero (12 migraciones) y actualización sin migraciones; PF-04 (Word, vista previa); carga de organigramas aplicada en la copia: 214 plazas, 0 cierres. No probado: EasyPanel, formulario de perfil con una sola línea que lleva «;». | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.8.0 | 20-11-2026 | H + nuevas (SEG-08, SEL-04, ING-01 a 06, LIM-01, PF-10) | Pasa. Copia de la base de EasyPanel con los Excel de organigramas cargados: migración 013 sin errores, limpieza de prueba (5 requisiciones, 3 candidatos, 1 ingreso, avisos) con historial encadenado intacto, flujo completo de ingreso; instalación desde cero (13 migraciones); humo 0.7.12 sin regresiones; escritorio y móvil sin errores JS. No probado: EasyPanel, envío real a n8n. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.9.0 | 20-11-2026 | H + nuevas (EMP, IMP, REG, EGR, ORG, LIM-02, IA-01 a 07, EV-05) | Pasa. Copia de la base de EasyPanel (0.8.0) → migraciones 014 y 015 sin errores; importación del Listado real en la copia (252 personas, 66 por regularizar, 106 pendientes, idempotente); 50 pruebas de servicio, 38 de pantallas (escritorio y móvil, sin errores JS), 5 de alcance del organigrama, 3 de seguridad; código de los nodos de n8n probado fuera de n8n; envío de eventos a dos webhooks simulados (cv.* al de IA, el resto al general). Instalación desde cero (15 migraciones). Regresión: 0.8.0 (23/23) por la ruta de actualización, 0.7.12 (18/18) y humo de requisiciones en instalación nueva. No probado: EasyPanel, n8n real con un modelo (IA-08), imprimir/PDF, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |

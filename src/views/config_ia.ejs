@@ -1,0 +1,13 @@
+<%- include('partials/head') %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Análisis de CV con IA' }) %><h1>Análisis de CV con IA</h1>
+<p class="sub">La IA compara el CV con el perfil del cargo, dimensión por dimensión (0 a 5), y el portal calcula un puntaje orientativo de 0 a 100 con estos pesos. Solo se usan las dimensiones que el perfil tiene descritas. La IA nunca decide ni considera datos personales protegidos.</p></div></div>
+<%- include('partials/config_nav') %>
+<form method="post" action="/config/ia" class="form-max"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<div class="tw"><table class="mid"><tr><th>Dimensión</th><th>Requisito que toma del perfil</th><th>Peso</th><th>Activa</th></tr>
+<% const CAMPO = { educacion: 'Educación', experiencia: 'Experiencia y años mín./máx.', conocimientos: 'Conocimientos', competencias: 'Competencias conductuales y organizacionales', idiomas: 'Idiomas y certificaciones', criterios: 'Criterios de selección' };
+   rs.forEach(x => { %><tr><td><b><%= x.nombre %></b></td><td><%= CAMPO[x.campo] || x.campo %></td>
+<td><label class="sr" for="p-<%= x.clave %>">Peso de <%= x.nombre %></label><input id="p-<%= x.clave %>" name="peso_<%= x.clave %>" type="number" min="0" max="100" value="<%= x.peso %>" style="max-width:90px"></td>
+<td><label class="chk"><input type="checkbox" name="activo_<%= x.clave %>"<%= x.activo ? ' checked' : '' %>><span class="sr">Activa</span></label></td></tr><% }) %></table></div>
+<p class="sub">Los pesos no tienen que sumar 100: el puntaje se normaliza. Los cambios aplican a los análisis nuevos; cada análisis guarda la rúbrica con la que se hizo.</p>
+<p class="act"><button class="btn p">Guardar</button></p></form>
+<%- include('partials/foot') %>

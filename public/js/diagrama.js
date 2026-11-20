@@ -29,7 +29,9 @@
   // ---- Disposición ----
   // h = horizontal (norma) · c = compacta (apila hojas) · k = cascada por columnas (2 niveles en horizontal y el resto en cascada)
   const MODO = data.disp === 'c' ? 'c' : data.disp === 'k' ? 'k' : 'h', HC = 54, IND = 22, GK = 8;
-  const by = new Map(data.nodes.map(n => [n.id, { ...n, hijos: [], h: H }]));
+  // Organigrama de empleados: debajo del cargo, quién ocupa cada plaza (hasta 6 nombres) y cuántas están vacantes
+  const MAXP = 6, LP = 14, lineasP = n => !n.personas ? 0 : Math.min(n.personas.length, MAXP) + (n.personas.length > MAXP ? 1 : 0) + (n.vacantes ? 1 : 0);
+  const by = new Map(data.nodes.map(n => [n.id, { ...n, hijos: [], h: H + (lineasP(n) ? lineasP(n) * LP + 8 : 0) }]));
   for (const n of by.values()) { const p = by.get(n.padre); if (p) p.hijos.push(n); }
   const ord = (a, b) => (a.rango != null ? a.rango : 1e9) - (b.rango != null ? b.rango : 1e9) || a.nivel - b.nivel || a.nombre.localeCompare(b.nombre, 'es');
   for (const n of by.values()) { n.hijos.sort(ord); n.apila = MODO === 'c' && n.hijos.length >= APILAR && n.hijos.every(h => !h.hijos.length); }
@@ -48,7 +50,7 @@
   };
   // Cascada: el subárbol baja con sangría; cajas bajas (nombre y empresa)
   const prof = (n, d) => n.hijos.reduce((m, h) => Math.max(m, prof(h, d + 1)), d);
-  const cascada = (n, x, y) => { n.hijos.forEach(h => { h.mini = true; h.h = HC; h.x = x + IND; h.y = y; altoMax = Math.max(altoMax, y + HC); y = cascada(h, x + IND, y + HC + GK); }); return y; };
+  const cascada = (n, x, y) => { n.hijos.forEach(h => { h.mini = true; h.h = HC + (lineasP(h) ? lineasP(h) * LP + 4 : 0); h.x = x + IND; h.y = y; altoMax = Math.max(altoMax, y + h.h); y = cascada(h, x + IND, y + h.h + GK); }); return y; };
   const ancho = n => {
     if (n._w != null) return n._w;
     if (n.columna) return (n._w = W + IND * prof(n, 0));
@@ -58,14 +60,17 @@
   };
   if (MODO === 'k') raices.forEach(r => r.hijos.forEach(c => { c.columna = true; }));
   const ubica = (n, izq, arriba) => {
-    const w = ancho(n); n.y = FILAS ? n.fila * (H + GY) : arriba; altoMax = Math.max(altoMax, n.y + n.h);
-    if (n.columna) { n.x = izq; cascada(n, izq, arriba + H + 14); return; }
-    if (n.apila) { n.x = izq; let y = arriba + H + 18; n.hijos.forEach(h => { h.x = izq + 30; h.y = y; altoMax = Math.max(altoMax, y + H); y += H + 14; }); return; }
+    const w = ancho(n); n.y = FILAS ? filaY[n.fila] : arriba; altoMax = Math.max(altoMax, n.y + n.h);
+    if (n.columna) { n.x = izq; cascada(n, izq, n.y + n.h + 14); return; }
+    if (n.apila) { n.x = izq; let y = n.y + n.h + 18; n.hijos.forEach(h => { h.x = izq + 30; h.y = y; altoMax = Math.max(altoMax, y + h.h); y += h.h + 14; }); return; }
     n.x = izq + (w - W) / 2; if (!n.hijos.length) return;
     const tot = n.hijos.reduce((s, h) => s + ancho(h), 0) + GX * (n.hijos.length - 1); let x = izq + (w - tot) / 2;
-    n.hijos.forEach(h => { ubica(h, x, arriba + H + GY); x += ancho(h) + GX; });
+    n.hijos.forEach(h => { ubica(h, x, n.y + n.h + GY); x += ancho(h) + GX; });
   };
   if (FILAS) raices.forEach(r => asignar(r, null));
+  // Con filas por nivel, cada fila mide lo que su caja más alta (las cajas con personas son más altas)
+  const filaY = [];
+  if (FILAS) { const alto = []; for (const n of by.values()) alto[n.fila] = Math.max(alto[n.fila] || H, n.h); let y = 0; for (let i = 0; i < alto.length; i++) { filaY[i] = y; y += (alto[i] || H) + GY; } }
   let x0 = 0; raices.forEach(r => { ubica(r, x0, 0); x0 += ancho(r) + 60; });
   const total = { w: Math.max(W, x0 - 60), h: altoMax };
   // ---- Dibujo ----
@@ -111,6 +116,15 @@
     for (const pts of r) { const n = choques(pts, a, b); if (n < min) { min = n; mejor = pts; } if (!n) break; }
     return 'M' + mejor.map(p => p[0] + ' ' + p[1]).join('L');
   };
+  // Nombres de los ocupantes (y vacantes) dentro de la caja, bajo una línea separadora
+  const personas = (g, n, y0) => {
+    const L = lineasP(n); if (!L) return;
+    el('line', { x1: 10, x2: W - 10, y1: y0 - 1, y2: y0 - 1, stroke: C.bd }, g);
+    let y = y0 + 12;
+    n.personas.slice(0, MAXP).forEach(p => { txt(g, 12, y, corta(p, FT, MAX), FT, C.tx); y += LP; });
+    if (n.personas.length > MAXP) { txt(g, 12, y, '+' + (n.personas.length - MAXP) + ' más', FT, C.mu); y += LP; }
+    if (n.vacantes) txt(g, 12, y, n.vacantes === 1 ? 'Vacante' : n.vacantes + ' vacantes', '600 ' + FT, C.wa);
+  };
   for (const l of data.links) {
     const a = by.get(l.de), b = by.get(l.a); if (!a || !b) continue;
     el('path', { d: rutasPunteada(a, b), fill: 'none', stroke: C.wa, 'stroke-width': 1.5, 'stroke-dasharray': '5 4', 'marker-end': 'url(#dg-fl)' }, gF);
@@ -124,8 +138,9 @@
     if (n.mini) {   // caja de cascada: franja lateral de color, nombre (2 líneas) y empresa
       el('rect', { x: 1, y: 1, width: 4, height: n.h - 2, rx: 2, fill: banda(n.nivelBanda != null ? n.nivelBanda : n.nivel) }, g);
       const FM = '600 12px ' + FF; envuelve(n.nombre, FM, MAX, 2).forEach((l, i) => txt(g, 12, 18 + i * 14, l, FM, C.tx));
-      txt(g, 12, n.h - 8, e.t, '11px ' + FF, C.mu); if (n.hcTxt) txt(g, W - 10, n.h - 8, n.hcTxt, '600 11px ' + FF, C.tx, { 'text-anchor': 'end' });
+      txt(g, 12, HC - 8, e.t, '11px ' + FF, C.mu); if (n.hcTxt) txt(g, W - 10, HC - 8, n.hcTxt, '600 11px ' + FF, C.tx, { 'text-anchor': 'end' });
       if (n.aprueba) txt(g, W - 10, 18, '✓', '700 12px ' + FF, n.aprobadores.length ? C.ok : C.wa, { 'text-anchor': 'end' });
+      personas(g, n, HC);
       continue;
     }
     el('rect', { x: 1, y: 1, width: W - 2, height: 5, rx: 3, fill: banda(n.nivelBanda != null ? n.nivelBanda : n.nivel) }, g);
@@ -134,6 +149,7 @@
     envuelve(n.nombre, FN, MAX, 2).forEach((l, i) => txt(g, 12, 41 + i * 16, l, FN, C.tx));
     txt(g, 12, H - 12, e.t, FE, C.mu); if (n.hcTxt) txt(g, W - 12, H - 12, n.hcTxt, '600 ' + FE, C.tx, { 'text-anchor': 'end' });
     if (!n.hcTxt && n.funcionalFuera.length) txt(g, W - 12, H - 12, '⇢', '600 13px ' + FF, C.wa, { 'text-anchor': 'end' });
+    personas(g, n, H);
   }
   // ---- Vista: zoom y desplazamiento sobre el viewBox ----
   const base = { x: -PAD, y: -PAD, w: total.w + PAD * 2, h: total.h + PAD * 2 }; let vb = { ...base };
@@ -156,6 +172,7 @@
     const n = document.elementsFromPoint(e.clientX, e.clientY).map(x => x.closest && x.closest('.dg-n')).find(Boolean);
     if (!n) return;
     const url = (data.ver === 'puestos' ? '/config/plantilla/puesto/' : '/config/estructura/') + n.dataset.id;
+    if (data.soloVer) return;   // organigrama de consulta (gerentes y directores): solo lectura
     if (data.editar) panel.abrir(url, by.get(+n.dataset.id)); else if (window.ghAbrir) window.ghAbrir(url);
   });
   cont.addEventListener('keydown', e => {

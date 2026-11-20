@@ -1,9 +1,30 @@
-<% const fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—'; %>
+<% const fd = s => !s ? '—' : s instanceof Date ? s.toLocaleDateString('es-VE') : String(s).slice(0, 10).split('-').reverse().join('/'); %>
 <div class="mh"><div><h2><%= ca.nombre %></h2><p class="sub"><%= ca.codigo %> · <%= ca.cargo %> · <span class="chip"><%= et ? et.nombre : ca.etapa %></span></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 <table class="kv"><tr><th>Correo</th><td><%= ca.email || '—' %></td></tr><tr><th>Teléfono</th><td><%= ca.telefono || '—' %></td></tr><tr><th>Cédula</th><td><%= ca.cedula || '—' %></td></tr>
 <% if (ca.motivo_rechazo) { %><tr><th>Motivo de rechazo</th><td><%= ca.motivo_rechazo %></td></tr><% } %></table>
 <% if (empleado) { %><p class="flash" role="status"><b>Ya es empleado:</b> <%= empleado.cargo %><%= empleado.unidad ? ' · ' + empleado.unidad : '' %>. Si ingresa, es un movimiento interno: su plaza actual se libera al confirmar el ingreso.</p><% } %>
 <% if (otras.length) { %><details class="blk"><summary>Otras postulaciones (<%= otras.length %>)</summary><ul><% otras.forEach(o => { %><li><%= o.codigo %> · <%= o.cargo %> · <%= o.etapa %></li><% }) %></ul></details><% } %>
+<section class="blk"><h3>CV y análisis con IA</h3>
+<% if (!ca.consentimiento_en) { %><p class="sub">Sin consentimiento del postulado no se analiza su CV (protección de datos).</p>
+<form method="post" action="/candidaturas/<%= ca.id %>/consentimiento" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<div><label for="cr-<%= ca.id %>">¿Cómo autorizó el tratamiento de sus datos?</label><input id="cr-<%= ca.id %>" name="ref" required placeholder="Formulario de postulación firmado, correo del…"></div><p class="act"><button class="btn">Registrar consentimiento</button></p></form>
+<% } else { %><p class="sub">Consentimiento registrado el <%= fd(ca.consentimiento_en) %> · <%= ca.consentimiento_ref %>
+<form method="post" action="/candidaturas/<%= ca.id %>/consentimiento" class="inl" data-confirm="Sin consentimiento no se pueden pedir análisis nuevos de este postulado." data-ok="Retirar"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><input type="hidden" name="retirar" value="1"><button class="btn">Retirar</button></form></p><% } %>
+<p><%= ca.cv_nombre ? 'CV: ' : 'Aún no hay CV.' %><% if (ca.cv_nombre) { %><a href="/cv/<%= ca.cv_archivo_id %>"><%= ca.cv_nombre %></a> <small class="mu">(<%= fd(ca.cv_subido_en) %>)</small><% } %></p>
+<form method="post" action="/candidaturas/<%= ca.id %>/cv?_csrf=<%= csrf %>" enctype="multipart/form-data" class="row"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<div><label for="cv-<%= ca.id %>"><%= ca.cv_nombre ? 'Reemplazar CV' : 'Subir CV' %> (PDF, Word o texto; máx. 5 MB)</label><input id="cv-<%= ca.id %>" type="file" name="cv" accept=".pdf,.docx,.txt" required></div><p class="act"><button class="btn"><%- ic('subir') %>Subir</button></p></form>
+<% if (ca.cv_nombre && ca.consentimiento_en && (!ia || ia.estado !== 'pendiente' || ia.cv_archivo_id !== ca.cv_archivo_id)) { %><form method="post" action="/candidaturas/<%= ca.id %>/analizar" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><button class="btn p"><%= ia && ia.cv_archivo_id === ca.cv_archivo_id ? 'Analizar de nuevo' : 'Analizar con IA' %></button></form><% } %>
+<% if (ia) { %>
+<% if (ia.estado === 'pendiente') { %><p class="flash" role="status">Análisis en curso (pedido por <%= ia.solicitado_por_nombre %>). Recarga en unos minutos.</p>
+<% } else if (ia.estado === 'error') { %><p class="flash err" role="alert">El análisis falló: <%= ia.error %></p>
+<% } else { const R = ia.resultado; %>
+<div class="kpi"><div><small>Puntaje orientativo</small><strong><%= Number(ia.puntaje).toFixed(0) %>/100</strong></div><div><small>Análisis</small><strong style="font-size:1rem"><%= fd(ia.recibido_en) %></strong></div></div>
+<p class="sub">La IA compara el CV con el perfil y no decide: Gestión Humana evalúa y decide. No considera foto, edad, sexo, estado civil, nacionalidad, religión ni salud.</p>
+<p><%= R.resumen %></p>
+<div class="tw"><table class="mid"><tr><th>Criterio</th><th>Peso</th><th>Puntaje</th><th>Evidencia en el CV</th></tr>
+<% R.criterios.forEach(c => { %><tr><td><%= c.nombre %></td><td><%= c.peso %></td><td><span class="chip<%= c.puntaje >= 3 ? '' : ' w' %>"><%= c.puntaje %>/5</span></td><td><%= c.evidencia || '—' %></td></tr><% }) %></table></div>
+<% [['Fortalezas', R.fortalezas], ['Brechas frente al perfil', R.brechas], ['Preguntas sugeridas para la entrevista', R.preguntas], ['Alertas', R.alertas]].forEach(([t, l]) => { if ((l || []).length) { %><details<%= t === 'Brechas frente al perfil' || t === 'Alertas' ? ' open' : '' %>><summary><%= t %> (<%= l.length %>)</summary><ul><% l.forEach(x => { %><li><%= x %></li><% }) %></ul></details><% } }) %>
+<% } } %></section>
 <% if (ingreso) { %><section class="blk"><h3>Ingreso</h3>
 <% if (ingreso.estado === 'por_ingresar') { %><p class="sub">Por ingresar<%= ingreso.plaza_codigo ? ' en la plaza ' + ingreso.plaza_codigo : '' %>. Confirma la fecha real cuando la persona empiece: entonces ocupa la plaza.</p>
 <form method="post" action="/ingresos/<%= ingreso.id %>/confirmar" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">

@@ -1,0 +1,21 @@
+<% const fd = s => !s ? '—' : s instanceof Date ? s.toLocaleDateString('es-VE') : String(s).slice(0, 10).split('-').reverse().join('/'), t = d.t, act = d.rels.find(x => x.estado === 'activo'); %>
+<div class="mh"><div><h2><%= t.nombres %></h2><p class="sub"><%= act ? act.cargo + ' · ' + (act.unidad || '—') : 'Sin relación activa' %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<p class="sub">Datos personales: solo Gestión Humana. Esta consulta quedó registrada.</p>
+<section class="blk"><h3>Datos personales</h3><table class="kv">
+<tr><th>Cédula</th><td><%= t.cedula || '—' %></td></tr><tr><th>Fecha de nacimiento</th><td><%= fd(t.fecha_nacimiento) %></td></tr><tr><th>Sexo</th><td><%= t.sexo || '—' %></td></tr>
+<tr><th>Hijos</th><td><%= t.hijos ?? '—' %></td></tr><tr><th>Nivel académico</th><td><%= t.nivel_academico || '—' %></td></tr><tr><th>Título</th><td><%= t.titulo || '—' %></td></tr>
+<tr><th>Correo</th><td><%= t.email || '—' %></td></tr><tr><th>Teléfono</th><td><%= t.telefono || '—' %></td></tr></table>
+<% const extra = Object.entries(t.datos || {}); if (extra.length) { %><details><summary>Fila completa del Listado de Activos (<%= extra.length %> datos)</summary><table class="kv"><% extra.forEach(([k, v]) => { %><tr><th><%= k %></th><td><%= v %></td></tr><% }) %></table></details><% } %></section>
+<section class="blk"><h3>Trayectoria en el grupo</h3>
+<% d.rels.forEach(r => { %><div class="rel blk"><p><span class="chip<%= r.estado === 'activo' ? '' : ' w' %>"><%= ESTADOS[r.estado] || r.estado %></span> <b><%= r.cargo %></b> · <%= r.unidad || '—' %> · <%= r.siglas || r.empresa || '—' %></p>
+<table class="kv"><tr><th>Plaza</th><td><%= r.plaza || '—' %><%= r.por_regularizar ? ' (por regularizar)' : '' %></td></tr><tr><th>Ingreso</th><td><%= fd(r.fecha_ingreso) %></td></tr>
+<% if (r.fecha_fin_contrato) { %><tr><th>Fin de contrato</th><td><%= fd(r.fecha_fin_contrato) %></td></tr><% } %>
+<% if (r.fecha_egreso) { %><tr><th>Egreso</th><td><%= fd(r.fecha_egreso) %><%= r.tipo_egreso ? ' · ' + TIPOS[r.tipo_egreso] : '' %><%= r.motivo_cierre ? ' · ' + r.motivo_cierre : '' %></td></tr><% } %>
+<tr><th>Supervisor inmediato</th><td><%= r.supervisor || r.supervisor_texto || '—' %></td></tr><tr><th>Tipo de empleado</th><td><%= r.tipo_empleado || '—' %></td></tr><tr><th>Ubicación</th><td><%= r.ubicacion || '—' %></td></tr>
+<tr><th>Origen</th><td><%= { seleccion: 'Selección' + (r.requisicion ? ' (' + r.requisicion + ')' : ''), carga_inicial: 'Carga inicial del Listado', manual: 'Manual' }[r.origen] %></td></tr></table>
+<% if (r.estado === 'activo') { %><details><summary>Registrar egreso</summary><form method="post" action="/empleados/relacion/<%= r.id %>/egreso" data-confirm="La persona deja la plaza y la plaza queda libre. El egreso no se puede deshacer." data-ok="Registrar egreso" data-peligro>
+<input type="hidden" name="_csrf" value="<%= csrf %>"><div class="g2"><div><label for="ef-<%= r.id %>">Fecha de egreso</label><input id="ef-<%= r.id %>" name="fecha" type="date" required></div>
+<div><label for="et-<%= r.id %>">Tipo de egreso</label><select id="et-<%= r.id %>" name="tipo" required><option value="">Elige</option><% Object.entries(TIPOS).forEach(([v, x]) => { %><option value="<%= v %>"><%= x %></option><% }) %></select></div></div>
+<label for="em-<%= r.id %>">Observación (opcional)</label><input id="em-<%= r.id %>" name="motivo"><p class="act"><button class="btn d">Registrar egreso</button></p></form></details><% } %></div><% }) %></section>
+<% if (d.aCargo.length) { %><details class="blk"><summary>Supervisa a (<%= d.aCargo.length %>)</summary><ul><% d.aCargo.forEach(x => { %><li><a href="/empleados/<%= x.id %>" data-modal><%= x.nombres %></a> · <%= x.cargo %></li><% }) %></ul></details><% } %>
+<details class="blk"><summary>Últimas consultas de esta ficha</summary><ul><% d.consultas.forEach(c => { %><li><%= c.nombre %> · <%= new Date(c.fecha).toLocaleString('es-VE') %></li><% }) %></ul></details>

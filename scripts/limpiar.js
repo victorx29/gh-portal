@@ -23,6 +23,7 @@ async function transacciones(c) {
     adjuntos: +(await c.query('select count(*) from adjunto')).rows[0].count,
     candidatos: +(await c.query('select count(*) from candidato')).rows[0].count,
     candidaturas: +(await c.query('select count(*) from candidatura')).rows[0].count,
+    analisis_ia: +(await c.query('select count(*) from ia_analisis')).rows[0].count,
     ingresos_de_seleccion: rel.length,
     plazas_de_requisiciones: +(await c.query("select count(*) from plaza where origen='requisicion'")).rows[0].count,
     avisos_n8n: +(await c.query('select count(*) from evento_outbox')).rows[0].count
@@ -31,12 +32,17 @@ async function transacciones(c) {
   const movidos = (await c.query(`select count(*) from relacion_laboral where estado='movido' and origen<>'seleccion'`)).rows[0].count;
   if (+movidos) throw new Error(`Hay ${movidos} relación(es) reales cerradas por un movimiento interno: esta limpieza no las restaura. Revisa con TI`);
   if (!aplicar) return n;
-  await sinTriggers(c, ['aprobacion', 'comentario', 'relacion_laboral', 'plaza'], false);
+  await sinTriggers(c, ['aprobacion', 'comentario', 'relacion_laboral', 'plaza', 'ia_analisis'], false);
+  await c.query('delete from ia_analisis');
   const archivos = (await c.query('delete from adjunto returning ruta')).rows.map(r => r.ruta);
   await c.query("delete from relacion_laboral where origen='seleccion'");
-  await c.query('delete from trabajador t where not exists (select 1 from relacion_laboral r where r.trabajador_id=t.id) and t.id = any($1)', [rel.map(r => r.trabajador_id)]);
-  await c.query('delete from etapa_registro'); await c.query('delete from candidatura'); await c.query('delete from candidato');
+  const huerfanos = (await c.query('select id from trabajador t where not exists (select 1 from relacion_laboral r where r.trabajador_id=t.id) and t.id = any($1)', [rel.map(r => r.trabajador_id)])).rows.map(r => r.id);
+  await c.query('update relacion_laboral set supervisor_id=null where supervisor_id = any($1)', [huerfanos]);
+  await c.query('delete from consulta_ficha where trabajador_id = any($1)', [huerfanos]);
+  await c.query('delete from trabajador where id = any($1)', [huerfanos]);
+  await c.query('delete from etapa_registro'); await c.query('update candidatura set cv_archivo_id=null'); await c.query('delete from candidatura');
   archivos.push(...(await c.query('delete from cv_archivo returning ruta')).rows.map(r => r.ruta));
+  await c.query('delete from candidato');
   await c.query('delete from comentario'); await c.query('delete from aprobacion');
   await c.query('delete from requisicion_equipo'); await c.query('delete from requisicion_acceso');
   await c.query("update plaza set requisicion_id=null where origen<>'requisicion' and requisicion_id is not null");
@@ -44,7 +50,7 @@ async function transacciones(c) {
   await c.query("delete from plaza where origen='requisicion'");
   await c.query('delete from requisicion');
   await c.query('delete from evento_outbox');   // todos los avisos son de las pruebas
-  await sinTriggers(c, ['aprobacion', 'comentario', 'relacion_laboral', 'plaza'], true);
+  await sinTriggers(c, ['aprobacion', 'comentario', 'relacion_laboral', 'plaza', 'ia_analisis'], true);
   await c.query(`select setval('req_seq', greatest(1, coalesce((select max(substring(codigo from '^REQ-([0-9]+)$')::int) from requisicion), 0)), (select count(*) > 0 from requisicion))`);
   n.archivos = archivos; return n;
 }

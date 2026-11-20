@@ -1,11 +1,12 @@
 const { tx } = require('../db'), cfg = require('../config');
 async function despachar() {
-  if (!cfg.n8n.url) return;
+  if (!cfg.n8n.url && !cfg.n8n.urlIa) return;
+  const destino = tipo => (tipo.startsWith('cv.') && cfg.n8n.urlIa) || cfg.n8n.url;
   await tx(async c => {
-    const ev = (await c.query('select * from evento_outbox where enviado_en is null and intentos<10 order by id limit 20 for update skip locked')).rows;
+    const ev = (await c.query(`select * from evento_outbox where enviado_en is null and intentos<10 ${cfg.n8n.url ? '' : "and tipo like 'cv.%'"} order by id limit 20 for update skip locked`)).rows;
     for (const e of ev) {
       try {
-        const r = await fetch(cfg.n8n.url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': cfg.n8n.key },
+        const r = await fetch(destino(e.tipo), { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': cfg.n8n.key },
           body: JSON.stringify({ id: e.id, tipo: e.tipo, payload: e.payload }), signal: AbortSignal.timeout(8000) });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         await c.query('update evento_outbox set enviado_en=now() where id=$1', [e.id]);

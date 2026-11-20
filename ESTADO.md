@@ -1,9 +1,9 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 20-11-2026, contra el código `gh-portal` 0.8.0 (package.json 0.8.0, migraciones 001–013).
+Última revisión: 20-11-2026, contra el código `gh-portal` 0.9.0 (package.json 0.9.0, migraciones 001–015).
 
 ## Versión
-- **Última entregada:** 0.8.0 (20-11-2026).
+- **Última entregada:** 0.9.0 (20-11-2026): incluye 0.8.1, 0.8.2 y 0.9 en una sola entrega.
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
   0.7.12 subida a GitHub (commit «Update 0.7.12»). (confirmar despliegue de 0.7.12 y 0.7.13)
 - **Probada:** 0.7.11 y 0.7.12 por Claude en entorno aislado (PostgreSQL 16 real, navegador de escritorio y móvil):
@@ -49,6 +49,15 @@
   GH ya no puede modificar a un superadmin y los cambios de usuarios quedan en el historial; el nombre del grupo
   en la descripción de cargo sale de la base; script de limpieza de datos de prueba (`npm run limpiar`).
   Migración 013.
+- **0.9.0 (entrega única de 0.8.1 + 0.8.2 + 0.9):**
+  - 0.8.1 Base de empleados (solo GH): importación del Listado de Activos con todas sus columnas, equivalencias
+    departamento → unidad y cargo → perfil (Excel), supervisor inmediato, plazas «por regularizar» (no cuentan en el HC)
+    y su regularización con soporte, egreso con tipo y fecha real, ficha con registro de consultas. Migración 014.
+  - 0.8.2 Organigrama de empleados (ISO): nombres y vacantes sobre el diagrama de cargos, bloque de control
+    (elaborado, revisado, aprobado) y `/organigrama` de consulta para todos en su alcance (solo nombre y cargo).
+  - 0.9 Postulados con IA: consentimiento, CV (PDF, Word o texto), análisis en n8n con rúbrica configurable
+    (puntaje 0–5 por criterio, resumen, brechas, preguntas y alertas; puntaje orientativo 0–100), API protegida
+    para n8n, flujo importable `n8n/gh-analisis-cv.json`. La IA no decide. Migración 015.
 
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
@@ -60,11 +69,31 @@
 - Propuesto en 0.7.9 y sin clasificar: arrastrar y soltar cajas en el diagrama, con «Deshacer».
   Recomendación del asesor: dejarlo para después de la 1.0 (solo visual). (confirmar)
 
+## Después de desplegar la 0.9.0
+- Seguir UPDATE_0.9.0.md: respaldo, variables nuevas, flujo de n8n, equivalencias revisadas por GH y luego la importación.
+- Con mi borrador de equivalencias, en una copia de la base: 252 personas importadas, 66 plazas «por regularizar»
+  (44 con perfil «Sin descripción»), 106 pendientes (98 por estructura: Silos, Occidente, Corpomax, Llano, Transauto;
+  8 por equivalencia: INCES, UCLA, Logística de MDV), 4 excluidos.
+- Validación sugerida antes de aplicar: la Dirección de Tecnología da en la copia «HC 11 · Ocupadas 10 · Vacantes 3» y
+  2 personas en plazas «por regularizar»; el organigrama oficial (10-2026) dice HC 11, 11 ocupados y 0 vacantes. La
+  diferencia sale de las equivalencias de cargo («Analista de Software» y analistas de desarrollo y calidad). (confirmar)
+
 ## Después de desplegar la 0.8.0
 - Limpiar los datos de prueba en EasyPanel con `npm run limpiar -- transacciones` y `npm run limpiar -- perfil GH-PF-001`
   (ver UPDATE_0.8.0.md). Antes, respaldo de la base.
 
-## Requisitos de la 0.8.1 (importación del Listado)
+## Supuestos de la 0.9.0 (validar con GH)
+- Regularizar = perfil con descripción + texto de quién autorizó y con qué soporte; no pasa por el flujo de aprobación.
+- Tipos de egreso (renuncia, despido justificado o injustificado, fin de contrato, mutuo acuerdo, jubilación, otro):
+  validar con legal (LOTTT). El tipo y el motivo no viajan a n8n.
+- Rúbrica de IA global (no por perfil). Consentimiento del postulado registrado por GH (cómo lo autorizó); la retención
+  y el borrado de CV de no seleccionados quedan por definir.
+- Vista previa de la importación con datos personales en la sesión de GH hasta 30 minutos (se borra al aplicar,
+  descartar o vencer).
+- Perfiles mínimos creados por la importación para cargos sin ficha (13 con el borrador): quedan «Sin descripción».
+- Las tarjetas de Selección se ordenan por el puntaje de la IA (orientativo). (confirmar)
+
+## Requisitos de la 0.8.1 (importación del Listado) — cumplidos en la 0.9.0
 - Diagnóstico de código: hecho el 19-11-2026 (hallazgos «Después» en «Pendientes técnicos»).
 - Repo gh-portal en privado: el historial se revisó el 19-11-2026 y no tiene claves ni datos personales (solo el
   correo del autor de los commits); se puede pasar a privado sin reescribirlo.
@@ -99,7 +128,11 @@
 ## Pendientes técnicos fuera de entrega
 - Consultas en paralelo sobre la misma transacción (aviso de pg en el log; dejará de funcionar con pg 9):
   `requisiciones.js` (detalleEvento), `perfiles.js` (carga masiva), `plantilla.js` (carga masiva). Para la
-  versión de estabilización; no actualizar pg a la 9 antes.
+  versión de estabilización; no actualizar pg a la 9 antes. (El código nuevo de la 0.9.0 ya no lo hace.)
+- 0.9.0, para después: no hay forma de reubicar a un empleado importado en otra plaza (corregir una equivalencia
+  después de aplicar no lo mueve) ni de anular un egreso registrado por error; el registro de consultas de fichas
+  no tiene disparador contra borrado; la API de n8n no limita intentos por minuto; índice en
+  `relacion_laboral.supervisor_id` cuando crezca la base.
 - Una excepción «Reporta a» puesta después de una línea punteada hacia ese mismo puesto deja las dos líneas
   (redundante, no rompe nada). Para la versión de estabilización.
 - Diagnóstico 19-11-2026, para la versión de estabilización: el resultado de cada etapa de selección se
@@ -117,11 +150,8 @@
 ## Plan
 - 0.9.x Estabilización: sin funciones nuevas; hallazgos «Ahora» pendientes y pruebas automáticas mínimas
   (aprobación por estructura, reserva de plazas, nada se borra, rechazo de usuarios no registrados).
-- **0.8** Empleados. 0.8.0 (hecha): ingreso ligado a la plaza y candidatos por cédula. 0.8.1: importar el
-  Listado de Activos (todos sus datos; los personales solo GH) con equivalencias departamento → unidad, supervisor
-  inmediato y plazas «por regularizar»; regularización por GH; egreso. 0.8.2: organigrama de empleados (ISO) por
-  división, empresa y unidad; enlace usuario ↔ ficha de empleado.
-- **0.9** Postulados con IA (análisis de CV con la rúbrica del perfil).
+- **0.8 y 0.9: entregadas en la 0.9.0.** Pendiente de la 0.8.2: enlace usuario ↔ ficha de empleado (no entró).
+- **0.9.1** Correcciones de GH sobre la 0.9.0 (equivalencias, pantallas, supuestos).
 - **1.0** Notificaciones, plantillas y SSO Microsoft 365 (enlace por `oid`, sin alta automática, rechazo de
   cuentas no registradas) = salida a producción.
 - **Después:** instalación ARO.

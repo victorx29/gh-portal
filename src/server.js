@@ -7,6 +7,8 @@ app.set('trust proxy', 1); app.set('view engine', 'ejs'); app.set('views', path.
 app.use(helmet()); app.use(express.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/health', async (_q, res) => { try { await q('select 1'); res.send('ok'); } catch (e) { res.status(500).send('db'); } });
+// API para n8n: antes de la sesión y del CSRF (se autentica con clave compartida y token por análisis)
+app.use('/api', express.json({ limit: '2mb' }), require('./controllers/api'));
 app.use(session({ store: new PgStore({ pool }), secret: cfg.secret, resave: false, saveUninitialized: false, name: 'gh.sid',
   cookie: { httpOnly: true, sameSite: 'lax', secure: cfg.secure, maxAge: 8 * 3600e3 } }));
 app.use(w(async (req, res, next) => {
@@ -32,7 +34,7 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(require('./controllers/pipeline')); app.use(require('./controllers/seleccion')); app.use(require('./controllers/comunicacion')); app.use(require('./controllers/requisiciones')); app.use(require('./controllers/perfiles')); app.use(require('./controllers/estructura')); app.use(require('./controllers/plantilla')); app.use(require('./controllers/config')); app.use(require('./controllers/admin'));
+app.use(require('./controllers/empleados')); app.use(require('./controllers/pipeline')); app.use(require('./controllers/seleccion')); app.use(require('./controllers/comunicacion')); app.use(require('./controllers/requisiciones')); app.use(require('./controllers/perfiles')); app.use(require('./controllers/estructura')); app.use(require('./controllers/plantilla')); app.use(require('./controllers/config')); app.use(require('./controllers/admin'));
 app.use((req, res, next) => { const e = new Error('Página no encontrada'); e.status = 404; next(e); });
 app.use((e, req, res, _n) => { if (!e.status) console.error(e); res.status(e.status || 500).render('error', { title: 'Error', msg: e.status ? e.message : 'Error interno', user: res.locals.user || null, flash: null, csrf: res.locals.csrf || '', nav: '', sub: '' }); });
 app.listen(cfg.port, () => console.log('GH portal en :' + cfg.port));

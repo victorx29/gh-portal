@@ -3,13 +3,15 @@ module.exports = [
   { sec: 'Organización', items: [
     ['estructura', '/config/estructura', 'Estructura organizativa', 'estructura', 'Unidades, dependencias sólidas y funcionales, y dónde se aprueba', 'gh'],
     ['plantilla', '/config/plantilla', 'Plantilla de puestos', 'plantilla', 'Puestos y plazas autorizadas, congeladas y proyectadas por unidad', 'gh'],
+    ['porreg', '/config/plantilla/por-regularizar', 'Plazas por regularizar', 'alerta', 'Plazas creadas por la carga inicial del Listado que GH debe regularizar', 'gh'],
     ['empresas', '/config/empresas', 'Empresas', 'empresa', 'Razón social, siglas, RIF, dirección fiscal y división', 'super'],
     ['divisiones', '/config/maestros?m=divisiones', 'Divisiones', 'division', 'Automotriz, Agroindustrial… y a cuál pertenece cada empresa', 'super']] },
   { sec: 'Personas y acceso', items: [
     ['usuarios', '/usuarios', 'Usuarios y roles', 'usuarios', 'Cuentas y roles por empresa o por unidad', 'gh']] },
   { sec: 'Procesos', items: [
     ['pipelines', '/config/pipelines', 'Pipelines', 'flujo', 'Columnas y validaciones de cada tablero, por empresa', 'gh'],
-    ['cargos', '/perfiles', 'Gestión de cargos', 'cargo', 'Perfiles y cargos que usan las requisiciones', 'gh']] },
+    ['cargos', '/perfiles', 'Gestión de cargos', 'cargo', 'Perfiles y cargos que usan las requisiciones', 'gh'],
+    ['ia', '/config/ia', 'Análisis de CV con IA', 'flujo', 'Pesos de la rúbrica con la que la IA compara el CV con el perfil', 'gh']] },
   { sec: 'Catálogos', items: [
     ['grados', '/config/maestros?m=grados', 'Grados de instrucción', 'grado', 'Opciones del formulario de requisición', 'super'],
     ['equipos', '/config/maestros?m=equipos', 'Equipos', 'equipo', 'Equipos que puede pedir el solicitante', 'super'],

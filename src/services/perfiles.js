@@ -243,4 +243,4 @@ async function guardarControl(u, perfilId, versionId, b) {
 }
 const controles = ids => ids.length ? q('select * from perfil_version_control where version_id = any($1)', [ids]).then(r => new Map(r.rows.map(x => [x.version_id, x]))) : Promise.resolve(new Map());
 const nivelesJ = () => q('select * from nivel_jerarquico where activo order by orden, nombre').then(r => r.rows);
-module.exports = { nivelesJ, __igual: igual, guardarControl, guardarControlC, controles, crearC, nuevaVersionC, codigoV, contenidoDe, RESP, anios, listar, detalle, crear, editar, nuevaVersion, activarVersion, activo, paraFormulario, ancestros, aplica, validarParaRequisicion, plantilla, leer, analizar, aplicarCarga };
+module.exports = { sinDescripcion, nivelesJ, __igual: igual, guardarControl, guardarControlC, controles, crearC, nuevaVersionC, codigoV, contenidoDe, RESP, anios, listar, detalle, crear, editar, nuevaVersion, activarVersion, activo, paraFormulario, ancestros, aplica, validarParaRequisicion, plantilla, leer, analizar, aplicarCarga };

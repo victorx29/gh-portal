@@ -22,6 +22,7 @@ r.get('/config/estructura/diagrama', gh, w(async (req, res) => {
     empresas: [].concat(req.query.empresas || []).map(Number).filter(Boolean), punteadas: req.query.punteadas !== '0',
     mods: (m => m.length ? m : ['nomina'])([].concat(req.query.mod || []).filter(x => PL.MODALIDADES[x])),   // modalidades a mostrar; por defecto solo nómina propia
     tipos: [].concat(req.query.tipos || []).map(Number).filter(Boolean), disp: ['c', 'k'].includes(req.query.disp) ? req.query.disp : 'h', ver: req.query.ver === 'puestos' ? 'puestos' : 'unidades' };
+  f.personas = f.ver === 'puestos' && req.query.personas === '1';   // organigrama de empleados (ISO): ocupantes y vacantes
   // El HC respeta el filtro de empresas (y las empresas de la división elegida): se cuenta por la empresa de cada plaza
   const empHC = f.empresas.concat(f.division ? (await q('select id from empresa where division_id=$1 union select empresa_id from empresa_division_servicio where division_id=$1', [+f.division])).rows.map(x => x.id) : []);
   const extra = f.ver === 'unidades' ? await PL.unidadesConPlazas(empHC, f.fecha) : null;

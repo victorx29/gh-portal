@@ -77,4 +77,56 @@ async function noIngreso(u, relId, motivo) {
   });
 }
 
-module.exports = { cedulaNorm, porIngresarC, deCandidatura, confirmarIngreso, noIngreso, CERRADOS };
+// ---------- Base de empleados (solo Gestión Humana) ----------
+const TIPOS_EGRESO = { renuncia: 'Renuncia (retiro voluntario)', despido_justificado: 'Despido justificado', despido_injustificado: 'Despido injustificado',
+  fin_contrato: 'Fin del contrato (tiempo u obra determinada)', mutuo_acuerdo: 'Mutuo acuerdo', jubilacion: 'Jubilación', otro: 'Otro' };
+const ESTADOS_REL = { por_ingresar: 'Por ingresar', activo: 'Activo', egresado: 'Egresado', movido: 'Movido a otra plaza', no_ingreso: 'No se presentó' };
+// Lista con la relación más reciente de cada persona
+async function listar(u, f = {}) {
+  ghOnly(u);
+  const w = [], p = [], add = (cond, v) => { p.push(v); w.push(cond.replace('$?', '$' + p.length)); };
+  if (f.q) { const t = String(f.q).trim(); if (/^[\d.\sVvEe-]+$/.test(t) && cedulaNorm(t)) add('t.cedula = $?', cedulaNorm(t)); else add("t.nombres ilike '%' || $? || '%'", t); }
+  if (f.empresa) add('x.empresa_id = $?', +f.empresa);
+  if (f.estado === 'activo' || !f.estado) w.push("x.estado = 'activo'"); else if (f.estado === 'egresado') w.push("x.estado in ('egresado','no_ingreso')");
+  if (f.unidad) add('x.unidad_id = any($?)', f.unidades || [+f.unidad]);
+  return (await q(`select t.id, t.nombres, x.cargo, x.estado, x.fecha_ingreso, x.fecha_egreso, x.origen, z.codigo plaza, z.por_regularizar, un.nombre unidad, un.codigo unidad_codigo,
+      coalesce(e.siglas, e.razon_social) empresa
+    from trabajador t join lateral (select * from relacion_laboral r where r.trabajador_id=t.id order by (r.estado='activo') desc, r.id desc limit 1) x on true
+    left join plaza z on z.id=x.plaza_id left join unidad un on un.id=x.unidad_id left join empresa e on e.id=x.empresa_id
+    ${w.length ? 'where ' + w.join(' and ') : ''} order by t.nombres limit 2000`, p)).rows;
+}
+// Ficha completa: cada consulta queda registrada (quién y cuándo), porque trae datos personales
+async function ficha(u, id) {
+  ghOnly(u);
+  const t = (await q('select * from trabajador where id=$1', [id])).rows[0]; if (!t) throw E(404, 'Empleado no encontrado');
+  await q('insert into consulta_ficha(trabajador_id, usuario_id) values($1,$2)', [id, u.id]);
+  const rels = (await q(`select r.*, z.codigo plaza, z.por_regularizar, un.nombre unidad, un.codigo unidad_codigo, coalesce(e.razon_social, e.nombre) empresa, e.siglas,
+      s.nombres supervisor, uc.nombre confirmado_por_nombre, ux.nombre cerrado_por_nombre, q.codigo requisicion
+    from relacion_laboral r left join plaza z on z.id=r.plaza_id left join unidad un on un.id=r.unidad_id left join empresa e on e.id=r.empresa_id
+    left join trabajador s on s.id=r.supervisor_id left join usuario uc on uc.id=r.confirmado_por left join usuario ux on ux.id=r.cerrado_por
+    left join requisicion q on q.id=r.requisicion_id where r.trabajador_id=$1 order by r.id desc`, [id])).rows;
+  const consultas = (await q(`select c.fecha, us.nombre from consulta_ficha c join usuario us on us.id=c.usuario_id where c.trabajador_id=$1 order by c.id desc limit 10`, [id])).rows;
+  const aCargo = (await q(`select t.id, t.nombres, r.cargo from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.supervisor_id=$1 and r.estado='activo' order by t.nombres`, [id])).rows;
+  return { t, rels, consultas, aCargo };
+}
+// Egreso: la persona deja la plaza (queda libre para un reemplazo). La fecha es la real y no puede ser futura.
+async function egresar(u, relId, b) {
+  ghOnly(u);
+  const fecha = String(b.fecha || ''), tipo = String(b.tipo || ''), motivo = String(b.motivo || '').trim();
+  if (!fechaOk(fecha)) throw E(400, 'Indica la fecha de egreso');
+  if (!TIPOS_EGRESO[tipo]) throw E(400, 'Elige el tipo de egreso');
+  return tx(async c => {
+    const hoy = (await c.query('select current_date::text d')).rows[0].d; if (fecha > hoy) throw E(400, 'La fecha de egreso no puede ser futura: regístralo cuando ocurra');
+    const rl = (await c.query('select * from relacion_laboral where id=$1 for update', [relId])).rows[0]; if (!rl) throw E(404, 'Relación laboral no encontrada');
+    if (rl.estado !== 'activo') throw E(400, 'Solo se registra el egreso de una persona activa');
+    if (rl.fecha_ingreso && fecha < rl.fecha_ingreso) throw E(400, 'La fecha de egreso no puede ser anterior a la de ingreso');
+    await c.query(`update relacion_laboral set estado='egresado', fecha_egreso=$2, tipo_egreso=$3, motivo_cierre=$4, cerrado_por=$5 where id=$1`, [relId, fecha, tipo, motivo || null, u.id]);
+    await hist(c, u, relId, 'egreso', { fecha_egreso: fecha, tipo, motivo: motivo || undefined });
+    const d = (await c.query(`select t.nombres, t.email, z.codigo plaza, un.nombre unidad from relacion_laboral r join trabajador t on t.id=r.trabajador_id
+      left join plaza z on z.id=r.plaza_id left join unidad un on un.id=r.unidad_id where r.id=$1`, [relId])).rows[0];
+    // Aviso a n8n (TI retira accesos y equipos): sin el tipo ni el motivo del egreso
+    await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['egreso.registrado', { relacion_id: relId, persona: { nombre: d.nombres, email: d.email }, cargo: rl.cargo,
+      plaza: d.plaza, unidad: d.unidad, fecha_egreso: fecha, registrado_por: u.nombre }]);
+  });
+}
+module.exports = { cedulaNorm, porIngresarC, deCandidatura, confirmarIngreso, noIngreso, CERRADOS, listar, ficha, egresar, TIPOS_EGRESO, ESTADOS_REL };

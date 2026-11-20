@@ -3,6 +3,6 @@
 <div class="row"><a class="btn" href="/pipeline">Volver al pipeline</a><% if (req.estado === 'seleccion') { %><a class="btn p" href="/requisiciones/<%= req.id %>/candidatos/nuevo" data-modal>+ Candidato</a><% } %></div></div>
 <div class="board"><% pl.etapas.forEach(c => { const L = cands.filter(x => x.etapa === c.clave); %>
 <section class="col k-<%= c.clase === 'cierre' ? 'cancelado' : c.clase === 'exito' ? 'ingreso' : 'seleccion' %>"><div class="ch"><%= c.nombre %><span><%= L.length %></span></div>
-<% L.forEach(x => { %><a class="card" href="/candidaturas/<%= x.id %>" data-modal><h4><%= x.nombre %></h4><p><%= x.email || 'Sin correo' %></p></a><% }) %>
+<% L.forEach(x => { %><a class="card" href="/candidaturas/<%= x.id %>" data-modal><h4><%= x.nombre %></h4><p><%= x.email || 'Sin correo' %></p><% if (x.ia && x.ia.estado === 'listo') { %><p><span class="chip" title="Puntaje orientativo de la IA frente al perfil; decide Gestión Humana">IA <%= Number(x.ia.puntaje).toFixed(0) %>/100</span></p><% } else if (x.ia && x.ia.estado === 'pendiente') { %><p><span class="chip w">IA en curso</span></p><% } %></a><% }) %>
 <% if (!L.length) { %><div class="empty">Sin candidatos</div><% } %></section><% }) %></div>
 <%- include('partials/foot') %>

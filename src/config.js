@@ -7,5 +7,6 @@ module.exports = {
   db: process.env.DATABASE_URL,
   secret: process.env.SESSION_SECRET || 'solo-desarrollo',
   secure: process.env.COOKIE_SECURE === 'true',
-  n8n: { url: process.env.N8N_WEBHOOK_URL || '', key: process.env.N8N_API_KEY || '' }
+  // urlIa: webhook del flujo de análisis de CV (opcional; si no se define, los eventos cv.* van al webhook general)
+  n8n: { url: process.env.N8N_WEBHOOK_URL || '', urlIa: process.env.N8N_WEBHOOK_IA_URL || '', key: process.env.N8N_API_KEY || '' }
 };

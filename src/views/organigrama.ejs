@@ -1,0 +1,19 @@
+<% title = 'Organigrama' %><%- include('partials/head') %>
+<% const fd = s => !s ? '—' : s instanceof Date ? s.toLocaleDateString('es-VE') : String(s).slice(0, 10).split('-').reverse().join('/'), raiz = opciones.find(o => String(o.id) === String(f.raiz)); %>
+<div class="top noprint"><div><h1>Organigrama de empleados</h1><p class="sub">Quién ocupa cada cargo y qué plazas autorizadas están vacantes. Solo nombre y cargo.</p></div>
+<% if (dg) { %><div class="row"><button class="btn" type="button" id="dg-png"><%- ic('bajar') %>Imagen</button><button class="btn p" type="button" id="dg-print">Imprimir o PDF</button></div><% } %></div>
+<% if (sinAlcance) { %><div class="empty">No tienes unidades asignadas. Pide a Gestión Humana que te asigne tu unidad.</div><% } else { %>
+<form method="get" action="/organigrama" class="filtros noprint">
+  <div><label for="or">Unidad</label><select id="or" name="raiz" data-buscar><% if (!raiz || opciones.length > 1) { %><option value="">Toda la estructura que puedo ver</option><% } %><% opciones.forEach(o => { %><option value="<%= o.id %>" data-a="<%= o.anc.join(',') %>" data-t="<%= o.codigo %>"<%= String(o.id) === String(f.raiz) ? ' selected' : '' %>><%= o.escalera %></option><% }) %></select></div>
+  <div><label for="of">Al</label><input id="of" name="fecha" type="date" value="<%= f.fecha || (dg && dg.fecha) %>"></div>
+  <div class="end"><button class="btn">Aplicar</button></div></form>
+<% if (dg) { %><header class="dg-h"><h1>Organigrama de empleados<%= raiz ? ' · ' + raiz.nombre : '' %></h1><p class="sub">Vigente al <b><%= fd(dg.fecha) %></b> · <%= dg.nodes.filter(n => !n.ctx).length %> cargos · Ocupadas <%= dg.tot.ocupadas %> · Vacantes <%= dg.tot.vacantes %><%= dg.tot.enPorReg ? ' · ⚑ ' + dg.tot.enPorReg + ' en plazas por regularizar (no cuentan en el HC)' : '' %></p></header>
+<% if (!dg.nodes.length) { %><div class="empty">No hay cargos en esta vista.</div><% } else { %>
+<div id="dg-wrap"><div class="dg-bar noprint"><button class="btn" type="button" id="dg-fs" aria-pressed="false">Pantalla completa</button><button class="btn" type="button" data-z="1.2" aria-label="Acercar">+</button><button class="btn" type="button" data-z="0.83" aria-label="Alejar">−</button><button class="btn" type="button" data-z="fit">Ajustar</button>
+<label class="chk"><input type="checkbox" id="dg-dot" checked>Líneas punteadas (funcionales)</label><span class="mu">Arrastra para moverte · rueda o botones para el zoom</span></div>
+<div class="dg-area"><div class="dg" id="dg" tabindex="0" aria-label="Organigrama de empleados"><svg id="dg-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Organigrama de empleados"></svg></div></div></div>
+<div class="dg-ley"><span>Bajo cada cargo: las personas que lo ocupan</span><span style="color:#b36b00">Vacante = plaza autorizada sin ocupante registrado</span><span>★ Puesto jefe de la unidad</span></div>
+<%- include('partials/dg_control') %>
+<script type="application/json" id="dg-data"><%- JSON.stringify({ nodes: dg.nodes, links: dg.links, esHoy: dg.esHoy, fecha: dg.fecha, disp: 'h', ver: 'puestos', editar: false, soloVer: true }).replace(/</g, '\\u003c') %></script>
+<script src="/js/diagrama.js" defer></script><% } } } %>
+<%- include('partials/foot') %>

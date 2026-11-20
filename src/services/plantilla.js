@@ -12,10 +12,11 @@ const ESTADOS = { vigente: 'Vigente', congelada: 'Congelada', proyectada: 'Proye
 
 // Conteo de un conjunto de plazas. HC = nómina propia vigente. Congeladas y proyectadas: nómina. Externas: vigentes, aparte.
 function contar(plazas, f, empSet, modSet) {   // modSet: modalidades a contar (sin él, todas)
-  const k = { hc: 0, cong: 0, proy: 0, porDefinir: 0, enProceso: 0, ext: { outsourcing: 0, pasante: 0, becario: 0, aprendiz: 0 }, porEmp: {} };
+  const k = { hc: 0, cong: 0, proy: 0, porDefinir: 0, enProceso: 0, porReg: 0, ext: { outsourcing: 0, pasante: 0, becario: 0, aprendiz: 0 }, porEmp: {} };
   for (const z of plazas) {
     if (empSet && !empSet.has(z.empresa_id)) continue; if (modSet && !modSet.has(z.modalidad)) continue;
     const e = estado(z, f); if (e === 'cerrada') continue;
+    if (z.por_regularizar) { if (e === 'vigente') k.porReg++; continue; }   // carga inicial sin autorización: no cuenta en el HC hasta que GH la regularice
     if (z.modalidad !== 'nomina') { if (e === 'vigente') k.ext[z.modalidad]++; continue; }
     if (e === 'vigente') { k.hc++; const s = z.empresa_id ? (z.siglas || z.empresa) : POR_DEFINIR; k.porEmp[s] = (k.porEmp[s] || 0) + 1; if (!z.empresa_id) k.porDefinir++; if (z.req) k.enProceso++; }
     else if (e === 'congelada') k.cong++; else k.proy++;
@@ -24,7 +25,7 @@ function contar(plazas, f, empSet, modSet) {   // modSet: modalidades a contar (
   return k;
 }
 // Texto corto de un conteo: «HC 5 · ❄1 · ⏳2 · +3 ext.»
-const resumenTxt = k => [k.hc || k.cong || k.proy ? 'HC ' + k.hc : '', k.enProceso ? '↻' + k.enProceso : '', k.cong ? '❄' + k.cong : '', k.proy ? '⏳' + k.proy : '', k.externas ? '+' + k.externas + ' ext.' : ''].filter(Boolean).join(' · ');
+const resumenTxt = k => [k.hc || k.cong || k.proy ? 'HC ' + k.hc : '', k.enProceso ? '↻' + k.enProceso : '', k.cong ? '❄' + k.cong : '', k.proy ? '⏳' + k.proy : '', k.externas ? '+' + k.externas + ' ext.' : '', k.porReg ? '⚑' + k.porReg : ''].filter(Boolean).join(' · ');
 
 async function cargar(fecha) {
   const f = fechaOk(fecha) ? fecha : await ES.hoy();
@@ -181,6 +182,24 @@ async function moverPuesto(u, id, destino, motivo) {
     return { excepcion: !!p.reporta_a, fijadas: fijadas.length };
   });
 }
+// ---------- Regularización de una plaza creada por la carga inicial ----------
+// GH la regulariza cuando el perfil tiene su descripción y consta quién autorizó la plaza (decisión del 18-11-2026)
+async function regularizar(u, plazaId, autorizado) {
+  autorizado = String(autorizado || '').trim(); if (!autorizado) throw E(400, 'Indica quién autorizó la plaza y con qué soporte (queda en el historial)');
+  return tx(async c => {
+    const z = (await c.query(`select z.*, pf.nombre perfil, pf.codigo perfil_codigo, v.contenido from plaza z join puesto p on p.id=z.puesto_id join perfil pf on pf.id=p.perfil_id
+      left join perfil_version v on v.id=pf.version_activa_id where z.id=$1 for update of z`, [plazaId])).rows[0];
+    if (!z) throw E(404, 'Plaza no encontrada'); if (!z.por_regularizar) throw E(400, 'La plaza ya está regularizada');
+    if (PF.sinDescripcion(z.contenido)) throw E(400, `El perfil ${z.perfil_codigo} · ${z.perfil} está «Sin descripción»: complétalo (o importa su Word) antes de regularizar la plaza`);
+    await c.query('update plaza set por_regularizar=false, regularizada_por=$2, regularizada_en=now(), regularizacion=$3 where id=$1', [plazaId, u.id, autorizado]);
+    await hist(c, u, 'plaza', plazaId, 'regularizar', { codigo: z.codigo, autorizado });
+    return z.puesto_id;
+  });
+}
+const porRegularizar = () => q(`select z.id, z.codigo, z.desde, z.modalidad, coalesce(e.siglas, e.razon_social) empresa, p.id puesto_id, pf.codigo perfil_codigo, pf.nombre perfil, un.codigo unidad_codigo, un.nombre unidad,
+    (select t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=z.id and r.estado='activo' limit 1) ocupante
+  from plaza z join puesto p on p.id=z.puesto_id join perfil pf on pf.id=p.perfil_id join unidad un on un.id=p.unidad_id left join empresa e on e.id=z.empresa_id
+  where z.por_regularizar and (z.hasta is null or z.hasta > current_date) order by un.codigo, pf.nombre, z.codigo`).then(r => r.rows);
 // ---------- Dependencia funcional entre puestos (línea punteada; no cambia el reporte ni la aprobación) ----------
 async function agregarFuncional(u, puestoId, deId, motivo) {
   motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo: queda en el historial');
@@ -331,6 +350,25 @@ async function diagramaPuestos(fl) {
   });
   const tot = contar([...match].flatMap(id => byP.get(id).plazas), f, filtra ? empSet : null, modSet);
   const links = []; for (const id of vis) for (const de of byP.get(id).funcionales) if (vis.has(de)) links.push({ de: id, a: de });
+  // Organigrama de empleados (ISO): quién ocupa cada plaza a la fecha, y las plazas vigentes sin nadie (vacantes)
+  if (fl.personas) {
+    const ids = [...vis].flatMap(id => abiertas(byP.get(id)).map(z => z.id));
+    const oc = (await q(`select r.plaza_id, t.nombres, r.estado from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id = any($1) and (
+        (r.estado in ('activo','egresado','movido') and coalesce(r.fecha_ingreso, $2::date) <= $2::date and (r.fecha_egreso is null or r.fecha_egreso >= $2::date) and (r.estado = 'activo' or r.fecha_egreso is not null))
+        or (r.estado = 'por_ingresar' and $3)) order by t.nombres`, [ids, f, !!dg.esHoy])).rows;
+    const porPlaza = new Map(); oc.forEach(o => porPlaza.set(o.plaza_id, (porPlaza.get(o.plaza_id) || []).concat(o)));
+    for (const n of nodes) {
+      const zs = abiertas(byP.get(n.id)); n.personas = []; n.vacantes = 0;
+      for (const z of zs) { let os = porPlaza.get(z.id) || [];
+        // El día del relevo (egreso y nuevo ingreso en la misma fecha) se muestra solo quien queda
+        if (os.some(o => o.estado === 'activo')) os = os.filter(o => o.estado === 'activo' || o.estado === 'por_ingresar');
+        os.forEach(o => n.personas.push(o.nombres + (z.por_regularizar ? ' ⚑' : '') + (o.estado === 'por_ingresar' ? ' (por ingresar)' : '')));
+        if (!os.some(o => o.estado !== 'por_ingresar') && estado(z, f) === 'vigente' && !z.por_regularizar) n.vacantes++; }
+    }
+    tot.ocupadas = nodes.filter(n => !n.ctx).reduce((s, n) => s + n.personas.filter(x => !x.endsWith('(por ingresar)')).length, 0);
+    tot.vacantes = nodes.filter(n => !n.ctx).reduce((s, n) => s + n.vacantes, 0);
+    tot.enPorReg = nodes.filter(n => !n.ctx).reduce((s, n) => s + n.personas.filter(x => x.endsWith(' ⚑')).length, 0);
+  }
   return { fecha: dg.fecha, esHoy: dg.esHoy, nodes, links, leyenda: dg.leyenda, tot };
 }
 // Unidades con plazas abiertas de alguna de esas empresas (para que entren al filtrar por empresa aunque no la «atiendan»)
@@ -524,5 +562,5 @@ const analizar = filas => tx(c => procesar(c, filas, null, false));
 async function aplicarCarga(filas, usr) {
   return tx(async c => { const r = await procesar(c, filas, usr, true); if (r.errs.length) throw E(400, 'La plantilla cambió desde la vista previa. Vuelve a subir el archivo'); return r; });
 }
-module.exports = { agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
+module.exports = { regularizar, porRegularizar, crearPlazasC, agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
   diagramaPuestos, plantilla, leer, analizar, aplicarCarga };

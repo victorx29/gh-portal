@@ -40,13 +40,28 @@ DATABASE_URL=postgres://gh:gh@localhost:5432/gh npm run dev
 ## GitHub y EasyPanel
 1. Repositorio **privado** en GitHub y `git push`.
 2. EasyPanel → proyecto → servicio **PostgreSQL** (anota usuario, clave y host interno).
-3. Servicio **App** desde GitHub (build con Dockerfile). Variables: `DATABASE_URL`, `SESSION_SECRET` (largo y aleatorio), `COOKIE_SECURE=true`, `NODE_ENV=production`, `N8N_WEBHOOK_URL`, `N8N_API_KEY`.
+3. Servicio **App** desde GitHub (build con Dockerfile). Variables: `DATABASE_URL`, `SESSION_SECRET` (largo y aleatorio), `COOKIE_SECURE=true`, `NODE_ENV=production`, `N8N_WEBHOOK_URL`, `N8N_API_KEY`, `PORTAL_URL`; desde la 0.9, `N8N_WEBHOOK_IA_URL` y `PORTAL_URL_INTERNA` (análisis de CV).
 4. Dominio con HTTPS. Health check: `/health`.
 5. Consola del servicio: `npm run seed` con `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD`. Las migraciones corren solas al arrancar.
 6. Backups programados del servicio PostgreSQL y prueba de restauración antes de producción.
 
 ## Contrato con n8n
-La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url`, `detalle.plaza` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.empresa_cambiada`, `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`.
+La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url`, `detalle.plaza` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.empresa_cambiada`, `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`. Desde la 0.8: `ingreso.confirmado` y `egreso.registrado` (sin tipo ni motivo del egreso). Desde la 0.9: `cv.analizar` (va a `N8N_WEBHOOK_IA_URL` si existe).
+
+### API para n8n (0.9)
+`cv.analizar` no lleva datos personales: trae `analisis_id`, `requisicion`, `url_datos`, `url_resultado` y `url_error` (con `?t=` token propio del análisis).
+n8n llama con la cabecera `x-api-key` (= `N8N_API_KEY`):
+- `GET url_datos` → perfil, rúbrica, escala 0–5, reglas y el CV (texto ya tachado de datos protegidos; si es PDF, el archivo en base64).
+- `POST url_resultado` con `{ resumen, criterios: [{ clave, puntaje 0–5, evidencia }], fortalezas, brechas, preguntas, alertas, modelo, texto_cv? }`.
+  El portal calcula el puntaje 0–100 con los pesos de la rúbrica. Un análisis terminado no se modifica.
+- `POST url_error` con `{ mensaje }`. Sin respuesta en 30 minutos, el análisis vence y GH puede pedirlo de nuevo.
+Flujo importable: `n8n/gh-analisis-cv.json` (ver `UPDATE_0.9.0.md`). La IA analiza y resume; nunca mueve ni descarta postulados.
+
+## Empleados y organigrama (0.8–0.9)
+`/empleados` (solo GH): base de empleados, ficha con registro de consultas, egreso e importación del Listado de Activos con equivalencias
+(departamento → unidad, cargo → perfil). Las personas sin plaza autorizada quedan en plazas «por regularizar»
+(`/config/plantilla/por-regularizar`), que no cuentan en el HC ni admiten reemplazo o ingreso hasta que GH las regulariza.
+`/organigrama`: organigrama de empleados de consulta para todos, cada uno en su alcance (solo nombre y cargo).
 
 ## Diagrama de estructura
 `/config/estructura/diagrama` (solo GH): vista de cajas con filtros por unidad, empresas, división y fecha; impresión o PDF e imagen. Sin librerías externas (`public/js/diagrama.js`).

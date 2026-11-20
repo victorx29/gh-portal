@@ -1,0 +1,88 @@
+// Empleados (0.8.1): base de empleados, ficha (solo GH), importación del Listado, equivalencias y egreso.
+// Organigrama de empleados de consulta (0.8.2): todos los usuarios, cada uno en su alcance.
+const r = require('express').Router(), EM = require('../services/empleados'), IE = require('../services/importar_empleados'), PL = require('../services/plantilla'),
+  ES = require('../services/estructura'), P = require('../services/perm'), { q } = require('../db'),
+  { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo } = require('../util');
+const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
+const empresasActivas = async () => (await q('select id, siglas, coalesce(razon_social, nombre) nombre from empresa where activa order by 3')).rows;
+
+r.get('/empleados', gh, w(async (req, res) => {
+  const f = { q: String(req.query.q || '').trim(), empresa: req.query.empresa || '', estado: ['activo', 'egresado', 'todos'].includes(req.query.estado) ? req.query.estado : 'activo' };
+  res.render('empleados', { title: 'Empleados', nav: 'empleados', f, es: await EM.listar(req.user, f), empresas: await empresasActivas(),
+    porReg: (await q("select count(*)::int n from plaza where por_regularizar and (hasta is null or hasta > current_date)")).rows[0].n });
+}));
+r.get('/empleados/:id(\\d+)', gh, w(async (req, res) => modal(req, res, 'empleado_ficha', { title: 'Empleado', nav: 'empleados', d: await EM.ficha(req.user, +req.params.id),
+  TIPOS: EM.TIPOS_EGRESO, ESTADOS: EM.ESTADOS_REL })));
+r.post('/empleados/relacion/:id(\\d+)/egreso', gh, w(async (req, res) => {
+  const t = (await q('select trabajador_id from relacion_laboral where id=$1', [+req.params.id])).rows[0];
+  try { await EM.egresar(req.user, +req.params.id, req.body); flash(req, 'ok', 'Egreso registrado: la plaza queda libre'); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
+  res.redirect(t ? '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + t.trabajador_id) : '/empleados');
+}));
+
+// ---- Importación del Listado de Activos ----
+const pagina = (req, res, extra) => {
+  // Una vista previa vencida no se queda en la sesión (trae datos personales)
+  if (req.session.importEmpleados && Date.now() - req.session.importEmpleados.en > VISTA_PREVIA_MS) delete req.session.importEmpleados;
+  return res.render('empleados_importar', { title: 'Importar Listado de Activos', nav: 'empleados', res: null, eq: null, hayListado: !!req.session.importEmpleados, ...extra });
+};
+r.get('/empleados/importar', gh, (req, res) => pagina(req, res));
+r.post('/empleados/importar', gh, subidaXlsx('/empleados/importar'), w(async (req, res) => {
+  try {
+    if (!req.file) throw E(400, 'Selecciona el archivo');
+    const filas = await IE.leer(req.file.buffer), out = await IE.analizar(filas), archivo = nombreArchivo(req.file);
+    // La vista previa (con datos personales) vive 30 minutos en la sesión del usuario de GH; se borra al aplicar o descartar
+    req.session.importEmpleados = { filas, archivo, en: Date.now(), ok: !out.errs.length };
+    pagina(req, res, { res: { ...out, archivo } });
+  } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect('/empleados/importar'); }
+}));
+r.post('/empleados/importar/aplicar', gh, hacer(async req => {
+  const c = req.session.importEmpleados; if (!c || !c.ok || Date.now() - c.en > VISTA_PREVIA_MS) throw E(400, 'La vista previa expiró. Sube el Listado de nuevo');
+  delete req.session.importEmpleados; await IE.aplicar(c.filas, req.user, c.archivo);
+}, 'Listado importado', '/empleados'));
+r.post('/empleados/importar/descartar', gh, hacer(async req => { delete req.session.importEmpleados; delete req.session.importEquiv; }, 'Importación descartada', '/empleados/importar'));
+// Equivalencias: se descargan (con lo que falta del último Listado subido) y se suben como cualquier carga masiva
+r.get('/empleados/equivalencias.xlsx', gh, w(async (req, res) => {
+  const c = req.session.importEmpleados;
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); res.set('Content-Disposition', 'attachment; filename="equivalencias-' + await ES.hoy() + '.xlsx"');
+  res.send(Buffer.from(await IE.plantillaEquivalencias(c && Date.now() - c.en < VISTA_PREVIA_MS ? c.filas : null)));
+}));
+r.post('/empleados/equivalencias', gh, subidaXlsx('/empleados/importar'), w(async (req, res) => {
+  try {
+    if (!req.file) throw E(400, 'Selecciona el archivo');
+    const filas = await IE.leerEquivalencias(req.file.buffer), out = await IE.analizarEquivalencias(filas);
+    req.session.importEquiv = out.errs.length ? null : { filas, en: Date.now() };
+    pagina(req, res, { eq: { ...out, archivo: nombreArchivo(req.file) } });
+  } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect('/empleados/importar'); }
+}));
+r.post('/empleados/equivalencias/aplicar', gh, hacer(async req => {
+  const c = req.session.importEquiv; if (!c || Date.now() - c.en > VISTA_PREVIA_MS) throw E(400, 'La vista previa expiró. Sube el archivo de nuevo');
+  delete req.session.importEquiv; await IE.aplicarEquivalencias(c.filas, req.user);
+}, 'Equivalencias guardadas. Vuelve a subir el Listado para revisarlo con ellas', '/empleados/importar'));
+
+// ---- Plazas por regularizar (las crea la carga inicial) ----
+r.get('/config/plantilla/por-regularizar', gh, w(async (req, res) => res.render('por_regularizar', { title: 'Plazas por regularizar', nav: 'config', sub: 'porreg', zs: await PL.porRegularizar() })));
+r.post('/config/plazas/:id(\\d+)/regularizar', gh, hacer(async req => '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + await PL.regularizar(req.user, +req.params.id, req.body.autorizado)),
+  'Plaza regularizada: ya cuenta en el HC autorizado', '/config/plantilla/por-regularizar'));
+
+// ---- Organigrama de empleados de consulta ----
+// GH y Presidencia ven todo. Un gerente o director con rol de empresa (sin unidad) ve las plazas de esa empresa;
+// con rol de unidad, su unidad y las que dependen de ella. Solo nombre y cargo: ningún dato personal.
+const ROLES_ORG = ['gerente', 'director'];
+r.get('/organigrama', w(async (req, res) => {
+  const u = req.user, roles = u.roles || [];
+  const global = P.esGH(u) || roles.some(x => x.rol === 'presidencia' || (ROLES_ORG.includes(x.rol) && !x.unidad_id && !x.empresa_id));
+  const empresasRol = global ? [] : [...new Set(roles.filter(x => ROLES_ORG.includes(x.rol) && !x.unidad_id && x.empresa_id).map(x => x.empresa_id))];
+  const propias = global ? [] : [...new Set(roles.filter(x => ROLES_ORG.includes(x.rol) && x.unidad_id).map(x => x.unidad_id))];
+  const g = await ES.grafo();
+  // Con rol de empresa la estructura es libre y el filtro va por empresa; con rol de unidad, solo su rama
+  const permitidas = global || empresasRol.length ? null : new Set(propias.flatMap(id => [...ES.descendientes(g.by, id)]));
+  const opciones = (await ES.opciones()).filter(o => !permitidas || permitidas.has(o.id));
+  let raiz = /^\d+$/.test(String(req.query.raiz || '')) ? +req.query.raiz : (permitidas ? propias[0] || '' : '');
+  if (raiz && permitidas && !permitidas.has(raiz)) raiz = propias[0];
+  const fecha = ES.fechaValida(req.query.fecha) ? req.query.fecha : '';
+  const conAlcance = global || empresasRol.length || propias.length;
+  const dg = conAlcance && (raiz || !permitidas) ? await PL.diagramaPuestos({ fecha, raiz: raiz || '', personas: true, mods: ['nomina'], tipos: [], empresas: empresasRol }) : null;
+  res.render('organigrama', { title: 'Organigrama', nav: 'organigrama', dg, opciones, f: { raiz, fecha }, sinAlcance: !conAlcance });
+}));
+
+module.exports = r;

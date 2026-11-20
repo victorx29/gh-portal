@@ -1,0 +1,24 @@
+<%- include('partials/head') %>
+<div class="top"><div><p class="crumb"><a href="/empleados">Empleados</a> <span aria-hidden="true">›</span> Importar Listado de Activos</p><h1>Importar Listado de Activos</h1>
+<p class="sub">Sube el Listado tal como lo lleva Gestión Humana (todas sus hojas: nómina, becarios, pasantes, aprendices). Nada se aplica hasta que revises la vista previa; volver a subir el mismo archivo no cambia nada.</p></div></div>
+<ol class="pasos">
+  <li><b>Equivalencias.</b> Cada departamento del Listado corresponde a una unidad del portal y cada cargo a un perfil. <a class="btn" href="/empleados/equivalencias.xlsx"><%- ic('bajar') %>Descargar equivalencias<%= hayListado ? ' (con lo que falta del último Listado)' : '' %></a></li>
+  <li><b>Sube el Listado</b> y revisa: personas nuevas, plazas que se ocupan, plazas «por regularizar» y pendientes.</li>
+  <li><b>Aplica.</b> Las personas de empresas sin estructura en el portal quedan pendientes y se importan cuando exista su estructura.</li></ol>
+<div class="g2">
+<form method="post" action="/empleados/importar?_csrf=<%= csrf %>" enctype="multipart/form-data" class="blk"><label for="li">Listado de Activos (.xlsx)</label>
+<input id="li" type="file" name="archivo" accept=".xlsx" required><p class="act"><button class="btn p"><%- ic('subir') %>Revisar Listado</button></p></form>
+<form method="post" action="/empleados/equivalencias?_csrf=<%= csrf %>" enctype="multipart/form-data" class="blk"><label for="eqf">Equivalencias (.xlsx)</label>
+<input id="eqf" type="file" name="archivo" accept=".xlsx" required><p class="act"><button class="btn"><%- ic('subir') %>Revisar equivalencias</button></p></form></div>
+<% if (eq) { %><%- include('partials/carga_preview', { res: { ...eq, kpis: [['Equivalencias nuevas', eq.resumen.nuevas], ['Equivalencias que cambian', eq.resumen.cambian]] }, aplicar: '/empleados/equivalencias/aplicar', descartar: '/empleados/importar' }) %><% } %>
+<% if (res) { const s = res.resumen; %>
+<%- include('partials/carga_preview', { res: { ...res, kpis: [['Personas nuevas', s.nuevas], ['Ocupan una plaza existente', s.plazasExistentes], ['Plazas «por regularizar»', s.plazasPorRegularizar], ['Perfiles mínimos nuevos', s.perfilesNuevos], ['Puestos nuevos', s.puestosNuevos], ['Fichas que se actualizan', s.actualizan], ['Sin cambios', s.sinCambio], ['Pendientes', s.pendEstructura + s.pendDepartamento], ['Excluidos (socios y presidencia)', s.excluidas]] }, aplicar: '/empleados/importar/aplicar', descartar: '/empleados/importar' }) %>
+<p class="sub">Supervisor inmediato: <%= s.supervisores %> vinculado<%= s.supervisores === 1 ? '' : 's' %> a una persona del Listado o del portal; <%= s.supervisoresSinVinculo %> sin vínculo (se guarda el nombre como texto).</p>
+<% if (res.pendientes.estructura.length) { %><details open class="blk"><summary>Pendientes por estructura (<%= s.pendEstructura %>): empresas sin estructura propia en el portal</summary>
+<div class="tw"><table><tr><th>Empresa</th><th>Personas</th></tr><% res.pendientes.estructura.forEach(([e, n]) => { %><tr><td><%= e %></td><td><%= n %></td></tr><% }) %></table></div>
+<p class="sub">Se importan cuando GH cargue su estructura y sus equivalencias de departamento.</p></details><% } %>
+<% if (res.pendientes.departamento.length) { %><details open class="blk"><summary>Pendientes por equivalencia (<%= s.pendDepartamento %>): departamentos sin unidad</summary>
+<div class="tw"><table><tr><th>Empresa · Departamento</th><th>Personas</th></tr><% res.pendientes.departamento.forEach(([e, n]) => { %><tr><td><%= e %></td><td><%= n %></td></tr><% }) %></table></div>
+<p class="sub">Descarga las equivalencias, indica la unidad de cada uno, súbelas y vuelve a subir el Listado.</p></details><% } %>
+<% } %>
+<%- include('partials/foot') %>
