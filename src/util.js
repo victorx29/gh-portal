@@ -21,4 +21,19 @@ const subidaXlsx = volver => {
 const nombreArchivo = f => { const n = (f && f.originalname) || '', u = Buffer.from(n, 'latin1').toString('utf8'); return u.includes('\uFFFD') ? n : u; };
 // Una vista previa de carga vive 30 minutos en la sesión
 const VISTA_PREVIA_MS = 30 * 60e3;
-module.exports = { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo };
+// Al guardar, volver a la vista donde estaba el usuario (0.9.2). dest = adonde la acción quería ir; volver = página de origen (con filtros).
+//  · Si la acción abre un modal (?modal= o ?abrir=), se abre sobre la página de origen, con sus filtros.
+//  · Si va a la misma página, se conservan los filtros de origen (más los parámetros que la acción agregue).
+//  · Si va a otra página, se respeta la acción. Solo se aceptan rutas internas del portal.
+const RUTA_INTERNA = /^\/(?![\/\\])[^\s]*$/;
+function volverA(dest, volver) {
+  if (!RUTA_INTERNA.test(String(volver || '')) || !RUTA_INTERNA.test(String(dest || ''))) return dest;
+  const o = new URL(volver, 'http://portal'), x = new URL(dest, 'http://portal');
+  o.searchParams.delete('modal'); o.searchParams.delete('abrir');
+  const abre = ['modal', 'abrir'].find(k => x.searchParams.has(k));
+  if (abre) { o.searchParams.set(abre, x.searchParams.get(abre)); return o.pathname + o.search; }
+  if (x.pathname !== o.pathname) return dest;
+  for (const [k, v] of x.searchParams) if (!o.searchParams.has(k)) o.searchParams.set(k, v);
+  return o.pathname + o.search;
+}
+module.exports = { w, E, flash, modal, hacer, subidaXlsx, VISTA_PREVIA_MS, nombreArchivo, volverA };

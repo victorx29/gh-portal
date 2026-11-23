@@ -135,3 +135,13 @@ details.inl-d .pop form{display:flex;gap:6px;flex-wrap:wrap}details.inl-d .pop s
   .cfgnav{flex-wrap:nowrap;overflow-x:auto;gap:4px;margin:10px 0 14px;padding-bottom:8px;scrollbar-width:thin}.cfg-g{flex-wrap:nowrap}.cfg-t{display:none}.pill{white-space:nowrap}
 }
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+
+/* 0.9.2 · Indicador de carga: la «O» del logo (anillo --pr) girando sobre un velo, por encima de los modales */
+.carga{border:0;background:transparent;width:auto;padding:0;overflow:visible;display:flex;flex-direction:column;align-items:center;gap:10px}
+.carga::backdrop{background:#ffffff59}
+[data-theme=dark] .carga::backdrop{background:#0006}
+.carga-o{width:40px;height:40px;border-radius:50%;border:6px solid var(--pr);border-top-color:transparent;animation:gh-gira .8s linear infinite}
+.carga-t{font-size:13px;color:var(--mu);background:var(--bg);border:1px solid var(--bd);border-radius:999px;padding:4px 12px}
+@keyframes gh-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.carga-o{animation:none;border-top-color:var(--pr);opacity:.7}}
+@media print{.carga{display:none!important}}

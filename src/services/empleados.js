@@ -7,15 +7,16 @@ const fechaOk = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && !isNaN(Date.
 const ghOnly = u => { if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana gestiona los ingresos'); };
 const hist = (c, u, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)',
   [u && u.id, 'relacion_laboral', String(id), accion, detalle || {}]);
-const CERRADOS = ['egresado', 'movido', 'no_ingreso', 'corregida'];
+const CERRADOS = ['egresado', 'movido', 'no_ingreso', 'corregida', 'egreso_anulado'];
 
 // Al llegar el candidato a «Ingreso»: la persona queda «por ingresar» en la plaza de la requisición (dentro de la transacción de avanzar)
 async function porIngresarC(c, u, ca, cd, r) {
   const ced = cedulaNorm(cd.cedula);
   if (!ced) throw E(400, 'Registra la cédula del candidato antes de pasarlo a Ingreso');
   if (r.plaza_id) {
-    const z = (await c.query('select codigo, por_regularizar from plaza where id=$1 for update', [r.plaza_id])).rows[0];
+    const z = (await c.query('select codigo, por_regularizar, congelada from plaza where id=$1 for update', [r.plaza_id])).rows[0];
     if (z && z.por_regularizar) throw E(400, `La plaza ${z.codigo} está «por regularizar»: Gestión Humana debe regularizarla antes del ingreso`);
+    if (z && z.congelada) throw E(400, `La plaza ${z.codigo} está congelada: Gestión Humana debe descongelarla antes del ingreso`);
     const otro = (await c.query(`select t.nombres from relacion_laboral rl join trabajador t on t.id=rl.trabajador_id where rl.plaza_id=$1 and rl.estado='por_ingresar'`, [r.plaza_id])).rows[0];
     if (otro) throw E(400, `La plaza ${z.codigo} ya tiene a ${otro.nombres} por ingresar`);
   }
@@ -44,6 +45,7 @@ async function confirmarIngreso(u, relId, fecha) {
     if (rl.plaza_id) {
       z = (await c.query('select * from plaza where id=$1 for update', [rl.plaza_id])).rows[0];
       if (z.por_regularizar) throw E(400, `La plaza ${z.codigo} está «por regularizar»: Gestión Humana debe regularizarla antes de confirmar el ingreso`);
+      if (z.congelada) throw E(400, `La plaza ${z.codigo} está congelada: Gestión Humana debe descongelarla antes de confirmar el ingreso`);
       if (z.hasta && z.hasta <= fecha) throw E(400, `La plaza ${z.codigo} está cerrada a esa fecha`);
       const ocupa = (await c.query(`select t.nombres from relacion_laboral x join trabajador t on t.id=x.trabajador_id where x.plaza_id=$1 and x.estado='activo' and x.trabajador_id<>$2`, [z.id, rl.trabajador_id])).rows[0];
       if (ocupa) throw E(400, `La plaza ${z.codigo} sigue ocupada por ${ocupa.nombres}: registra primero su egreso`);
@@ -78,9 +80,16 @@ async function noIngreso(u, relId, motivo) {
 }
 
 // ---------- Base de empleados (solo Gestión Humana) ----------
+// Confirmación escribiendo el nombre de la persona (egreso y su anulación): sin acentos, mayúsculas ni espacios de más
+const plano = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+function confirmaNombre(t, escrito) {
+  const e = plano(escrito), validos = [t.nombres, [t.nombres, t.apellidos].filter(Boolean).join(' ')].map(plano);
+  if (!e || !validos.includes(e)) throw E(400, `Para confirmar, escribe el nombre completo tal como aparece: «${[t.nombres, t.apellidos].filter(Boolean).join(' ')}»`);
+}
 const TIPOS_EGRESO = { renuncia: 'Renuncia (retiro voluntario)', despido_justificado: 'Despido justificado', despido_injustificado: 'Despido injustificado',
   fin_contrato: 'Fin del contrato (tiempo u obra determinada)', mutuo_acuerdo: 'Mutuo acuerdo', jubilacion: 'Jubilación', otro: 'Otro' };
-const ESTADOS_REL = { por_ingresar: 'Por ingresar', activo: 'Activo', egresado: 'Egresado', movido: 'Movido a otra plaza', no_ingreso: 'No se presentó', corregida: 'Corregida (plaza equivocada)' };
+const ESTADOS_REL = { por_ingresar: 'Por ingresar', activo: 'Activo', egresado: 'Egresado', movido: 'Movido a otra plaza', no_ingreso: 'No se presentó', corregida: 'Corregida (plaza equivocada)',
+  egreso_anulado: 'Egreso anulado' };
 // Lista con la relación más reciente de cada persona
 async function listar(u, f = {}) {
   ghOnly(u);
@@ -101,9 +110,9 @@ async function ficha(u, id) {
   const t = (await q('select * from trabajador where id=$1', [id])).rows[0]; if (!t) throw E(404, 'Empleado no encontrado');
   await q('insert into consulta_ficha(trabajador_id, usuario_id) values($1,$2)', [id, u.id]);
   const rels = (await q(`select r.*, z.codigo plaza, z.por_regularizar, un.nombre unidad, un.codigo unidad_codigo, coalesce(e.razon_social, e.nombre) empresa, e.siglas,
-      s.nombres supervisor, uc.nombre confirmado_por_nombre, ux.nombre cerrado_por_nombre, q.codigo requisicion, zd.codigo reubicada_de_plaza
+      s.nombres supervisor, uc.nombre confirmado_por_nombre, ux.nombre cerrado_por_nombre, ua.nombre anulado_por_nombre, q.codigo requisicion, zd.codigo reubicada_de_plaza
     from relacion_laboral r left join plaza z on z.id=r.plaza_id left join relacion_laboral rd on rd.id=r.reubicada_desde left join plaza zd on zd.id=rd.plaza_id left join unidad un on un.id=r.unidad_id left join empresa e on e.id=r.empresa_id
-    left join trabajador s on s.id=r.supervisor_id left join usuario uc on uc.id=r.confirmado_por left join usuario ux on ux.id=r.cerrado_por
+    left join trabajador s on s.id=r.supervisor_id left join usuario uc on uc.id=r.confirmado_por left join usuario ux on ux.id=r.cerrado_por left join usuario ua on ua.id=r.anulado_por
     left join requisicion q on q.id=r.requisicion_id where r.trabajador_id=$1 order by r.id desc`, [id])).rows;
   const consultas = (await q(`select c.fecha, us.nombre from consulta_ficha c join usuario us on us.id=c.usuario_id where c.trabajador_id=$1 order by c.id desc limit 10`, [id])).rows;
   const aCargo = (await q(`select t.id, t.nombres, r.cargo from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.supervisor_id=$1 and r.estado='activo' order by t.nombres`, [id])).rows;
@@ -113,15 +122,20 @@ async function ficha(u, id) {
 async function egresar(u, relId, b) {
   ghOnly(u);
   const fecha = String(b.fecha || ''), tipo = String(b.tipo || ''), motivo = String(b.motivo || '').trim();
+  const congelar = b.congelar === 'on', motivoCongelar = String(b.motivo_congelar || '').trim();
   if (!fechaOk(fecha)) throw E(400, 'Indica la fecha de egreso');
   if (!TIPOS_EGRESO[tipo]) throw E(400, 'Elige el tipo de egreso');
+  if (congelar && !motivoCongelar) throw E(400, 'Indica por qué se congela la plaza');
   return tx(async c => {
     const hoy = (await c.query('select current_date::text d')).rows[0].d; if (fecha > hoy) throw E(400, 'La fecha de egreso no puede ser futura: regístralo cuando ocurra');
     const rl = (await c.query('select * from relacion_laboral where id=$1 for update', [relId])).rows[0]; if (!rl) throw E(404, 'Relación laboral no encontrada');
     if (rl.estado !== 'activo') throw E(400, 'Solo se registra el egreso de una persona activa');
     if (rl.fecha_ingreso && fecha < rl.fecha_ingreso) throw E(400, 'La fecha de egreso no puede ser anterior a la de ingreso');
+    confirmaNombre((await c.query('select nombres, apellidos from trabajador where id=$1', [rl.trabajador_id])).rows[0], b.confirmar_nombre);
     await c.query(`update relacion_laboral set estado='egresado', fecha_egreso=$2, tipo_egreso=$3, motivo_cierre=$4, cerrado_por=$5 where id=$1`, [relId, fecha, tipo, motivo || null, u.id]);
-    await hist(c, u, relId, 'egreso', { fecha_egreso: fecha, tipo, motivo: motivo || undefined });
+    await hist(c, u, relId, 'egreso', { fecha_egreso: fecha, tipo, motivo: motivo || undefined, congelar_plaza: congelar || undefined });
+    // Congelar la plaza que queda vacía (opcional): con la misma regla de siempre, solo si de verdad quedó vacía
+    if (congelar) { if (!rl.plaza_id) throw E(400, 'Esta persona no tenía plaza: no hay plaza que congelar'); await PT.congelarC(c, u, rl.plaza_id, true, `Al egresar (${fecha.split('-').reverse().join('/')}): ${motivoCongelar}`); }
     const d = (await c.query(`select t.nombres, t.email, z.codigo plaza, un.nombre unidad from relacion_laboral r join trabajador t on t.id=r.trabajador_id
       left join plaza z on z.id=r.plaza_id left join unidad un on un.id=r.unidad_id where r.id=$1`, [relId])).rows[0];
     // Aviso a n8n (TI retira accesos y equipos): sin el tipo ni el motivo del egreso
@@ -129,6 +143,46 @@ async function egresar(u, relId, b) {
       plaza: d.plaza, unidad: d.unidad, fecha_egreso: fecha, registrado_por: u.nombre }]);
   });
 }
+// ---------- Anular un egreso registrado por error (0.9.2, solo Gestión Humana) ----------
+// La relación egresada queda «egreso_anulado» (no aparece en el organigrama a ninguna fecha) y se abre otra activa igual, con la
+// misma fecha de ingreso. Solo si la plaza sigue libre. Si al egresar se congeló la plaza, se descongela. TI recibe «egreso.anulado».
+async function anularEgreso(u, relId, b) {
+  ghOnly(u);
+  const motivo = String(b.motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo de la anulación: queda en el historial');
+  return tx(async c => {
+    const rl = (await c.query('select * from relacion_laboral where id=$1 for update', [relId])).rows[0]; if (!rl) throw E(404, 'Relación laboral no encontrada');
+    if (rl.estado !== 'egresado') throw E(400, 'Solo se anula un egreso registrado');
+    const t = (await c.query('select nombres, apellidos, email from trabajador where id=$1', [rl.trabajador_id])).rows[0];
+    confirmaNombre(t, b.confirmar_nombre);
+    const otra = (await c.query("select 1 from relacion_laboral where trabajador_id=$1 and estado in ('activo','por_ingresar')", [rl.trabajador_id])).rowCount;
+    if (otra) throw E(400, `${t.nombres} ya tiene otra relación activa o un ingreso en curso: el egreso no se puede anular`);
+    let z = null;
+    if (rl.plaza_id) {
+      z = (await c.query('select * from plaza where id=$1 for update', [rl.plaza_id])).rows[0];
+      const hoy = (await c.query('select current_date::text d')).rows[0].d;
+      if (z.hasta && z.hasta <= hoy) throw E(400, `La plaza ${z.codigo} ya está cerrada: el egreso no se puede anular`);
+      const ocupa = (await c.query(`select t.nombres, x.estado from relacion_laboral x join trabajador t on t.id=x.trabajador_id where x.plaza_id=$1 and x.estado in ('activo','por_ingresar')
+        union all select t.nombres, x.estado from relacion_laboral x join trabajador t on t.id=x.trabajador_id where x.plaza_id=$1 and x.estado in ('egresado','movido') and x.id<>$2 and x.fecha_egreso > $3`, [z.id, rl.id, rl.fecha_egreso])).rows[0];
+      if (ocupa) throw E(400, `La plaza ${z.codigo} ya la ${ocupa.estado === 'por_ingresar' ? 'tiene por ingresar' : 'ocupó después'} ${ocupa.nombres}: el egreso no se puede anular`);
+      const req = (await c.query(`select r.codigo from requisicion r where r.plaza_id=$1 and ${PT.ABIERTA} limit 1`, [z.id])).rows[0];
+      if (req) throw E(400, `La plaza ${z.codigo} tiene abierta la requisición ${req.codigo} (reemplazo): anúlala antes de anular el egreso`);
+      if (z.congelada) await PT.congelarC(c, u, z.id, false, `Anulación del egreso de ${t.nombres}: ${motivo}`);
+    }
+    await c.query("update relacion_laboral set estado='egreso_anulado', anulado_por=$2, anulado_en=now(), motivo_anulacion=$3 where id=$1", [relId, u.id, motivo]);
+    const nueva = (await c.query(`insert into relacion_laboral(trabajador_id,empresa_id,unidad_id,cargo,requisicion_id,plaza_id,perfil_version_id,candidatura_id,origen,estado,fecha_ingreso,
+        fecha_fin_contrato,ubicacion,tipo_empleado,departamento_origen,supervisor_id,supervisor_texto,importacion_id,confirmado_por,confirmado_en,reubicada_desde,tipo_reubicacion)
+      select trabajador_id,empresa_id,unidad_id,cargo,requisicion_id,plaza_id,perfil_version_id,candidatura_id,origen,'activo',fecha_ingreso,fecha_fin_contrato,ubicacion,tipo_empleado,
+        departamento_origen,supervisor_id,supervisor_texto,importacion_id,confirmado_por,confirmado_en,id,'anulacion_egreso' from relacion_laboral where id=$1 returning id`, [relId])).rows[0].id;
+    await hist(c, u, relId, 'anular_egreso', { motivo, fecha_egreso: rl.fecha_egreso, a_relacion: nueva });
+    await hist(c, u, nueva, 'egreso_anulado', { motivo, desde_relacion: relId });
+    // Aviso a n8n: TI devuelve los accesos y equipos que retiró con «egreso.registrado» (sin datos personales sensibles)
+    const d = (await c.query('select un.nombre unidad from unidad un where un.id=$1', [rl.unidad_id])).rows[0] || {};
+    await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['egreso.anulado', { relacion_id: nueva, relacion_anulada_id: relId, persona: { nombre: t.nombres, email: t.email },
+      cargo: rl.cargo, plaza: z && z.codigo, unidad: d.unidad, fecha_egreso_anulada: rl.fecha_egreso, anulado_por: u.nombre }]);
+    return { trabajador_id: rl.trabajador_id, descongelada: !!(z && z.congelada) };
+  });
+}
+
 // ---------- Reubicar en otra plaza (0.9.1, solo Gestión Humana) ----------
 // Corrección: la persona quedó en la plaza equivocada (por ejemplo, en la carga inicial). La relación se cierra como «corregida»
 //   y se abre otra en la plaza correcta con la MISMA fecha de ingreso: a cualquier fecha, el organigrama la muestra en la plaza correcta.
@@ -276,4 +330,4 @@ async function reubicar(u, relId, b) {
   });
 }
 module.exports = { cedulaNorm, porIngresarC, deCandidatura, confirmarIngreso, noIngreso, CERRADOS, listar, ficha, egresar, TIPOS_EGRESO, ESTADOS_REL,
-  TIPOS_REUBICACION, opcionesReubicar, revisarReubicacion, reubicar };
+  TIPOS_REUBICACION, opcionesReubicar, revisarReubicacion, reubicar, anularEgreso };

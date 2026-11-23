@@ -19,6 +19,14 @@ r.post('/empleados/relacion/:id(\\d+)/egreso', gh, w(async (req, res) => {
   res.redirect(t ? '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + t.trabajador_id) : '/empleados');
 }));
 
+// ---- Anular un egreso registrado por error (0.9.2) ----
+r.post('/empleados/relacion/:id(\\d+)/anular-egreso', gh, w(async (req, res) => {
+  const t = (await q('select trabajador_id from relacion_laboral where id=$1', [+req.params.id])).rows[0];
+  try { const x = await EM.anularEgreso(req.user, +req.params.id, req.body); flash(req, 'ok', 'Egreso anulado: la persona vuelve a su plaza' + (x.descongelada ? ' y la plaza se descongeló' : '')); }
+  catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
+  res.redirect(t ? '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + t.trabajador_id) : '/empleados');
+}));
+
 // ---- Reubicar en otra plaza (0.9.1): formulario → revisar → confirmar ----
 const fichaDe = tid => '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + tid);
 const formReubicar = id => '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/relacion/' + id + '/reubicar');
@@ -79,6 +87,10 @@ r.post('/empleados/equivalencias/aplicar', gh, hacer(async req => {
 
 // ---- Plazas por regularizar (las crea la carga inicial) ----
 r.get('/config/plantilla/por-regularizar', gh, w(async (req, res) => res.render('por_regularizar', { title: 'Plazas por regularizar', nav: 'config', sub: 'porreg', zs: await PL.porRegularizar() })));
+r.get('/config/plazas/:id(\\d+)/regularizar', gh, w(async (req, res) => {
+  const z = (await PL.porRegularizar()).find(x => x.id === +req.params.id); if (!z) throw E(404, 'La plaza no está por regularizar');
+  modal(req, res, 'plaza_regularizar', { title: 'Regularizar plaza', nav: 'config', sub: 'porreg', z });
+}));
 r.post('/config/plazas/:id(\\d+)/regularizar', gh, hacer(async req => '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + await PL.regularizar(req.user, +req.params.id, req.body.autorizado)),
   'Plaza regularizada: ya cuenta en el HC autorizado', '/config/plantilla/por-regularizar'));
 

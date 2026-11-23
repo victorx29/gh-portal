@@ -125,6 +125,18 @@ Flotantes (`.toast`) arriba a la derecha: el de éxito se cierra solo; el de err
 **Modales** (`dialog`): radio 16 px, padding 20 px, ancho hasta 760 px, alto hasta 90 % con desplazamiento
 propio. Encabezado `.mh` con título y botón de cerrar.
 
+**Acciones que cambian datos** (0.9.2): siempre en un modal propio, nunca en un menú desplegable dentro de una tabla
+(el contenedor con desplazamiento lo recorta). Desde un modal se abre en el segundo modal (`data-modal2`), con la plaza o
+el registro y cada acción en su bloque, con su motivo. Al guardar, el portal vuelve a la misma vista: mismos filtros,
+el modal que estaba abierto y la misma posición (campo `_volver` que agrega `app.js`; el servidor solo acepta rutas
+internas). Un formulario que no debe volver lleva `data-sin-volver`.
+
+**Indicador de carga** (`.carga`, 0.9.2): la «O» del logo (anillo de 40 px, borde 6 px `--pr` con un cuarto
+transparente) girando 0,8 s por vuelta, con la etiqueta «Guardando…» (13 px `--mu` en una pastilla `--bg` con borde
+`--bd`), centrada sobre un velo claro (`#ffffff59`; oscuro `#0006`) por encima de los modales. Aparece si el envío tarda
+más de 250 ms (300 ms al abrir un modal) y el botón queda deshabilitado para no enviar dos veces. Con «reducir movimiento»
+no gira. No se imprime.
+
 **Indicadores** (`.kpi`): fila con borde y radio 14 px; etiqueta pequeña `--mu` y valor en 22 px.
 
 **Estados vacíos** (`.empty`): texto `--mu` centrado dentro de un borde punteado.

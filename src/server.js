@@ -1,5 +1,5 @@
 const express = require('express'), session = require('express-session'), PgStore = require('connect-pg-simple')(session), helmet = require('helmet'), path = require('path'), crypto = require('crypto');
-const cfg = require('./config'), { pool, q } = require('./db'), P = require('./services/perm'), outbox = require('./services/outbox'), { w } = require('./util');
+const cfg = require('./config'), { pool, q } = require('./db'), P = require('./services/perm'), outbox = require('./services/outbox'), { w, volverA } = require('./util');
 require('fs').mkdirSync(cfg.uploads, { recursive: true });
 const app = express();
 app.locals.ic = require('./icons'); app.locals.CONFIG_NAV = require('./confignav');
@@ -13,7 +13,7 @@ app.use(session({ store: new PgStore({ pool }), secret: cfg.secret, resave: fals
   cookie: { httpOnly: true, sameSite: 'lax', secure: cfg.secure, maxAge: 8 * 3600e3 } }));
 app.use(w(async (req, res, next) => {
   if (!req.session.csrf) req.session.csrf = crypto.randomBytes(24).toString('hex');
-  Object.assign(res.locals, { csrf: req.session.csrf, flash: req.session.flash || null, user: null, nav: '', sub: '' }); delete req.session.flash;
+  Object.assign(res.locals, { csrf: req.session.csrf, flash: req.session.flash || null, user: null, nav: '', sub: '', esGet: req.method === 'GET' }); delete req.session.flash;
   if (req.session.uid) { const u = await P.cargarUsuario(req.session.uid); if (u) req.user = res.locals.user = u; }
   if (req.method === 'POST' && ((req.body && req.body._csrf) || req.query._csrf) !== req.session.csrf) { const e = new Error('Solicitud no válida'); e.status = 403; throw e; }
   next();
@@ -22,15 +22,20 @@ app.use(require('./controllers/auth'));
 app.use((req, res, next) => req.user ? next() : res.redirect('/login'));
 // Formularios del panel de edición del diagrama: al guardar se vuelve al mismo diagrama (mismos filtros y zoom).
 // Si la acción redirigía a un modal (por ejemplo, el puesto recién creado), ese modal se abre en el panel.
+// (0.9.2) Cualquier otro formulario: al guardar se vuelve a la página donde estaba (mismos filtros) — ver volverA en util.js.
 app.use((req, res, next) => {
   const v = req.method === 'POST' && req.body && typeof req.body._volver === 'string' ? req.body._volver : '';
   if (/^\/config\/estructura\/diagrama(\?|$)/.test(v)) {
     const red = res.redirect.bind(res);
     res.redirect = (...args) => {
       const url = String(args[args.length - 1]), m = /[?&]modal=([^&]+)/.exec(url), u = new URL(v, 'http://portal');
-      if (m) { const panel = decodeURIComponent(m[1]); if (/^\/config\/[a-z]/.test(panel)) u.searchParams.set('panel', panel); }
+      // En modo edición se abre en el panel; fuera de él (0.9.2), como modal sobre el mismo diagrama
+      if (m) { const panel = decodeURIComponent(m[1]); if (/^\/config\/[a-z]/.test(panel)) u.searchParams.set(u.searchParams.get('editar') === '1' ? 'panel' : 'modal', panel); }
       return red(u.pathname + u.search);
     };
+  } else if (v) {
+    const red = res.redirect.bind(res);
+    res.redirect = (...args) => red(volverA(String(args[args.length - 1]), v));
   }
   next();
 });

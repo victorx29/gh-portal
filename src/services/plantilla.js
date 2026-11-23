@@ -227,7 +227,9 @@ async function cerrarFuncional(u, relId, motivo) {
     return r.puesto_id;
   });
 }
-async function desactivarPuesto(u, id) {
+async function desactivarPuesto(u, id, b = {}) {
+  const error = b.error === 'on', motivo = String(b.motivo || '').trim();
+  if (error && !motivo) throw E(400, 'Indica por qué el puesto fue un error: queda en el historial');
   return tx(async c => {
     const n = (await c.query('select count(*)::int n from plaza where puesto_id=$1 and (hasta is null or hasta > current_date)', [id])).rows[0].n;
     if (n) throw E(400, 'Tiene ' + n + ' plaza(s) abiertas: ciérralas antes de desactivar el puesto');
@@ -235,18 +237,34 @@ async function desactivarPuesto(u, id) {
     if (dep) throw E(400, dep + ' puesto(s) le reportan como excepción: cámbialos antes');
     const fun = (await c.query('select count(*)::int n from puesto_relacion where (puesto_id=$1 or funcional_de=$1) and hasta is null', [id])).rows[0].n;
     if (fun) throw E(400, 'Tiene ' + fun + ' dependencia(s) funcional(es) vigente(s): ciérralas antes de desactivar el puesto');
-    await c.query('update puesto set activo=false, jefe=false where id=$1', [id]); await hist(c, u, 'puesto', id, 'desactivar');
+    await c.query('update puesto set activo=false, jefe=false, creado_por_error=$2, motivo_baja=$3, desactivado_por=$4, desactivado_en=now() where id=$1', [id, error, motivo || null, u.id]);
+    await hist(c, u, 'puesto', id, 'desactivar', { motivo: motivo || undefined, creado_por_error: error || undefined });
   });
 }
 const agregarPlazas = (u, puestoId, b) => tx(c => crearPlazasC(c, u, puestoId, datosPlazas(b)));
-async function congelar(u, plazaId, on, motivo) {
-  motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo');
-  return tx(async c => {
-    const z = (await c.query('select * from plaza where id=$1 for update', [plazaId])).rows[0]; if (!z) throw E(404, 'Plaza no encontrada');
-    if (z.hasta) throw E(400, 'La plaza está cerrada');
-    await c.query('update plaza set congelada=$2 where id=$1', [plazaId, on]); await hist(c, u, 'plaza', plazaId, on ? 'congelar' : 'descongelar', { codigo: z.codigo, motivo }); return z.puesto_id;
-  });
+// Congelar = la plaza existe pero no se autoriza usarla ni pedir su requisición. Por eso solo se congela una plaza VACÍA:
+// sin ocupante, sin nadie por ingresar y sin requisición abierta (decisión del 23-11-2026).
+async function motivoNoCongelable(c, plazaId) {
+  const x = (await c.query(`select (select t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=$1 and r.estado='activo' limit 1) ocupante,
+      (select t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=$1 and r.estado='por_ingresar' limit 1) por_ingresar,
+      (select r.codigo from requisicion r where r.plaza_id=$1 and ${ABIERTA} limit 1) requisicion`, [plazaId])).rows[0];
+  if ((await c.query('select por_regularizar from plaza where id=$1', [plazaId])).rows[0].por_regularizar) return 'está «por regularizar»: regularízala o ciérrala; no se congela';
+  if (x.ocupante) return `la ocupa ${x.ocupante}: solo se congela una plaza vacía`;
+  if (x.por_ingresar) return `tiene a ${x.por_ingresar} por ingresar: solo se congela una plaza vacía`;
+  if (x.requisicion) return `tiene abierta la requisición ${x.requisicion}: anúlala o ciérrala antes de congelar`;
+  return null;
 }
+async function congelarC(c, u, plazaId, on, motivo) {
+  motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo');
+  const z = (await c.query('select * from plaza where id=$1 for update', [plazaId])).rows[0]; if (!z) throw E(404, 'Plaza no encontrada');
+  if (z.hasta) throw E(400, 'La plaza está cerrada');
+  if (on && z.congelada) throw E(400, `La plaza ${z.codigo} ya está congelada`);
+  if (!on && !z.congelada) throw E(400, `La plaza ${z.codigo} no está congelada`);
+  if (on) { const m = await motivoNoCongelable(c, plazaId); if (m) throw E(400, `La plaza ${z.codigo} ${m}`); }
+  await c.query('update plaza set congelada=$2 where id=$1', [plazaId, on]); await hist(c, u, 'plaza', plazaId, on ? 'congelar' : 'descongelar', { codigo: z.codigo, motivo });
+  return z;
+}
+const congelar = (u, plazaId, on, motivo) => tx(async c => (await congelarC(c, u, plazaId, on, motivo)).puesto_id);
 async function cerrarPlaza(u, plazaId, motivo) {
   motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo del cierre');
   return tx(async c => {
@@ -257,6 +275,18 @@ async function cerrarPlaza(u, plazaId, motivo) {
   });
 }
 
+// Datos para el modal de acciones de una plaza
+async function plazaAcciones(id) {
+  const z = (await q(`select z.*, e.siglas, coalesce(e.razon_social, e.nombre) empresa, pf.nombre perfil, pf.codigo perfil_codigo, un.nombre unidad, un.codigo unidad_codigo
+    from plaza z join puesto p on p.id=z.puesto_id join perfil pf on pf.id=p.perfil_id join unidad un on un.id=p.unidad_id left join empresa e on e.id=z.empresa_id where z.id=$1`, [id])).rows[0];
+  if (!z) throw E(404, 'Plaza no encontrada');
+  const f = await ES.hoy(); z.estado = estado(z, f);
+  z.ocupantes = (await q(`select r.estado, r.fecha_ingreso, trim(t.nombres || ' ' || coalesce(t.apellidos, '')) nombre from relacion_laboral r join trabajador t on t.id=r.trabajador_id
+    where r.plaza_id=$1 and r.estado in ('activo','por_ingresar') order by r.estado`, [id])).rows;
+  z.req = (await q(`select r.id, r.codigo from requisicion r where r.plaza_id=$1 and ${ABIERTA} limit 1`, [id])).rows[0] || null;
+  z.noCongelable = z.congelada || z.hasta ? null : await motivoNoCongelable({ query: q }, id);   // q tiene la misma firma que c.query
+  return z;
+}
 // ---------- Empresa de la plaza ----------
 async function cambiarEmpresaC(c, u, plazaId, empresaId, motivo, origen) {
   const z = (await c.query('select z.*, p.unidad_id from plaza z join puesto p on p.id=z.puesto_id where z.id=$1 for update of z', [plazaId])).rows[0]; if (!z) throw E(404, 'Plaza no encontrada');
@@ -333,8 +363,10 @@ async function diagramaPuestos(fl) {
   const modSet = new Set((fl.mods && fl.mods.length ? fl.mods : ['nomina']));   // por defecto: solo nómina propia
   const abiertasTodas = p => p.plazas.filter(z => estado(z, f) !== 'cerrada' && (!filtra || empSet.has(z.empresa_id)));
   const abiertas = p => abiertasTodas(p).filter(z => modSet.has(z.modalidad));
-  // Entra si tiene plazas de las modalidades elegidas; un puesto sin ninguna plaza (p. ej. Presidente) se muestra igual, salvo con filtro de empresa
-  const match = new Set([...byP.values()].filter(p => unidades.has(p.unidad_id) && (abiertas(p).length || (!filtra && !abiertasTodas(p).length))).map(p => p.id));
+  // Entra si tiene plazas de las modalidades elegidas; un puesto que NUNCA tuvo plazas (p. ej. Presidente) se muestra igual, salvo con filtro de empresa.
+  // Uno que tuvo plazas y están todas cerradas no se dibuja (0.9.2: por ejemplo, un puesto creado por error en la carga inicial).
+  const conPlazas = new Set((await q('select distinct puesto_id from plaza where creado_en::date <= $1::date', [f])).rows.map(r => r.puesto_id));
+  const match = new Set([...byP.values()].filter(p => unidades.has(p.unidad_id) && (abiertas(p).length || (!filtra && !abiertasTodas(p).length && !conPlazas.has(p.id)))).map(p => p.id));
   const vis = new Set(match);
   for (const id of match) { let s = byP.get(byP.get(id).reporta_id), n = 0; while (s && n++ < 60 && unidades.has(s.unidad_id)) { vis.add(s.id); s = byP.get(s.reporta_id); } }
   const nodes = [...vis].map(id => {
@@ -488,6 +520,9 @@ async function procesar(c, filas, usr, aplicar) {
     }
   }
   const relAct = (await c.query('select r.id, r.puesto_id, r.funcional_de from puesto_relacion r where r.hasta is null')).rows, keyDeId = new Map(ps.map(p => [p.id, pKey(p.unidad_id, p.perfil_id)]));
+  // Plazas que no se pueden congelar: con ocupante, alguien por ingresar o requisición abierta (0.9.2)
+  const enUso = new Set((await c.query(`select plaza_id from relacion_laboral where estado in ('activo','por_ingresar') and plaza_id is not null
+    union select plaza_id from requisicion r where r.plaza_id is not null and ${ABIERTA}`)).rows.map(r => r.plaza_id));
   const conFuncional = filas.some(f => f.funcional !== undefined);   // Excel anterior sin la columna: las líneas punteadas no se tocan
   // Diferencias
   const cambios = []; let altas = 0, cierres = 0, cong = 0;
@@ -502,7 +537,10 @@ async function procesar(c, filas, usr, aplicar) {
       const op = { gr, abrir: Math.max(0, gr.nP - vig.length), cerrar: vig.length > gr.nP ? vig.filter(z => !z.congelada).concat(vig.filter(z => z.congelada)).slice(-(vig.length - gr.nP)) : [],
         abrirY: Math.max(0, gr.nY - pro.length), cerrarY: pro.length > gr.nY ? pro.slice(-(pro.length - gr.nY)) : [] };
       const quedan = vig.filter(z => !op.cerrar.includes(z)), congAct = quedan.filter(z => z.congelada).length;
-      op.congelar = gr.nC > congAct ? quedan.filter(z => !z.congelada).slice(0, gr.nC - congAct) : []; op.descongelar = congAct > gr.nC ? quedan.filter(z => z.congelada).slice(0, congAct - gr.nC) : [];
+      const congelables = quedan.filter(z => !z.congelada && !enUso.has(z.id)), faltan = gr.nC - congAct;
+      op.congelar = faltan > 0 ? congelables.slice(0, faltan) : []; op.descongelar = congAct > gr.nC ? quedan.filter(z => z.congelada).slice(0, congAct - gr.nC) : [];
+      if (faltan > 0 && congelables.length + op.abrir < faltan)   // las plazas nuevas nacen vacías y también se pueden congelar
+        err(gr.fila || pl.fila, `Congeladas: se piden ${faltan} más, pero solo ${congelables.length + op.abrir} plaza(s) quedarían vacías (sin ocupante, ingreso ni requisición abierta). Solo se congela una plaza vacía`);
       op.congelarNuevas = Math.max(0, gr.nC - congAct - op.congelar.length);
       const s = gr.empId ? (es.find(e => e.id === gr.empId) || {}).siglas || 'empresa ' + gr.empId : POR_DEFINIR.toLowerCase(), m = gr.mod === 'nomina' ? '' : ' ' + MODALIDADES[gr.mod].toLowerCase();
       if (op.abrir) d.push(`+${op.abrir} ${s}${m}`); if (op.cerrar.length) d.push(`cierra ${op.cerrar.length} ${s}${m}`); if (op.abrirY) d.push(`+${op.abrirY} proyectada ${s}${m}`); if (op.cerrarY.length) d.push(`cancela ${op.cerrarY.length} proyectada ${s}`);
@@ -563,5 +601,5 @@ const analizar = filas => tx(c => procesar(c, filas, null, false));
 async function aplicarCarga(filas, usr) {
   return tx(async c => { const r = await procesar(c, filas, usr, true); if (r.errs.length) throw E(400, 'La plantilla cambió desde la vista previa. Vuelve a subir el archivo'); return r; });
 }
-module.exports = { regularizar, porRegularizar, crearPlazasC, agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
+module.exports = { plazaAcciones, congelarC, motivoNoCongelable, regularizar, porRegularizar, crearPlazasC, agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
   diagramaPuestos, plantilla, leer, analizar, aplicarCarga };

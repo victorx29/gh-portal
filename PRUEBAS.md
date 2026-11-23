@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.1), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.2), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -202,6 +202,21 @@ antes funcionaba.
 | REU-09 | Una relación corregida o movida no se modifica (la base lo impide) y no se puede reubicar otra vez; el historial registra «reubicar», «reubicado» y el cierre automático de la plaza. | C · A | 0.9.1 |
 | REU-10 | Volver a subir el Listado después de una corrección no mueve a la persona: aparece como aviso «ocupa otra plaza o cargo». | C · A | 0.9.1 |
 
+### Plazas, egreso e interfaz (0.9.2)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| CNG-01 | Congelar una plaza con ocupante, con alguien por ingresar, con requisición abierta o «por regularizar» se rechaza con el motivo; una vacía se congela y descongela con motivo. El modal de acciones explica por qué no se puede. | H · A | 0.9.2 |
+| CNG-02 | Carga masiva de plantilla: pedir más «Congeladas» que plazas vacías da error en la fila y no aplica nada. | C · A | 0.9.2 |
+| CNG-03 | Confirmar un ingreso en una plaza congelada se rechaza. | C · A | 0.9.2 |
+| EGR-03 | Egreso: sin escribir el nombre, o con otro nombre, se rechaza; mayúsculas, acentos y espacios de más no importan. Con «Congelar la plaza» exige motivo y la plaza queda congelada (si tiene requisición abierta, se rechaza todo). | H · A | 0.9.2 |
+| EGR-04 | Anular egreso: solo GH, motivo y nombre obligatorios; la persona vuelve a su plaza con la misma fecha de ingreso; la plaza congelada al egresar se descongela; sale `egreso.anulado` sin cédula; no se anula dos veces ni si otra persona ocupa o tiene por ingresar la plaza, ni con requisición abierta. | H · A | 0.9.2 |
+| EGR-05 | La base impide modificar un egreso anulado y, al anular, cambiar otro dato que no sea el estado y los datos de la anulación. | C · A | 0.9.2 |
+| PL-13 | Un puesto con todas sus plazas cerradas no se dibuja en el organigrama ni en «Ver: Cargos»; uno que nunca tuvo plazas (Presidente) sí. Desactivar «creado por error» exige motivo y queda en el historial. | H · A | 0.9.2 |
+| UI-06 | Acciones de una plaza y «Regularizar» se abren en un modal propio, completas, en escritorio y móvil (nada se corta). | H | 0.9.2 |
+| UI-07 | Al guardar desde un modal en una lista filtrada (Plantilla, Empleados, Por regularizar) o desde el diagrama, se vuelve a la misma vista con los mismos filtros y el modal abierto. | H · A | 0.9.2 |
+| UI-08 | Al guardar, si tarda, aparece la «O» con «Guardando…» por encima del modal y el botón queda deshabilitado; con «Atrás» del navegador desaparece. | C | 0.9.2 |
+
 ## 10d. Postulados con análisis de CV por IA (0.9.0)
 
 | ID | Prueba | Tipo | Origen |
@@ -253,3 +268,4 @@ antes funcionaba.
 | 0.8.0 | 20-11-2026 | H + nuevas (SEG-08, SEL-04, ING-01 a 06, LIM-01, PF-10) | Pasa. Copia de la base de EasyPanel con los Excel de organigramas cargados: migración 013 sin errores, limpieza de prueba (5 requisiciones, 3 candidatos, 1 ingreso, avisos) con historial encadenado intacto, flujo completo de ingreso; instalación desde cero (13 migraciones); humo 0.7.12 sin regresiones; escritorio y móvil sin errores JS. No probado: EasyPanel, envío real a n8n. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.0 | 20-11-2026 | H + nuevas (EMP, IMP, REG, EGR, ORG, LIM-02, IA-01 a 07, EV-05) | Pasa. Copia de la base de EasyPanel (0.8.0) → migraciones 014 y 015 sin errores; importación del Listado real en la copia (252 personas, 66 por regularizar, 106 pendientes, idempotente); 50 pruebas de servicio, 38 de pantallas (escritorio y móvil, sin errores JS), 5 de alcance del organigrama, 3 de seguridad; código de los nodos de n8n probado fuera de n8n; envío de eventos a dos webhooks simulados (cv.* al de IA, el resto al general). Instalación desde cero (15 migraciones). Regresión: 0.8.0 (23/23) por la ruta de actualización, 0.7.12 (18/18) y humo de requisiciones en instalación nueva. No probado: EasyPanel, n8n real con un modelo (IA-08), imprimir/PDF, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.1 | 23-11-2026 | Nuevas REU-01 a 10 + INS-01/02 + LIM-01 | Pasa. Base 0.9.0 con estructura de Tecnología y un Listado FICTICIOS cargados con el código 0.9.0 → migración 016 sin errores; 16 pruebas de servicio (ruta de actualización e instalación desde cero, 16 migraciones); pantallas en escritorio y móvil (corrección, intercambio, traslado con supervisor sugerido, error sin fecha), sin errores JS. `limpiar -- transacciones` se detiene si hay traslados reales. No probado: la base real de EasyPanel (no hubo volcado), EasyPanel, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.9.2 | 23-11-2026 | Nuevas CNG, EGR-03 a 05, PL-13, UI-06 a 08 + regresión REU (0.9.1) + INS-01/02 | Pasa. Base 0.9.1 con datos ficticios → migración 017 sin errores; 13 pruebas de servicio; regresión 0.9.1 (16/16) por la ruta 0.9.0 → 0.9.2 y en instalación desde cero (17 migraciones); pantallas en escritorio y móvil (acciones de plaza, egreso con nombre, anular, regularizar, «O» de carga en claro y oscuro, volver a la vista en Plantilla y en el diagrama), sin errores JS. No probado: EasyPanel, envío real de `egreso.anulado` a n8n, restaurar la posición de desplazamiento, «Atrás» con la «O» puesta, anular con requisición abierta, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |

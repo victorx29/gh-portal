@@ -1,11 +1,12 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 23-11-2026, contra el código `gh-portal` 0.9.1 (package.json 0.9.1, migraciones 001–016).
+Última revisión: 23-11-2026, contra el código `gh-portal` 0.9.2 (package.json 0.9.2, migraciones 001–017).
 
 ## Versión
-- **Última entregada:** 0.9.1 (23-11-2026): reubicar a un empleado en otra plaza (corrección o traslado).
-- **Desplegada en EasyPanel (según Victor, 23-11-2026):** 0.9.0, con la importación del Listado aplicada **sin respaldo previo**.
-  Antes de desplegar la 0.9.1: respaldo completo de la base.
+- **Última entregada:** 0.9.2 (23-11-2026): reglas de congelar, egreso con confirmación por nombre, anular egreso, puesto creado
+  por error, acciones en modal, volver a la misma vista y la «O» de carga.
+- **Desplegada en EasyPanel:** 0.9.1 (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
+  reubicados por Victor). La importación de la 0.9.0 se aplicó sin respaldo previo: respaldo antes de cada despliegue.
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
   0.7.12 subida a GitHub (commit «Update 0.7.12»). (confirmar despliegue de 0.7.12 y 0.7.13)
 - **Probada:** 0.7.11 y 0.7.12 por Claude en entorno aislado (PostgreSQL 16 real, navegador de escritorio y móvil):
@@ -66,6 +67,12 @@
   la anterior queda «movido» el día antes). Formulario → revisar → confirmar; la plaza «por regularizar» que queda vacía se
   cierra sola con motivo; supervisor: mantener, el sugerido por la plantilla o ninguno. Acceso desde la ficha y desde
   «Plazas por regularizar». Migración 016.
+- **0.9.2:** solo se congela una plaza vacía (sin ocupante, ingreso ni requisición abierta; tampoco «por regularizar»), también
+  en la carga masiva; no se confirma un ingreso en una plaza congelada; egreso con confirmación escribiendo el nombre y casilla
+  «congelar la plaza al quedar vacía»; anular egreso (motivo + nombre, solo con la plaza libre; descongela; evento
+  `egreso.anulado`); el organigrama no dibuja puestos con todas sus plazas cerradas; desactivar puesto con «creado por error»;
+  acciones de plaza y «Regularizar» en modal propio; al guardar se vuelve a la misma vista (filtros, modal y posición);
+  indicador de carga con la «O» del logo. Migración 017.
 
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
@@ -73,17 +80,18 @@
   Probados en una copia de la base de EasyPanel. Son para validar el sistema con GH: la plantilla 2027 cambiará.
 - Fuera de esta carga: Silos de Portuguesa, Corpomax y F21 (sin organigrama ni unidades).
 
-## Pendiente para la 0.9.2 (Victor quiere definirlo bien antes; nada decidido)
-- Tres hallazgos de plazas de la 0.9.0: regularizar un cargo nuevo ¿pasa por aprobación? (el 18-11 se decidió «con soporte
-  escrito, sin aprobación»: probablemente ya está cerrado); no congelar una plaza ocupada; no confirmar un ingreso en una
-  plaza congelada.
-- La Directora de Finanzas quedó fuera por la regla «APB/ARO GROUP» y su cargo sale vacante: ¿regla o alta manual?
-- Anular un egreso registrado por error (encaja en el módulo de egreso que Victor va a detallar).
-- Alta manual de un empleado por GH sin requisición (con plaza y soporte, como «por regularizar»).
-- Datos: equivalencia «Analista de Software» → GH-PF-003 (no GH-PF-004) en `4-equivalencias-para-cargar.xlsx`; nombre del
-  perfil «Analista de Calidad de Sofware»; plaza de telecomunicaciones (mover el puesto y regularizar; HC 12 frente a 11).
-- Después de la carga inicial: sin Excel en el día a día (equivalencias solo para la carga inicial; reportería en vistas;
-  exportación puntual solo GH y registrada). Versiones propias antes de la 1.0.
+## Pendiente para la 0.9.3 y siguientes (antes de la 1.0)
+- **0.9.3 Alta manual de un empleado por GH** (sin requisición, con plaza, motivo y soporte). Primer caso: la Directora de
+  Finanzas, que atiende APB y ARO: se registra por separado en cada instalación, sin vínculo entre ambas. Falta el dato:
+  qué empresa paga su nómina en APB. La regla de exclusión «APB/ARO GROUP» de la importación se mantiene.
+- Datos (en el portal, sin código): plaza de telecomunicaciones de Jose Gabriel Barreto ya regularizada (confirmar quién);
+  cerrar las 2 plazas que sobran de Analista de Servicios Tecnológicos en la Gerencia de Tecnología si el organigrama oficial
+  no las tiene; desactivar el puesto «Analista de Software» de la Dirección de Tecnología como «creado por error»;
+  razón social de CIM en Empresas (las cajas muestran «CIM»); nombre del perfil «Analista de Calidad de Sofware»;
+  equivalencia «Analista de Software» → GH-PF-003 en `4-equivalencias-para-cargar.xlsx`.
+- Visto en la 0.9.2 y sin decidir: cerrar una plaza ocupada (a mano o con la carga masiva) hoy se permite y deja a la persona
+  en una plaza cerrada. Propuesta: misma regla que congelar.
+- Después: módulo de egreso (Victor lo detallará), reportería en vistas y exportación puntual solo GH.
 
 ## Pendiente sin clasificar
 - Propuesto en 0.7.9 y sin clasificar: arrastrar y soltar cajas en el diagrama, con «Deshacer».
@@ -135,6 +143,13 @@
 - Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
   nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
 
+## Decisiones del 23-11-2026 (Victor), continuación
+- Congelar = la plaza existe pero no se autoriza usarla ni pedir su requisición: solo una plaza vacía.
+- Egreso: confirmación escribiendo el nombre de la persona. Anular egreso: solo con motivo y confirmación por nombre.
+- Directora de Finanzas: atiende APB y ARO; se registra por separado en cada instalación (alta manual, 0.9.3).
+- Un puesto creado por error no se borra: se desactiva marcado «creado por error» y no se dibuja.
+- Interfaz: toda acción que cambia datos se abre en modal; al guardar se vuelve a la misma vista; «O» del logo como carga.
+
 ## Decisiones del 23-11-2026 (Victor)
 - Reubicar: dos tipos, «Corrección» (error de carga, no cuenta como movimiento) y «Traslado» (real, con fecha); solo GH,
   con motivo; el historial conserva la plaza anterior. La plaza «por regularizar» que queda vacía se cierra sola.
@@ -154,7 +169,7 @@
 - Consultas en paralelo sobre la misma transacción (aviso de pg en el log; dejará de funcionar con pg 9):
   `requisiciones.js` (detalleEvento), `perfiles.js` (carga masiva), `plantilla.js` (carga masiva). Para la
   versión de estabilización; no actualizar pg a la 9 antes. (El código nuevo de la 0.9.0 ya no lo hace.)
-- 0.9.0, para después: no hay forma de anular un egreso registrado por error (reubicar quedó resuelto en la 0.9.1); el registro de consultas de fichas
+- 0.9.0, para después (anular egreso y reubicar quedaron resueltos en la 0.9.2 y la 0.9.1): el registro de consultas de fichas
   no tiene disparador contra borrado; la API de n8n no limita intentos por minuto; índice en
   `relacion_laboral.supervisor_id` cuando crezca la base.
 - Una excepción «Reporta a» puesta después de una línea punteada hacia ese mismo puesto deja las dos líneas
@@ -176,8 +191,8 @@
   (aprobación por estructura, reserva de plazas, nada se borra, rechazo de usuarios no registrados).
 - **0.8 y 0.9: entregadas en la 0.9.0.** Pendiente de la 0.8.2: enlace usuario ↔ ficha de empleado (no entró).
 - **0.9.1 (entregada):** reubicar empleados (corrige el organigrama tras la importación).
-- **0.9.2** Por definir con Victor (ver «Pendiente para la 0.9.2»). Después, versiones propias antes de la 1.0: alta manual
-  por GH, módulo de egreso, reportería y exportación.
+- **0.9.2 (entregada).** **0.9.3:** alta manual por GH. Después, versiones propias antes de la 1.0: módulo de egreso,
+  reportería y exportación.
 - **1.0** Notificaciones, plantillas y SSO Microsoft 365 (enlace por `oid`, sin alta automática, rechazo de
   cuentas no registradas) = salida a producción.
 - **Después:** instalación ARO.

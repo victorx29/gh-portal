@@ -42,7 +42,10 @@ r.post('/config/plantilla/puesto/:id/mover', w(async (req, res) => {
 }));
 r.post('/config/plantilla/puesto/:id/funcional', hacer(req => PL.agregarFuncional(req.user, +req.params.id, req.body.funcional_de, req.body.motivo), 'Dependencia funcional agregada', req => aPuesto(req.params.id)));
 r.post('/config/plantilla/funcional/:id/cerrar', hacer(async req => aPuesto(await PL.cerrarFuncional(req.user, +req.params.id, req.body.motivo)), 'Dependencia funcional cerrada con fecha de hoy', '/config/plantilla'));
-r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id), 'Puesto desactivado', req => aPuesto(req.params.id)));
+r.post('/config/plantilla/puesto/:id/desactivar', hacer(req => PL.desactivarPuesto(req.user, +req.params.id, req.body), 'Puesto desactivado', req => aPuesto(req.params.id)));
+// Acciones de una plaza en su propio modal (0.9.2): congelar, cambiar empresa, cerrar
+r.get('/config/plazas/:id(\\d+)/acciones', w(async (req, res) => modal(req, res, 'plaza_acciones', { title: 'Acciones de la plaza', nav: 'config', sub: 'plantilla',
+  z: await PL.plazaAcciones(+req.params.id), empresas: (await q('select id, siglas, coalesce(razon_social,nombre) mostrar from empresa where activa order by 3')).rows })));
 r.post('/config/plazas/:id/congelar', hacer(async req => aPuesto(await PL.congelar(req.user, +req.params.id, req.body.on === '1', req.body.motivo)), 'Plaza actualizada', '/config/plantilla'));
 r.post('/config/plazas/:id/empresa', hacer(async req => aPuesto(await PL.cambiarEmpresaPlaza(req.user, +req.params.id, req.body.empresa_id, req.body.motivo)), 'Empresa de la plaza actualizada', '/config/plantilla'));
 r.post('/config/plazas/:id/cerrar', hacer(async req => aPuesto(await PL.cerrarPlaza(req.user, +req.params.id, req.body.motivo)), 'Plaza cerrada con fecha de hoy', '/config/plantilla'));

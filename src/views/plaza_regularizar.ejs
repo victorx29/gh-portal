@@ -1,0 +1,6 @@
+<div class="mh"><div><h2>Regularizar <%= z.codigo %></h2><p class="sub"><%= z.perfil %> <small class="mu"><%= z.perfil_codigo %></small> · <%= z.unidad %> · <%= z.empresa || 'Empresa por definir' %> · <%= z.ocupante || 'sin ocupante' %></p></div>
+<button type="button" class="btn" data-close>Cerrar</button></div>
+<p class="sub">Después de regularizarla, la plaza cuenta en el HC autorizado y admite reemplazo. El perfil debe tener su descripción.</p>
+<form method="post" action="/config/plazas/<%= z.id %>/regularizar"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<label for="rg-a">Quién la autorizó y soporte</label><input id="rg-a" name="autorizado" required placeholder="Presidencia, correo del 20-11-2026">
+<p class="act"><a class="btn" href="/config/plantilla/puesto/<%= z.puesto_id %>" data-modal>Ver puesto</a> <button class="btn p">Regularizar</button></p></form>

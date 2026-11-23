@@ -66,9 +66,30 @@
     el.hidden = !f || !v.split('|').includes(val);
   });
   async function abrir(url, target) {
-    const r = await fetch(url, { headers: { 'X-Modal': '1' }, credentials: 'same-origin' });
-    if (!r.ok) { if (target === dlg) location.href = url; return; }
-    target.innerHTML = await r.text(); buscadores(target); unidades(target); perfilesPuesto(target); cond(target); if (!target.open) target.showModal();
+    const t = setTimeout(() => cargando(true), 300);   // si tarda, la «O» de carga
+    try {
+      const r = await fetch(url, { headers: { 'X-Modal': '1' }, credentials: 'same-origin' });
+      if (!r.ok) { if (target === dlg) location.href = url; return; }
+      target.innerHTML = await r.text(); target.dataset.url = url; buscadores(target); unidades(target); perfilesPuesto(target); cond(target); if (!target.open) target.showModal();
+    } finally { clearTimeout(t); cargando(false); }
+  }
+  // ---- Indicador de carga (0.9.2): la «O» del logo girando, por encima de todo (también de los modales) ----
+  let veloT = null;
+  function cargando(on) {
+    let v = d.getElementById('gh-carga');
+    if (on && !v) { v = d.createElement('dialog'); v.id = 'gh-carga'; v.className = 'carga'; v.setAttribute('aria-label', 'Cargando');
+      v.innerHTML = '<span class="carga-o" aria-hidden="true"></span><span class="carga-t" role="status">Guardando…</span>'; v.oncancel = e => e.preventDefault(); d.body.appendChild(v); }
+    if (!v) return;
+    if (on) { if (!v.open) v.showModal(); } else if (v.open) v.close();
+  }
+  // ---- Al guardar, volver a la misma vista (0.9.2): filtros, modal abierto y posición ----
+  // Cada formulario POST de una página abierta con GET lleva _volver = la dirección actual (sin el modal); el servidor la usa al redirigir.
+  const esGet = d.body && d.body.dataset.get === '1';
+  function marcarVolver(f) {
+    if ((f.getAttribute('method') || '').toLowerCase() !== 'post' || f.hasAttribute('data-sin-volver') || !esGet || f.querySelector('input[name="_volver"]')) return;
+    const u = new URL(location.href); u.searchParams.delete('modal'); u.searchParams.delete('abrir');
+    const h = d.createElement('input'); h.type = 'hidden'; h.name = '_volver'; h.value = u.pathname + u.search; f.appendChild(h);
+    try { sessionStorage.setItem('gh.pos', JSON.stringify({ p: u.pathname + u.search, y: scrollY, m: dlg && dlg.open ? dlg.scrollTop : 0, en: Date.now() })); } catch (e) {}
   }
   window.ghAbrir = url => abrir(url, dlg);   // lo usa el diagrama de estructura
   window.ghIniciar = el => { buscadores(el); unidades(el); perfilesPuesto(el); cond(el); };   // panel de edición del diagrama
@@ -135,10 +156,23 @@
     e.preventDefault();
     confirmar(src.dataset.confirm, src.dataset.ok, src.hasAttribute('data-peligro')).then(ok => { if (ok) { confirmados.add(f); f.requestSubmit(b || undefined); } });
   }, true);
+  d.addEventListener('submit', e => {
+    if (e.defaultPrevented) return;
+    const f = e.target; marcarVolver(f);
+    if ((f.getAttribute('method') || '').toLowerCase() !== 'post') return;
+    setTimeout(() => f.querySelectorAll('button, input[type=submit]').forEach(b => { b.disabled = true; }), 0);   // después: el botón pulsado aún viaja con el formulario
+    clearTimeout(veloT); veloT = setTimeout(() => cargando(true), 250);
+  });
+  // Al volver con «Atrás» la página puede salir de la caché con el velo puesto
+  window.addEventListener('pageshow', () => { clearTimeout(veloT); cargando(false); d.querySelectorAll('button[disabled]').forEach(b => { b.disabled = false; }); });
   cond(d); buscadores(d);
   // Volver a abrir el modal tras guardar: ?abrir=<id requisición> o ?modal=/ruta/interna
   const qs = new URLSearchParams(location.search), ab = qs.get('abrir'), md = qs.get('modal');
-  if (ab && dlg) abrir('/requisiciones/' + encodeURIComponent(ab), dlg);
-  else if (md && dlg && /^\/[a-z]/.test(md) && !md.startsWith('//')) abrir(md, dlg);
+  let pos = null; try { pos = JSON.parse(sessionStorage.getItem('gh.pos') || 'null'); sessionStorage.removeItem('gh.pos'); } catch (e) {}
+  const u0 = new URL(location.href); u0.searchParams.delete('modal'); u0.searchParams.delete('abrir');
+  if (pos && Date.now() - pos.en < 30000 && pos.p === u0.pathname + u0.search) scrollTo(0, pos.y); else pos = null;
+  const alModal = () => { if (pos && pos.m && dlg.open) dlg.scrollTop = pos.m; };
+  if (ab && dlg) abrir('/requisiciones/' + encodeURIComponent(ab), dlg).then(alModal);
+  else if (md && dlg && /^\/[a-z]/.test(md) && !md.startsWith('//')) abrir(md, dlg).then(alModal);
   if ((ab || md) && history.replaceState) { qs.delete('abrir'); qs.delete('modal'); history.replaceState(null, '', location.pathname + (qs.toString() ? '?' + qs : '')); }
 })();

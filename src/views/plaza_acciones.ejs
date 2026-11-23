@@ -1,0 +1,21 @@
+<% const fd = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—', hid = '<input type="hidden" name="_csrf" value="' + csrf + '">', ESTADOS = { vigente: 'Vigente', congelada: 'Congelada', proyectada: 'Proyectada', cerrada: 'Cerrada' }; %>
+<div class="mh"><div><h2>Plaza <%= z.codigo %></h2><p class="sub"><%= z.perfil %> · <%= z.unidad %> (<%= z.unidad_codigo %>) · <%= z.empresa_id ? (z.siglas || z.empresa) : 'Empresa por definir' %> · <%= ESTADOS[z.estado] %></p></div>
+<button type="button" class="btn" data-close>Cerrar</button></div>
+<p class="sub">Ocupante: <%= z.ocupantes.length ? z.ocupantes.map(o => o.nombre + (o.estado === 'por_ingresar' ? ' (por ingresar)' : ' desde ' + fd(o.fecha_ingreso))).join(' · ') : 'nadie' %><%= z.req ? ' · Requisición abierta: ' + z.req.codigo : '' %></p>
+<% if (z.estado === 'cerrada') { %><p class="empty">La plaza está cerrada: no admite cambios.</p><% } else { %>
+<section class="blk"><h3><%= z.congelada ? 'Descongelar' : 'Congelar' %></h3>
+<% if (!z.congelada && z.noCongelable) { %><p class="flash" role="status">No se puede congelar: <%= z.noCongelable %>.</p>
+<% } else { %><p class="sub"><%= z.congelada ? 'La plaza vuelve a estar disponible para pedir su requisición.' : 'La plaza sigue existiendo, pero no se autoriza usarla ni pedir su requisición. Solo se congela una plaza vacía.' %></p>
+<form method="post" action="/config/plazas/<%= z.id %>/congelar"><%- hid %><input type="hidden" name="on" value="<%= z.congelada ? '0' : '1' %>">
+<label for="pa-m1">Motivo</label><input id="pa-m1" name="motivo" required placeholder="<%= z.congelada ? 'Presupuesto aprobado para 2027' : 'Reestructuración del área: no se repone por ahora' %>">
+<p class="act"><button class="btn p"><%= z.congelada ? 'Descongelar' : 'Congelar' %></button></p></form><% } %></section>
+<section class="blk"><h3>Empresa de nómina</h3>
+<% if (z.req) { %><p class="sub">La empresa se cambia desde la requisición <%= z.req.codigo %>.</p><% } else { %>
+<form method="post" action="/config/plazas/<%= z.id %>/empresa" data-confirm="¿Cambiar la empresa de nómina de esta plaza? Queda registrado con su motivo." data-ok="Cambiar empresa"><%- hid %>
+<div class="g2"><div><label for="pa-e">Empresa</label><select id="pa-e" name="empresa_id"><option value="">Por definir</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= z.empresa_id === e.id ? ' selected' : '' %>><%= e.mostrar %></option><% }) %></select></div>
+<div><label for="pa-m2">Motivo</label><input id="pa-m2" name="motivo" required placeholder="La nómina la paga MDV"></div></div>
+<p class="act"><button class="btn">Cambiar empresa</button></p></form><% } %></section>
+<section class="blk"><h3>Cerrar la plaza</h3><p class="sub">Es definitivo: queda en el historial y no se puede reabrir.</p>
+<form method="post" action="/config/plazas/<%= z.id %>/cerrar" data-confirm="Cerrar la plaza es definitivo: queda en el historial y no se puede reabrir." data-ok="Cerrar plaza" data-peligro><%- hid %>
+<label for="pa-m3">Motivo del cierre</label><input id="pa-m3" name="motivo" required placeholder="Plantilla sobrestimada: el organigrama oficial tiene dos analistas">
+<p class="act"><button class="btn d">Cerrar plaza</button></p></form></section><% } %>
