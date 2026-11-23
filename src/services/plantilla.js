@@ -197,8 +197,9 @@ async function regularizar(u, plazaId, autorizado) {
   });
 }
 const porRegularizar = () => q(`select z.id, z.codigo, z.desde, z.modalidad, coalesce(e.siglas, e.razon_social) empresa, p.id puesto_id, pf.codigo perfil_codigo, pf.nombre perfil, un.codigo unidad_codigo, un.nombre unidad,
-    (select t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=z.id and r.estado='activo' limit 1) ocupante
+    oc.nombres ocupante, oc.trabajador_id ocupante_id, oc.id ocupante_rel
   from plaza z join puesto p on p.id=z.puesto_id join perfil pf on pf.id=p.perfil_id join unidad un on un.id=p.unidad_id left join empresa e on e.id=z.empresa_id
+  left join lateral (select r.id, r.trabajador_id, t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=z.id and r.estado='activo' limit 1) oc on true
   where z.por_regularizar and (z.hasta is null or z.hasta > current_date) order by un.codigo, pf.nombre, z.codigo`).then(r => r.rows);
 // ---------- Dependencia funcional entre puestos (línea punteada; no cambia el reporte ni la aprobación) ----------
 async function agregarFuncional(u, puestoId, deId, motivo) {

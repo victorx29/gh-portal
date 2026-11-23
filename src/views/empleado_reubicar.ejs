@@ -1,0 +1,40 @@
+<% const fd = s => !s ? '—' : String(s).slice(0, 10).split('-').reverse().join('/'); %>
+<% if (paso === 'form') { const rl = o.rl; %>
+<div class="mh"><div><h2>Reubicar a <%= rl.nombres %></h2><p class="sub">Hoy: <%= rl.cargo %> · <%= rl.unidad || '—' %> · plaza <%= rl.plaza_codigo || '—' %><%= rl.plaza_por_regularizar ? ' (por regularizar)' : '' %> · <%= rl.empresa || '—' %></p></div>
+<a class="btn" href="/empleados/<%= rl.trabajador_id %>" data-modal>Volver</a></div>
+<form method="post" action="/empleados/relacion/<%= rl.id %>/reubicar/revisar"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<fieldset><legend>¿Qué pasó?</legend>
+<label class="chk"><input type="radio" name="tipo" value="correccion" checked>Corrección: quedó en la plaza equivocada (por ejemplo, en la carga inicial). Conserva su fecha de ingreso; no cuenta como movimiento.</label>
+<label class="chk"><input type="radio" name="tipo" value="traslado">Traslado: cambió de plaza en una fecha. La plaza actual termina el día antes.</label></fieldset>
+<div data-when="tipo=correccion"><label for="rb-pc">Plaza correcta</label>
+<select id="rb-pc" name="plaza_correccion" data-buscar><option value="">Selecciona la plaza</option>
+<% if (o.vacantes.length) { %><optgroup label="Vacantes"><% o.vacantes.forEach(z => { %><option value="<%= z.id %>" data-a="<%= z.id %>" data-t="<%= z.codigos %>"><%= z.etiqueta %></option><% }) %></optgroup><% } %>
+<% if (o.ocupadas.length) { %><optgroup label="Ocupadas: se intercambian las dos personas"><% o.ocupadas.forEach(z => { %><option value="<%= z.id %>" data-a="<%= z.id %>" data-t="<%= z.codigos %>"><%= z.etiqueta %> — ocupada por <%= z.ocupante %></option><% }) %></optgroup><% } %>
+</select>
+<p class="sub">Si eliges una plaza ocupada, quien la ocupa pasa a la plaza actual de <%= rl.nombres %> (los dos casos se corrigen).</p></div>
+<div data-when="tipo=traslado" hidden><div class="g2"><div><label for="rb-pt">Plaza destino (vacante)</label>
+<select id="rb-pt" name="plaza_traslado" data-buscar><option value="">Selecciona la plaza</option><% o.vacantes.forEach(z => { %><option value="<%= z.id %>" data-a="<%= z.id %>" data-t="<%= z.codigos %>"><%= z.etiqueta %></option><% }) %></select></div>
+<div><label for="rb-f">Fecha del traslado</label><input id="rb-f" name="fecha" type="date"></div></div></div>
+<% if (!o.vacantes.length && !o.ocupadas.length) { %><p class="empty">No hay plazas disponibles: las vacantes deben estar vigentes, sin congelar, autorizadas y sin requisición abierta.</p><% } %>
+<label for="rb-m">Motivo</label><input id="rb-m" name="motivo" required placeholder="Error de carga: su cargo es Analista de Calidad de Software, confirmado con GH">
+<p class="act"><button class="btn p">Revisar</button></p></form>
+<p class="sub">Solo aparecen plazas vigentes, sin congelar, autorizadas (no «por regularizar») y sin requisición ni ingreso en curso. Si la plaza correcta no existe, créala o mueve su puesto en Plantilla y vuelve aquí.</p>
+<% } else { const rl = p.rl, z = p.z; %>
+<div class="top"><div><p class="crumb"><a href="/empleados">Empleados</a> <span aria-hidden="true">›</span> Revisar reubicación</p><h1>Revisar reubicación</h1><p class="sub"><%= TIPOS[p.tipo] %> · todavía no se ha guardado nada.</p></div></div>
+<% p.avisos.forEach(a => { %><p class="flash<%= a.alerta ? ' err' : '' %>" role="<%= a.alerta ? 'alert' : 'status' %>"><%= a.txt %></p><% }) %>
+<section class="blk"><h3><%= rl.nombres %></h3><table class="kv">
+<tr><th>Hoy</th><td><%= rl.cargo %> · <%= rl.unidad || '—' %> · plaza <%= rl.plaza_codigo || '—' %><%= rl.plaza_por_regularizar ? ' (por regularizar)' : '' %> · <%= rl.empresa || '—' %></td></tr>
+<tr><th>Pasa a</th><td><%= z.perfil %> · <%= z.unidad %> (<%= z.unidad_codigo %>) · plaza <%= z.codigo %> · <%= z.empresa || 'Empresa por definir' %></td></tr>
+<tr><th>Fecha</th><td><%= p.tipo === 'traslado' ? 'Desde el ' + fd(p.fecha) + '; la plaza actual termina el ' + fd(p.finAnterior) : 'Conserva su fecha de ingreso (' + fd(p.ingreso) + '): a cualquier fecha aparece en la plaza correcta' %></td></tr>
+<% if (p.otro) { %><tr><th>Intercambio</th><td><%= p.otro.nombres %> (hoy en <%= z.codigo %>) pasa a la plaza <%= rl.plaza_codigo %> y conserva su supervisor.</td></tr><% } %>
+<tr><th>Plaza <%= rl.plaza_codigo || '' %></th><td><%= p.otro ? 'La ocupa ' + p.otro.nombres : p.cierra ? 'Queda vacía y, por ser «por regularizar», se cierra sola con motivo' : 'Queda vacante' %></td></tr>
+<tr><th>Motivo</th><td><%= p.motivo %></td></tr></table></section>
+<form method="post" action="/empleados/relacion/<%= rl.id %>/reubicar" data-confirm="<%= TIPOS[p.tipo] %>: <%= rl.nombres %> pasa a la plaza <%= z.codigo %>. Queda en el historial y no se deshace desde el portal." data-ok="Reubicar">
+<input type="hidden" name="_csrf" value="<%= csrf %>"><% ['tipo', 'plaza_correccion', 'plaza_traslado', 'fecha', 'motivo'].forEach(k => { %><input type="hidden" name="<%= k %>" value="<%= b[k] || '' %>"><% }) %>
+<fieldset><legend>Supervisor inmediato</legend>
+<% const sug = p.sugerido && p.sugerido.id !== rl.supervisor_id ? p.sugerido : null, porSug = sug && p.tipo === 'traslado'; %>
+<label class="chk"><input type="radio" name="supervisor" value="mantener"<%= porSug ? '' : ' checked' %>>Mantener: <%= rl.supervisor_nombre || rl.supervisor_texto || 'sin supervisor' %></label>
+<% if (sug) { %><label class="chk"><input type="radio" name="supervisor" value="<%= sug.id %>"<%= porSug ? ' checked' : '' %>><%= sug.nombres %> (ocupa el puesto al que reporta la plaza <%= z.codigo %>)</label><% } %>
+<label class="chk"><input type="radio" name="supervisor" value="ninguno">Ninguno</label></fieldset>
+<p class="act"><a class="btn" href="/empleados?estado=todos&modal=<%= encodeURIComponent('/empleados/relacion/' + rl.id + '/reubicar') %>">Cambiar</a> <button class="btn p">Reubicar</button></p></form>
+<% } %>

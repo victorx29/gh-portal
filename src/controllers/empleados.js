@@ -19,6 +19,24 @@ r.post('/empleados/relacion/:id(\\d+)/egreso', gh, w(async (req, res) => {
   res.redirect(t ? '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + t.trabajador_id) : '/empleados');
 }));
 
+// ---- Reubicar en otra plaza (0.9.1): formulario → revisar → confirmar ----
+const fichaDe = tid => '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + tid);
+const formReubicar = id => '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/relacion/' + id + '/reubicar');
+const errNegocio = (req, res, e, volver) => { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); res.redirect(volver); };
+r.get('/empleados/relacion/:id(\\d+)/reubicar', gh, w(async (req, res) => modal(req, res, 'empleado_reubicar', { title: 'Reubicar', nav: 'empleados', paso: 'form',
+  o: await EM.opcionesReubicar(req.user, +req.params.id), TIPOS: EM.TIPOS_REUBICACION })));
+r.post('/empleados/relacion/:id(\\d+)/reubicar/revisar', gh, w(async (req, res) => {
+  try { res.render('shell', { title: 'Revisar reubicación', nav: 'empleados', inner: 'empleado_reubicar', paso: 'revisar', p: await EM.revisarReubicacion(req.user, +req.params.id, req.body), b: req.body, TIPOS: EM.TIPOS_REUBICACION }); }
+  catch (e) { errNegocio(req, res, e, formReubicar(+req.params.id)); }
+}));
+r.post('/empleados/relacion/:id(\\d+)/reubicar', gh, w(async (req, res) => {
+  try {
+    const x = await EM.reubicar(req.user, +req.params.id, req.body);
+    flash(req, 'ok', 'Persona reubicada' + (x.intercambio ? '; ' + x.intercambio + ' pasó a su plaza anterior' : '') + (x.cerrada ? '. La plaza ' + x.cerrada + ' («por regularizar») quedó vacía y se cerró' : ''));
+    res.redirect(fichaDe(x.trabajador_id));
+  } catch (e) { errNegocio(req, res, e, formReubicar(+req.params.id)); }
+}));
+
 // ---- Importación del Listado de Activos ----
 const pagina = (req, res, extra) => {
   // Una vista previa vencida no se queda en la sesión (trae datos personales)

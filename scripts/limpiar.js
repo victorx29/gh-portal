@@ -29,7 +29,9 @@ async function transacciones(c) {
     avisos_n8n: +(await c.query('select count(*) from evento_outbox')).rows[0].count
   };
   // Movimientos internos de prueba: no se pueden deshacer solos
-  const movidos = (await c.query(`select count(*) from relacion_laboral where estado='movido' and origen<>'seleccion'`)).rows[0].count;
+  // (0.9.1) y los traslados («Reubicar») de personas que entraron por selección: la relación nueva no es de selección y quedaría huérfana
+  const movidos = (await c.query(`select count(*) from relacion_laboral where (estado='movido' and origen<>'seleccion')
+    or (origen<>'seleccion' and reubicada_desde in (select id from relacion_laboral where origen='seleccion'))`)).rows[0].count;
   if (+movidos) throw new Error(`Hay ${movidos} relación(es) reales cerradas por un movimiento interno: esta limpieza no las restaura. Revisa con TI`);
   if (!aplicar) return n;
   await sinTriggers(c, ['aprobacion', 'comentario', 'relacion_laboral', 'plaza', 'ia_analisis'], false);

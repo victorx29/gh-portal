@@ -1,9 +1,11 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 20-11-2026, contra el código `gh-portal` 0.9.0 (package.json 0.9.0, migraciones 001–015).
+Última revisión: 23-11-2026, contra el código `gh-portal` 0.9.1 (package.json 0.9.1, migraciones 001–016).
 
 ## Versión
-- **Última entregada:** 0.9.0 (20-11-2026): incluye 0.8.1, 0.8.2 y 0.9 en una sola entrega.
+- **Última entregada:** 0.9.1 (23-11-2026): reubicar a un empleado en otra plaza (corrección o traslado).
+- **Desplegada en EasyPanel (según Victor, 23-11-2026):** 0.9.0, con la importación del Listado aplicada **sin respaldo previo**.
+  Antes de desplegar la 0.9.1: respaldo completo de la base.
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
   0.7.12 subida a GitHub (commit «Update 0.7.12»). (confirmar despliegue de 0.7.12 y 0.7.13)
 - **Probada:** 0.7.11 y 0.7.12 por Claude en entorno aislado (PostgreSQL 16 real, navegador de escritorio y móvil):
@@ -58,6 +60,12 @@
   - 0.9 Postulados con IA: consentimiento, CV (PDF, Word o texto), análisis en n8n con rúbrica configurable
     (puntaje 0–5 por criterio, resumen, brechas, preguntas y alertas; puntaje orientativo 0–100), API protegida
     para n8n, flujo importable `n8n/gh-analisis-cv.json`. La IA no decide. Migración 015.
+- **0.9.1:** «Reubicar en otra plaza» (solo GH), para corregir a las personas que la importación dejó en la plaza
+  equivocada y para traslados reales. Corrección (conserva la fecha de ingreso; la relación anterior queda «corregida» y no
+  aparece en el organigrama a ninguna fecha; hacia una plaza ocupada intercambia a las dos personas) o Traslado (fecha real;
+  la anterior queda «movido» el día antes). Formulario → revisar → confirmar; la plaza «por regularizar» que queda vacía se
+  cierra sola con motivo; supervisor: mantener, el sugerido por la plantilla o ninguno. Acceso desde la ficha y desde
+  «Plazas por regularizar». Migración 016.
 
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
@@ -65,7 +73,19 @@
   Probados en una copia de la base de EasyPanel. Son para validar el sistema con GH: la plantilla 2027 cambiará.
 - Fuera de esta carga: Silos de Portuguesa, Corpomax y F21 (sin organigrama ni unidades).
 
-## Pendiente para la siguiente entrega
+## Pendiente para la 0.9.2 (Victor quiere definirlo bien antes; nada decidido)
+- Tres hallazgos de plazas de la 0.9.0: regularizar un cargo nuevo ¿pasa por aprobación? (el 18-11 se decidió «con soporte
+  escrito, sin aprobación»: probablemente ya está cerrado); no congelar una plaza ocupada; no confirmar un ingreso en una
+  plaza congelada.
+- La Directora de Finanzas quedó fuera por la regla «APB/ARO GROUP» y su cargo sale vacante: ¿regla o alta manual?
+- Anular un egreso registrado por error (encaja en el módulo de egreso que Victor va a detallar).
+- Alta manual de un empleado por GH sin requisición (con plaza y soporte, como «por regularizar»).
+- Datos: equivalencia «Analista de Software» → GH-PF-003 (no GH-PF-004) en `4-equivalencias-para-cargar.xlsx`; nombre del
+  perfil «Analista de Calidad de Sofware»; plaza de telecomunicaciones (mover el puesto y regularizar; HC 12 frente a 11).
+- Después de la carga inicial: sin Excel en el día a día (equivalencias solo para la carga inicial; reportería en vistas;
+  exportación puntual solo GH y registrada). Versiones propias antes de la 1.0.
+
+## Pendiente sin clasificar
 - Propuesto en 0.7.9 y sin clasificar: arrastrar y soltar cajas en el diagrama, con «Deshacer».
   Recomendación del asesor: dejarlo para después de la 1.0 (solo visual). (confirmar)
 
@@ -115,6 +135,11 @@
 - Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
   nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
 
+## Decisiones del 23-11-2026 (Victor)
+- Reubicar: dos tipos, «Corrección» (error de carga, no cuenta como movimiento) y «Traslado» (real, con fecha); solo GH,
+  con motivo; el historial conserva la plaza anterior. La plaza «por regularizar» que queda vacía se cierra sola.
+- La base de pruebas de la 0.9.1 iba a ser un volcado de EasyPanel; no llegó y se probó con datos ficticios.
+
 ## Decisiones abiertas
 - **Siglas o razón social en espacios cortos:** el código ya aplica razón social como nombre principal y
   siglas donde el espacio es corto (0.6, 0.6.1). Confirmar que es la decisión aprobada.
@@ -129,8 +154,7 @@
 - Consultas en paralelo sobre la misma transacción (aviso de pg en el log; dejará de funcionar con pg 9):
   `requisiciones.js` (detalleEvento), `perfiles.js` (carga masiva), `plantilla.js` (carga masiva). Para la
   versión de estabilización; no actualizar pg a la 9 antes. (El código nuevo de la 0.9.0 ya no lo hace.)
-- 0.9.0, para después: no hay forma de reubicar a un empleado importado en otra plaza (corregir una equivalencia
-  después de aplicar no lo mueve) ni de anular un egreso registrado por error; el registro de consultas de fichas
+- 0.9.0, para después: no hay forma de anular un egreso registrado por error (reubicar quedó resuelto en la 0.9.1); el registro de consultas de fichas
   no tiene disparador contra borrado; la API de n8n no limita intentos por minuto; índice en
   `relacion_laboral.supervisor_id` cuando crezca la base.
 - Una excepción «Reporta a» puesta después de una línea punteada hacia ese mismo puesto deja las dos líneas
@@ -151,7 +175,9 @@
 - 0.9.x Estabilización: sin funciones nuevas; hallazgos «Ahora» pendientes y pruebas automáticas mínimas
   (aprobación por estructura, reserva de plazas, nada se borra, rechazo de usuarios no registrados).
 - **0.8 y 0.9: entregadas en la 0.9.0.** Pendiente de la 0.8.2: enlace usuario ↔ ficha de empleado (no entró).
-- **0.9.1** Correcciones de GH sobre la 0.9.0 (equivalencias, pantallas, supuestos).
+- **0.9.1 (entregada):** reubicar empleados (corrige el organigrama tras la importación).
+- **0.9.2** Por definir con Victor (ver «Pendiente para la 0.9.2»). Después, versiones propias antes de la 1.0: alta manual
+  por GH, módulo de egreso, reportería y exportación.
 - **1.0** Notificaciones, plantillas y SSO Microsoft 365 (enlace por `oid`, sin alta automática, rechazo de
   cuentas no registradas) = salida a producción.
 - **Después:** instalación ARO.

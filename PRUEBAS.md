@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.0), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.1), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -187,6 +187,21 @@ antes funcionaba.
 | ORG-03 | El día del relevo (egreso y nuevo ingreso en la misma fecha) la plaza muestra solo a quien queda. | C | 0.9.0 |
 | LIM-02 | `npm run limpiar -- transacciones` también borra análisis de IA y CV; conserva los empleados importados y sus plazas. | C | 0.9.0 |
 
+### Reubicar en otra plaza (0.9.1)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| REU-01 | Reubicar es solo de GH: un gerente recibe 403 en el formulario, en «Revisar» y en «Reubicar» (también por URL directa). | H · A | 0.9.1 |
+| REU-02 | Corrección a una plaza vacante: «Revisar» no guarda nada; al confirmar, la relación anterior queda «Corregida», la nueva conserva la fecha de ingreso, toma el cargo del perfil de la plaza y la ficha muestra «Corrección desde la plaza …». | H · A | 0.9.1 |
+| REU-03 | La plaza «por regularizar» que queda vacía se cierra sola con motivo y sale de «Plazas por regularizar»; una plaza autorizada que queda vacía sigue vigente como vacante. | H · A | 0.9.1 |
+| REU-04 | Organigrama (Personas) después de una corrección: la persona aparece solo en la plaza correcta, nunca en la equivocada. | H | 0.9.1 |
+| REU-05 | Corrección hacia una plaza ocupada: se intercambian las dos personas; cada una conserva su fecha de ingreso y su supervisor si se elige «Mantener». | C · A | 0.9.1 |
+| REU-06 | Traslado: solo a una plaza vacante; fecha obligatoria, no futura y posterior al ingreso; la relación anterior queda «Movido» hasta el día antes; en una fecha anterior al traslado el organigrama la muestra en la plaza anterior. | H · A | 0.9.1 |
+| REU-07 | No se ofrece ni se acepta como destino una plaza cerrada, proyectada, congelada, «por regularizar», con requisición abierta o con alguien por ingresar. | C · A | 0.9.1 |
+| REU-08 | Empresa: plaza «Por definir» toma la de la persona (aviso informativo); plaza de otra empresa avisa el cambio antes de confirmar. | C | 0.9.1 |
+| REU-09 | Una relación corregida o movida no se modifica (la base lo impide) y no se puede reubicar otra vez; el historial registra «reubicar», «reubicado» y el cierre automático de la plaza. | C · A | 0.9.1 |
+| REU-10 | Volver a subir el Listado después de una corrección no mueve a la persona: aparece como aviso «ocupa otra plaza o cargo». | C · A | 0.9.1 |
+
 ## 10d. Postulados con análisis de CV por IA (0.9.0)
 
 | ID | Prueba | Tipo | Origen |
@@ -237,3 +252,4 @@ antes funcionaba.
 | 0.7.13 | 19-11-2026 | PF-09, CM-01 (perfiles) con la base copiada de EasyPanel + carga de organigramas | Pasa. Instalación desde cero (12 migraciones) y actualización sin migraciones; PF-04 (Word, vista previa); carga de organigramas aplicada en la copia: 214 plazas, 0 cierres. No probado: EasyPanel, formulario de perfil con una sola línea que lleva «;». | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.8.0 | 20-11-2026 | H + nuevas (SEG-08, SEL-04, ING-01 a 06, LIM-01, PF-10) | Pasa. Copia de la base de EasyPanel con los Excel de organigramas cargados: migración 013 sin errores, limpieza de prueba (5 requisiciones, 3 candidatos, 1 ingreso, avisos) con historial encadenado intacto, flujo completo de ingreso; instalación desde cero (13 migraciones); humo 0.7.12 sin regresiones; escritorio y móvil sin errores JS. No probado: EasyPanel, envío real a n8n. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.0 | 20-11-2026 | H + nuevas (EMP, IMP, REG, EGR, ORG, LIM-02, IA-01 a 07, EV-05) | Pasa. Copia de la base de EasyPanel (0.8.0) → migraciones 014 y 015 sin errores; importación del Listado real en la copia (252 personas, 66 por regularizar, 106 pendientes, idempotente); 50 pruebas de servicio, 38 de pantallas (escritorio y móvil, sin errores JS), 5 de alcance del organigrama, 3 de seguridad; código de los nodos de n8n probado fuera de n8n; envío de eventos a dos webhooks simulados (cv.* al de IA, el resto al general). Instalación desde cero (15 migraciones). Regresión: 0.8.0 (23/23) por la ruta de actualización, 0.7.12 (18/18) y humo de requisiciones en instalación nueva. No probado: EasyPanel, n8n real con un modelo (IA-08), imprimir/PDF, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.9.1 | 23-11-2026 | Nuevas REU-01 a 10 + INS-01/02 + LIM-01 | Pasa. Base 0.9.0 con estructura de Tecnología y un Listado FICTICIOS cargados con el código 0.9.0 → migración 016 sin errores; 16 pruebas de servicio (ruta de actualización e instalación desde cero, 16 migraciones); pantallas en escritorio y móvil (corrección, intercambio, traslado con supervisor sugerido, error sin fecha), sin errores JS. `limpiar -- transacciones` se detiene si hay traslados reales. No probado: la base real de EasyPanel (no hubo volcado), EasyPanel, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
