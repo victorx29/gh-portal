@@ -1,0 +1,16 @@
+<%- include('partials/head') %>
+<div class="top"><div><%- include('partials/crumb', { aqui: 'Conciliación' }) %><h1>Conciliación de personas y plazas</h1>
+<p class="sub">Personas activas en plazas «por regularizar» y las plazas vacantes autorizadas de su misma área que más se parecen a su cargo. El sistema solo sugiere: «Corregir aquí» abre la revisión y nada cambia hasta que confirmes. Úsala después de la carga inicial o de cargar una plantilla nueva.</p></div></div>
+<%- include('partials/config_nav') %>
+<div class="kpi"><div><small>Personas por conciliar</small><strong><%= c.personas.length %></strong></div><div><small>Con sugerencia</small><strong><%= c.conSugerencia %></strong></div><div><small>Vacantes sin sugerencia</small><strong><%= c.sinSugerencia.length %></strong></div></div>
+<% if (!c.personas.length) { %><div class="empty">No hay personas en plazas por regularizar.</div><% } else { %>
+<div class="tw"><table class="mid"><tr><th>Persona</th><th>Hoy</th><th>Plazas vacantes sugeridas</th></tr>
+<% c.personas.forEach(pe => { %><tr><td><a href="/empleados/<%= pe.trabajador_id %>" data-modal><b><%= pe.nombres %></b></a><br><small class="mu">Cargo en el Listado: <%= pe.cargo %></small></td>
+<td><%= pe.perfil %> · <%= pe.unidad %><br><small class="mu"><%= pe.plaza %> (por regularizar) · <%= pe.empresa || '—' %><%= pe.modalidad !== 'nomina' ? ' · ' + pe.modalidad : '' %></small></td>
+<td><% if (!pe.sugerencias.length) { %><span class="mu">Sin plaza parecida en su área: regularízala o revisa con «Reubicar».</span><% } %>
+<% pe.sugerencias.forEach(x => { %><form method="post" action="/empleados/relacion/<%= pe.rel_id %>/reubicar/revisar" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<input type="hidden" name="tipo" value="correccion"><input type="hidden" name="plaza_correccion" value="<%= x.z.id %>"><input type="hidden" name="motivo" value="Conciliación: en el Listado «<%= pe.cargo %>», corresponde a <%= x.z.perfil %>">
+<span><%= x.etiqueta %><%= x.empresaDistinta ? ' · otra empresa' : '' %></span> <button class="btn">Corregir aquí</button></form><% }) %>
+<a class="btn" href="/empleados/relacion/<%= pe.rel_id %>/reubicar" data-modal>Otras opciones</a></td></tr><% }) %></table></div><% } %>
+<% if (c.sinSugerencia.length) { %><details class="blk"><summary>Plazas vacantes sin persona sugerida (<%= c.sinSugerencia.length %>)</summary><ul><% c.sinSugerencia.forEach(z => { %><li><a href="/config/plantilla/puesto/<%= z.puesto_id %>" data-modal><%= z.etiqueta %></a></li><% }) %></ul></details><% } %>
+<%- include('partials/foot') %>

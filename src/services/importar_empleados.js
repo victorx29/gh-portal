@@ -120,6 +120,9 @@ async function procesar(c, filas, usr, aplicar, archivo) {
       continue;
     }
     if (!emp) { const k = limpio(f.empresa) || 'Sin empresa'; pend.estructura.set(k, (pend.estructura.get(k) || 0) + 1); continue; }   // empresa que el portal no tiene
+    // 0.9.3: una empresa sin estructura propia que entra por una equivalencia general (sin empresa) puede ser personal de otra
+    // unidad de negocio con un departamento de igual nombre (por ejemplo, «Administración» de SDP): se avisa antes de aplicar
+    if (!eqDep.empresa_id && !cx.conEstructura.has(emp.id)) aviso(f, `«${f.nombre}» (${emp.siglas || emp.nombre}) entra a una unidad corporativa por la equivalencia general «${limpio(f.departamento || f.direccion)}». Si su empresa no tiene estructura cargada, puede no ser personal corporativo: revísalo o crea una equivalencia para esa empresa`);
     if (!f.fecha_ingreso) aviso(f, `«${f.nombre}»: sin fecha de ingreso válida; queda vacía`);
     // Cargo → perfil: equivalencia, o nombre exacto; si no hay, se crea un perfil mínimo con ese nombre
     const cargo = limpio(f.cargo) || 'Sin cargo', eqC = busca(cx, 'cargo', emp.id, cargo);

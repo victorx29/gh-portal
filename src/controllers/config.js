@@ -28,7 +28,8 @@ r.post('/config/etapas/:id/quitar', guardado(async req => { await puedePipeline(
 
 // Maestros configurables (superadmin): nada de listas fijas en el código. Una pestaña por catálogo.
 const MAESTROS = { grados: ['grado_instruccion', 'Grados de instrucción', 'orden, nombre'], equipos: ['catalogo_equipo', 'Equipos', 'nombre'],
-  accesos: ['catalogo_acceso', 'Accesos a sistemas', 'nombre'], tipos: ['tipo_unidad', 'Tipos de unidad', 'nivel, nombre'], niveles: ['nivel_jerarquico', 'Niveles jerárquicos', 'orden, nombre'], divisiones: ['division', 'Divisiones', 'nombre'] };
+  accesos: ['catalogo_acceso', 'Accesos a sistemas', 'nombre'], tipos: ['tipo_unidad', 'Tipos de unidad', 'nivel, nombre'], niveles: ['nivel_jerarquico', 'Niveles jerárquicos', 'orden, nombre'], divisiones: ['division', 'Divisiones', 'nombre'],
+  ubicaciones: ['ubicacion', 'Ubicaciones', 'nombre'], tiposemp: ['tipo_empleado', 'Tipos de empleado', 'nombre'] };
 const volverM = m => '/config/maestros?m=' + (MAESTROS[m] ? m : 'grados');
 r.get('/config/maestros', sup, w(async (req, res) => {
   const m = MAESTROS[req.query.m] ? req.query.m : 'grados', [t, titulo, orden] = MAESTROS[m];
@@ -42,6 +43,7 @@ r.post('/config/maestros/:m', sup, w(async (req, res) => {
     let ins;
     if (req.params.m === 'equipos') ins = await q('insert into catalogo_equipo(nombre,requiere_linea) values($1,$2) on conflict do nothing', [n, req.body.requiere_linea === 'on']);
     else if (req.params.m === 'tipos') ins = await q('insert into tipo_unidad(nombre,nivel) values($1,$2) on conflict do nothing', [n, Math.min(999, Math.max(1, parseInt(req.body.nivel) || 50))]);
+    else if (req.params.m === 'tiposemp') ins = await q('insert into tipo_empleado(nombre,requiere_fin) values($1,$2) on conflict do nothing', [n, req.body.requiere_fin === 'on']);
     else if (req.params.m === 'niveles') ins = await q('insert into nivel_jerarquico(nombre,orden) values($1,(select coalesce(max(orden),0)+10 from nivel_jerarquico)) on conflict do nothing', [n]);   // entra al final; luego se sube
     else ins = await q(`insert into ${m[0]}(nombre) values($1) on conflict do nothing`, [n]);
     flash(req, ins.rowCount ? 'ok' : 'err', ins.rowCount ? 'Elemento agregado' : '«' + n + '» ya existe');

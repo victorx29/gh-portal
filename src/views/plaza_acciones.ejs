@@ -15,7 +15,7 @@
 <div class="g2"><div><label for="pa-e">Empresa</label><select id="pa-e" name="empresa_id"><option value="">Por definir</option><% empresas.forEach(e => { %><option value="<%= e.id %>"<%= z.empresa_id === e.id ? ' selected' : '' %>><%= e.mostrar %></option><% }) %></select></div>
 <div><label for="pa-m2">Motivo</label><input id="pa-m2" name="motivo" required placeholder="La nómina la paga MDV"></div></div>
 <p class="act"><button class="btn">Cambiar empresa</button></p></form><% } %></section>
-<section class="blk"><h3>Cerrar la plaza</h3><p class="sub">Es definitivo: queda en el historial y no se puede reabrir.</p>
+<section class="blk"><h3>Cerrar la plaza</h3><% if (z.noCerrable) { %><p class="flash" role="status">No se puede cerrar: <%= z.noCerrable %>.</p></section><% } else { %><p class="sub">Es definitivo: queda en el historial y no se puede reabrir.</p>
 <form method="post" action="/config/plazas/<%= z.id %>/cerrar" data-confirm="Cerrar la plaza es definitivo: queda en el historial y no se puede reabrir." data-ok="Cerrar plaza" data-peligro><%- hid %>
 <label for="pa-m3">Motivo del cierre</label><input id="pa-m3" name="motivo" required placeholder="Plantilla sobrestimada: el organigrama oficial tiene dos analistas">
-<p class="act"><button class="btn d">Cerrar plaza</button></p></form></section><% } %>
+<p class="act"><button class="btn d">Cerrar plaza</button></p></form></section><% } %><% } %>

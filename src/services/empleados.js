@@ -1,5 +1,5 @@
 // Trabajadores y su relación laboral (ingreso a una plaza). Base de la 0.8: la importación del Listado usará estas mismas reglas.
-const { q, tx } = require('../db'), P = require('./perm'), RS = require('./requisiciones'), PT = require('./plantilla'), ES = require('./estructura'), { E } = require('../util');
+const { q, tx } = require('../db'), P = require('./perm'), RS = require('./requisiciones'), PT = require('./plantilla'), ES = require('./estructura'), FI = require('./ficha'), { E } = require('../util');
 
 // Cédula: solo los dígitos («V-12.345.678» → «12345678»), igual que cedula_norm() en la base (migración 013)
 const cedulaNorm = t => String(t == null ? '' : t).replace(/\D/g, '') || null;
@@ -33,9 +33,13 @@ const deCandidatura = id => q(`select rl.*, z.codigo plaza_codigo, uc.nombre con
   left join usuario uc on uc.id=rl.confirmado_por where rl.candidatura_id=$1 order by rl.id desc limit 1`, [id]).then(r => r.rows[0] || null);
 
 // GH confirma el ingreso con la fecha real: la persona ocupa la plaza. Si ya trabajaba en otra plaza, esa relación se cierra (movimiento interno).
-async function confirmarIngreso(u, relId, fecha) {
+// 0.9.3: con la ficha completa (datos del Listado y campos personalizados obligatorios); sin ella no se confirma.
+async function confirmarIngreso(u, relId, b) {
   ghOnly(u);
+  b = typeof b === 'object' && b ? b : { fecha: b };
+  const fecha = String(b.fecha || '');
   if (!fechaOk(fecha)) throw E(400, 'Indica la fecha real de ingreso');
+  const datos = await FI.leerDatos(b, { exigir: true, fechaIngreso: fecha }), defs = await FI.campos('empleado');
   return tx(async c => {
     const hoy = (await c.query('select current_date::text d')).rows[0].d;
     if (fecha > hoy) throw E(400, 'La fecha de ingreso no puede ser futura: confirma el ingreso cuando la persona ya empezó');
@@ -58,6 +62,8 @@ async function confirmarIngreso(u, relId, fecha) {
       await hist(c, u, prev.id, 'movido', { a_relacion: relId, fecha_egreso: egreso });
     }
     await c.query(`update relacion_laboral set estado='activo', fecha_ingreso=$2, confirmado_por=$3, confirmado_en=now() where id=$1`, [relId, fecha, u.id]);
+    const tr = (await c.query('select campos from trabajador where id=$1', [rl.trabajador_id])).rows[0];
+    await FI.guardarC(c, rl.trabajador_id, relId, datos, FI.leerCampos(defs, b, tr.campos, true));
     await hist(c, u, relId, 'ingreso', { fecha_ingreso: fecha, plaza: z && z.codigo });
     // Aviso para TI y GH (equipos, accesos, correo): sin datos personales sensibles
     const t = (await c.query('select nombres, apellidos, email from trabajador where id=$1', [rl.trabajador_id])).rows[0];
@@ -98,11 +104,15 @@ async function listar(u, f = {}) {
   if (f.empresa) add('x.empresa_id = $?', +f.empresa);
   if (f.estado === 'activo' || !f.estado) w.push("x.estado = 'activo'"); else if (f.estado === 'egresado') w.push("x.estado in ('egresado','no_ingreso')");
   if (f.unidad) add('x.unidad_id = any($?)', f.unidades || [+f.unidad]);
-  return (await q(`select t.id, t.nombres, x.cargo, x.estado, x.fecha_ingreso, x.fecha_egreso, x.origen, z.codigo plaza, z.por_regularizar, un.nombre unidad, un.codigo unidad_codigo,
+  const defs = await FI.campos('empleado');
+  const filas = (await q(`select t.id, t.nombres, t.fecha_nacimiento, t.sexo, t.nivel_academico, t.titulo, t.hijos, t.campos, x.ubicacion, x.tipo_empleado, x.cargo, x.estado, x.fecha_ingreso, x.fecha_egreso, x.origen, z.codigo plaza, z.por_regularizar, un.nombre unidad, un.codigo unidad_codigo,
       coalesce(e.siglas, e.razon_social) empresa
     from trabajador t join lateral (select * from relacion_laboral r where r.trabajador_id=t.id order by (r.estado='activo') desc, r.id desc limit 1) x on true
     left join plaza z on z.id=x.plaza_id left join unidad un on un.id=x.unidad_id left join empresa e on e.id=x.empresa_id
     ${w.length ? 'where ' + w.join(' and ') : ''} order by t.nombres limit 2000`, p)).rows;
+  // «Ficha incompleta»: le faltan datos obligatorios (0.9.3). Solo se marca a quien está activo.
+  filas.forEach(x => { x.incompleta = x.estado === 'activo' && FI.faltantes(x, x, defs).length > 0; });
+  return filas;
 }
 // Ficha completa: cada consulta queda registrada (quién y cuándo), porque trae datos personales
 async function ficha(u, id) {
@@ -116,7 +126,8 @@ async function ficha(u, id) {
     left join requisicion q on q.id=r.requisicion_id where r.trabajador_id=$1 order by r.id desc`, [id])).rows;
   const consultas = (await q(`select c.fecha, us.nombre from consulta_ficha c join usuario us on us.id=c.usuario_id where c.trabajador_id=$1 order by c.id desc limit 10`, [id])).rows;
   const aCargo = (await q(`select t.id, t.nombres, r.cargo from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.supervisor_id=$1 and r.estado='activo' order by t.nombres`, [id])).rows;
-  return { t, rels, consultas, aCargo };
+  const defs = await FI.campos('empleado'), act = rels.find(r => r.estado === 'activo');
+  return { t, rels, consultas, aCargo, defs, faltan: act ? FI.faltantes(t, act, defs) : [], mostrar: FI.mostrar };
 }
 // Egreso: la persona deja la plaza (queda libre para un reemplazo). La fecha es la real y no puede ser futura.
 async function egresar(u, relId, b) {
@@ -143,6 +154,95 @@ async function egresar(u, relId, b) {
       plaza: d.plaza, unidad: d.unidad, fecha_egreso: fecha, registrado_por: u.nombre }]);
   });
 }
+// ---------- Alta manual por Gestión Humana, sin requisición (0.9.3) ----------
+// Para quien trabaja y no está en el portal (no venía en el Listado, cargo especial). Con ficha completa, fecha real y soporte.
+// Va a una plaza vacante autorizada del puesto; si no hay, se crea una plaza «por regularizar» (no cuenta en el HC hasta regularizarla).
+async function opcionesAlta() {
+  const hoy = (await q('select current_date::text d')).rows[0].d, orden = new Map((await ES.arbol()).filas.map((x, i) => [x.u.id, i]));
+  const vacantes = (await q(SEL_PLAZAS + ' where (z.hasta is null or z.hasta > current_date)')).rows.filter(z => !impedimento(z, { plaza_id: null }, 'traslado', hoy))
+    .sort((a, b) => (orden.get(a.unidad_id) ?? 1e9) - (orden.get(b.unidad_id) ?? 1e9) || a.perfil.localeCompare(b.perfil, 'es'))
+    .map(z => ({ id: z.id, etiqueta: etiquetaPlaza(z), codigos: [z.codigo, z.perfil_codigo, z.unidad_codigo].join(' ') }));
+  return { vacantes, puestos: await PT.opcionesPuestos(), empresas: (await q('select id, coalesce(razon_social,nombre) nombre from empresa where activa order by 2')).rows,
+    MODALIDADES: PT.MODALIDADES, cat: await FI.catalogos(), defs: await FI.campos('empleado') };
+}
+async function altaManual(u, b) {
+  ghOnly(u);
+  const ced = cedulaNorm(b.cedula), nombres = String(b.nombres || '').replace(/\s+/g, ' ').trim(), fecha = String(b.fecha || ''), soporte = String(b.soporte || '').trim();
+  if (!ced) throw E(400, 'Indica la cédula'); if (!nombres) throw E(400, 'Indica el nombre completo');
+  if (!fechaOk(fecha)) throw E(400, 'Indica la fecha real de ingreso');
+  if (!soporte) throw E(400, 'Indica quién autorizó el alta y con qué soporte: queda en el historial');
+  const datos = await FI.leerDatos(b, { exigir: true, fechaIngreso: fecha }), defs = await FI.campos('empleado');
+  return tx(async c => {
+    const hoy = (await c.query('select current_date::text d')).rows[0].d; if (fecha > hoy) throw E(400, 'La fecha de ingreso no puede ser futura');
+    let t = (await c.query('select * from trabajador where cedula=$1 for update', [ced])).rows[0];
+    if (t && (await c.query("select 1 from relacion_laboral where trabajador_id=$1 and estado in ('activo','por_ingresar')", [t.id])).rowCount)
+      throw E(400, `La cédula ya es de ${t.nombres}, que está activo o por ingresar: si cambia de plaza, usa «Reubicar» en su ficha`);
+    let z, porRegularizar = false;
+    if (b.modo === 'puesto') {
+      const pu = (await c.query('select p.*, u.empresa_id u_empresa from puesto p join unidad u on u.id=p.unidad_id where p.id=$1 and p.activo', [+b.puesto_id])).rows[0];
+      if (!pu) throw E(400, 'Elige el puesto');
+      const mod = PT.MODALIDADES[b.modalidad] ? b.modalidad : 'nomina', emp = +b.empresa_id || pu.u_empresa;
+      if (!emp) throw E(400, 'Elige la empresa que paga la nómina');
+      const nueva = (await PT.crearPlazasC(c, u, pu.id, { n: 1, modalidad: mod, desde: fecha, congelada: false, empresa_id: emp, motivo: 'Alta manual sin plaza vacante: ' + soporte }, 'manual')).filas[0];
+      await c.query('update plaza set por_regularizar=true where id=$1', [nueva.id]); porRegularizar = true;
+      z = (await c.query(SEL_PLAZAS + ' where z.id=$1', [nueva.id])).rows[0];
+    } else {
+      if (!+b.plaza_id) throw E(400, 'Elige la plaza vacante, o «Sin plaza vacante» para crear una por regularizar');
+      await c.query('select id from plaza where id=$1 for update', [+b.plaza_id]);
+      z = (await c.query(SEL_PLAZAS + ' where z.id=$1', [+b.plaza_id])).rows[0]; if (!z) throw E(404, 'Plaza no encontrada');
+      const imp = impedimento(z, { plaza_id: null }, 'traslado', hoy); if (imp) throw E(400, imp);
+      if (z.desde > fecha) throw E(400, `La plaza ${z.codigo} no existía en esa fecha`);
+      const antes = await ocupadaDesde(c, z.id, fecha); if (antes) throw E(400, `La plaza ${z.codigo} estuvo ocupada por ${antes.nombres} hasta el ${antes.f.split('-').reverse().join('/')}: revisa la fecha`);
+    }
+    const emp = z.empresa_id || +b.empresa_id || null; if (!emp) throw E(400, `La plaza ${z.codigo} tiene la empresa «Por definir»: elige la empresa que paga la nómina`);
+    if (!z.empresa_id) await c.query('update plaza set empresa_id=$2 where id=$1', [z.id, emp]);
+    const email = String(b.email || '').trim() || null, tel = String(b.telefono || '').trim() || null;
+    if (t) await c.query('update trabajador set nombres=$2, email=coalesce($3,email), telefono=coalesce($4,telefono) where id=$1', [t.id, nombres, email, tel]);
+    else t = (await c.query('insert into trabajador(cedula,nombres,email,telefono) values($1,$2,$3,$4) returning *', [ced, nombres, email, tel])).rows[0];
+    const rel = (await c.query(`insert into relacion_laboral(trabajador_id,empresa_id,unidad_id,cargo,plaza_id,perfil_version_id,origen,estado,fecha_ingreso,confirmado_por,confirmado_en,motivo_cierre)
+      values($1,$2,$3,$4,$5,$6,'manual','activo',$7,$8,now(),null) returning id`, [t.id, emp, z.unidad_id, z.perfil, z.id, z.version_activa_id, fecha, u.id])).rows[0].id;
+    await FI.guardarC(c, t.id, rel, datos, FI.leerCampos(defs, b, t.campos || {}, true));
+    await hist(c, u, rel, 'alta_manual', { plaza: z.codigo, fecha_ingreso: fecha, soporte, plaza_por_regularizar: porRegularizar || undefined });
+    // Aviso a n8n (TI decide si hace falta equipo o acceso): sin datos personales sensibles
+    await c.query('insert into evento_outbox(tipo,payload) values($1,$2)', ['empleado.alta_manual', { relacion_id: rel, persona: { nombre: nombres, email }, cargo: z.perfil,
+      plaza: z.codigo, unidad: z.unidad, fecha_ingreso: fecha, registrado_por: u.nombre }]);
+    return { trabajador_id: t.id, plaza: z.codigo, porRegularizar };
+  });
+}
+
+// ---------- Conciliación de personas y plazas (0.9.3) ----------
+// Personas activas en plazas «por regularizar» y, para cada una, las plazas vacantes autorizadas más parecidas de su misma área
+// (misma dirección o gerencia general): por el nombre del cargo, la empresa y la unidad. GH decide; nada se mueve solo.
+const PALABRAS_VACIAS = new Set(['de', 'del', 'la', 'las', 'los', 'el', 'y', 'e', 'en', 'para', 'con', 'a']);
+const palabras = s => new Set(String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+  .filter(w => w.length > 1 && !PALABRAS_VACIAS.has(w)).map(w => w.replace(/(es|s)$/, '')));
+const parecido = (a, b) => { const A = palabras(a), B = palabras(b); if (!A.size || !B.size) return 0; let n = 0; for (const w of A) if (B.has(w)) n++; return n / Math.max(A.size, B.size); };
+async function conciliacion(u) {
+  ghOnly(u);
+  const hoy = (await q('select current_date::text d')).rows[0].d, g = await ES.grafo(), by = g.by;
+  // Área = la unidad de primer nivel bajo la raíz (una dirección, por ejemplo) que contiene a la unidad
+  const area = uid => { let x = by.get(uid), n = 0; while (x && n++ < 60) { const p = by.get(x.padre_id); if (!p || !by.get(p.padre_id)) return x.id; x = p; } return uid; };
+  const linaje = uid => { const s = new Set(); let x = by.get(uid), n = 0; while (x && n++ < 60) { s.add(x.id); x = by.get(x.padre_id); } return s; };
+  const personas = (await q(`select r.id rel_id, r.cargo, r.empresa_id, t.id trabajador_id, t.nombres, z.codigo plaza, z.modalidad, p.unidad_id, un.nombre unidad, pf.nombre perfil,
+      coalesce(e.siglas, e.razon_social) empresa
+    from relacion_laboral r join trabajador t on t.id=r.trabajador_id join plaza z on z.id=r.plaza_id join puesto p on p.id=z.puesto_id join unidad un on un.id=p.unidad_id
+    join perfil pf on pf.id=p.perfil_id left join empresa e on e.id=r.empresa_id
+    where r.estado='activo' and z.por_regularizar and (z.hasta is null or z.hasta > current_date) order by un.nombre, t.nombres`)).rows;
+  const vacantes = (await q(SEL_PLAZAS + ' where (z.hasta is null or z.hasta > current_date)')).rows.filter(z => !impedimento(z, { plaza_id: null }, 'traslado', hoy));
+  const usadas = new Set();
+  for (const pe of personas) {
+    const a = area(pe.unidad_id), lin = linaje(pe.unidad_id);
+    pe.sugerencias = vacantes.filter(z => area(z.unidad_id) === a).map(z => {
+      const nombre = Math.max(parecido(pe.cargo, z.perfil), parecido(pe.perfil, z.perfil));
+      const puntos = nombre + (z.empresa_id === pe.empresa_id ? 0.3 : !z.empresa_id ? 0.15 : 0) + (lin.has(z.unidad_id) || linaje(z.unidad_id).has(pe.unidad_id) ? 0.15 : 0) + (z.modalidad === pe.modalidad ? 0.1 : -0.3);
+      return { z, nombre, puntos, etiqueta: etiquetaPlaza(z), empresaDistinta: !!z.empresa_id && z.empresa_id !== pe.empresa_id };
+    }).filter(x => x.nombre >= 0.3).sort((x, y) => y.puntos - x.puntos).slice(0, 3);
+    pe.sugerencias.forEach(x => usadas.add(x.z.id));
+  }
+  const sinSugerencia = vacantes.filter(z => !usadas.has(z.id)).map(z => ({ id: z.id, puesto_id: z.puesto_id, etiqueta: etiquetaPlaza(z) }));
+  return { personas, sinSugerencia, conSugerencia: personas.filter(p => p.sugerencias.length).length };
+}
+
 // ---------- Anular un egreso registrado por error (0.9.2, solo Gestión Humana) ----------
 // La relación egresada queda «egreso_anulado» (no aparece en el organigrama a ninguna fecha) y se abre otra activa igual, con la
 // misma fecha de ingreso. Solo si la plaza sigue libre. Si al egresar se congeló la plaza, se descongela. TI recibe «egreso.anulado».
@@ -272,14 +372,16 @@ async function prepararC(c, u, relId, b, lock) {
   const sugeridos = supZ.length ? (await c.query("select distinct t.id, t.nombres from relacion_laboral x join trabajador t on t.id=x.trabajador_id where x.plaza_id = any($1) and x.estado='activo'", [supZ])).rows : [];
   const sugerido = sugeridos.length === 1 && sugeridos[0].id !== rl.trabajador_id ? sugeridos[0] : null;
   const avisos = [];
-  if (z.empresa_id && z.empresa_id !== rl.empresa_id) avisos.push({ alerta: true, txt: `Cambia de empresa: de ${rl.empresa || '—'} a ${z.empresa}. Si la empresa correcta es la de la persona, cambia primero la empresa de la plaza ${z.codigo} y vuelve aquí.` });
+  // 0.9.3: si la empresa de la plaza no es la de la persona, GH elige aquí mismo si la plaza toma la empresa de la persona
+  const empresaDistinta = !otro && !!z.empresa_id && z.empresa_id !== rl.empresa_id;
+  if (empresaDistinta && b.empresa_persona !== 'on') avisos.push({ alerta: true, txt: `Cambia de empresa: de ${rl.empresa || '—'} a ${z.empresa}. Si la empresa correcta es la de la persona, marca «La plaza toma la empresa de la persona».` });
   if (!z.empresa_id) avisos.push({ txt: `La plaza ${z.codigo} tiene la empresa «Por definir»: tomará la de la persona (${rl.empresa || '—'}).` });
   if (otro && otro.empresa_id !== rl.empresa_id) avisos.push({ alerta: true, txt: `${otro.nombres} y ${rl.nombres} son de empresas distintas: cada uno toma la empresa de su plaza nueva.` });
   if (tipo === 'correccion' && !otro && ingreso) {
     const antes = await ocupadaDesde(c, z.id, ingreso);
     if (antes) avisos.push({ alerta: true, txt: `La plaza ${z.codigo} la ocupó ${antes.nombres} hasta el ${antes.f.split('-').reverse().join('/')}, después del ingreso de ${rl.nombres}: revisa que sea la plaza correcta.` });
   }
-  return { tipo, motivo, fecha, finAnterior, ingreso, rl, z, otro, cierra, sugerido, avisos };
+  return { tipo, motivo, fecha, finAnterior, ingreso, rl, z, otro, cierra, sugerido, avisos, empresaDistinta, empresaPersona: empresaDistinta && b.empresa_persona === 'on' };
 }
 // Vista previa (no guarda nada)
 const revisarReubicacion = (u, relId, b) => tx(c => prepararC(c, u, relId, b, false));
@@ -311,6 +413,7 @@ async function reubicar(u, relId, b) {
           corr ? r.fecha_ingreso : p.fecha, r.fecha_fin_contrato, r.ubicacion, r.tipo_empleado, r.departamento_origen, sup.id, sup.txt, corr ? r.importacion_id : null,
           corr ? r.confirmado_por : u.id, corr ? r.confirmado_en : new Date(), r.id, tipo])).rows[0].id;
     };
+    if (p.empresaPersona) await PT.cambiarEmpresaC(c, u, z.id, rl.empresa_id, `Reubicación de ${rl.nombres}: la plaza toma la empresa de la persona. ${motivo}`, 'reubicar');
     const anterior = { id: rl.plaza_id, codigo: rl.plaza_codigo };
     await cerrar(rl, z); if (otro) await cerrar(otro, anterior);
     const nueva = await abrir(rl, z, { id: supId, txt: supTxt });
@@ -330,4 +433,4 @@ async function reubicar(u, relId, b) {
   });
 }
 module.exports = { cedulaNorm, porIngresarC, deCandidatura, confirmarIngreso, noIngreso, CERRADOS, listar, ficha, egresar, TIPOS_EGRESO, ESTADOS_REL,
-  TIPOS_REUBICACION, opcionesReubicar, revisarReubicacion, reubicar, anularEgreso };
+  TIPOS_REUBICACION, opcionesReubicar, revisarReubicacion, reubicar, anularEgreso, opcionesAlta, altaManual, conciliacion, parecido };

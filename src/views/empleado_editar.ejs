@@ -1,0 +1,9 @@
+<div class="mh"><div><h2>Editar ficha</h2><p class="sub"><%= t.nombres %> · cédula <%= t.cedula %></p></div><a class="btn" href="/empleados/<%= t.id %>" data-modal>Volver</a></div>
+<form method="post" action="/empleados/<%= t.id %>/editar"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<fieldset><legend>Identificación</legend><div class="g2"><div><label for="ee-n">Nombre completo</label><input id="ee-n" name="nombres" required value="<%= t.nombres %>"></div>
+<div><label for="ee-e">Correo</label><input id="ee-e" name="email" type="email" value="<%= t.email || '' %>"></div><div><label for="ee-t">Teléfono</label><input id="ee-t" name="telefono" value="<%= t.telefono || '' %>"></div></div></fieldset>
+<%- include('partials/ficha_form', { cat, v, k: 'ee', exigir: false }) %>
+<% if (!activo) { %><p class="sub">Sin relación activa: los datos laborales no se guardan.</p><% } %>
+<% if (defs.length) { %><fieldset><legend>Datos adicionales</legend><%- include('partials/campos_form', { defs, vals: t.campos, k: 'ee', exigir: false }) %></fieldset><% } %>
+<p class="sub">Se puede guardar incompleta; la ficha seguirá marcada «Ficha incompleta» hasta tener todos los datos obligatorios. Queda en el historial qué datos se tocaron (sin sus valores).</p>
+<p class="act"><button class="btn p">Guardar ficha</button></p></form>

@@ -1,0 +1,25 @@
+<%- include('partials/head') %>
+<% const b0 = typeof b !== 'undefined' ? b : {}, v = { ...b0 }, cp = {}; Object.keys(b0).filter(k => k.startsWith('cp_')).forEach(k => { const x = b0[k]; cp[k.slice(3)] = x === 'si' ? true : x === 'no' ? false : x; }); %>
+<div class="top"><div><p class="crumb"><a href="/empleados">Empleados</a> <span aria-hidden="true">›</span> Alta manual</p><h1>Alta manual de un empleado</h1>
+<p class="sub">Para quien ya trabaja y no está en el portal (no venía en el Listado o es un caso especial). Todo ingreso nuevo de personal entra por requisición. Solo Gestión Humana.</p></div></div>
+<% if (typeof error !== 'undefined') { %><p class="flash err" role="alert"><%= error %></p><% } %>
+<form method="post" action="/empleados/nuevo" class="form-max" data-confirm="Se registra a la persona como empleado activo en la plaza elegida. Queda en el historial con su soporte." data-ok="Registrar"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<fieldset><legend>Identificación</legend><div class="g2">
+<div><label for="al-c">Cédula *</label><input id="al-c" name="cedula" required inputmode="numeric" placeholder="V-12345678" value="<%= v.cedula || '' %>"></div>
+<div><label for="al-n">Nombre completo *</label><input id="al-n" name="nombres" required value="<%= v.nombres || '' %>"></div>
+<div><label for="al-e">Correo</label><input id="al-e" name="email" type="email" value="<%= v.email || '' %>"></div>
+<div><label for="al-t">Teléfono</label><input id="al-t" name="telefono" value="<%= v.telefono || '' %>"></div></div>
+<p class="sub">Si la cédula ya tiene ficha (por ejemplo, alguien que egresó), se usa la misma.</p></fieldset>
+<fieldset><legend>Plaza</legend>
+<label class="chk"><input type="radio" name="modo" value="plaza"<%= v.modo !== 'puesto' ? ' checked' : '' %>>En una plaza vacante autorizada</label>
+<label class="chk"><input type="radio" name="modo" value="puesto"<%= v.modo === 'puesto' ? ' checked' : '' %>>Sin plaza vacante: crear una plaza «por regularizar» en el puesto (no cuenta en el HC hasta regularizarla)</label>
+<div data-when="modo=plaza"><label for="al-p">Plaza vacante</label><select id="al-p" name="plaza_id" data-buscar><option value="">Selecciona la plaza</option><% o.vacantes.forEach(z => { %><option value="<%= z.id %>" data-a="<%= z.id %>" data-t="<%= z.codigos %>"<%= String(v.plaza_id) === String(z.id) ? ' selected' : '' %>><%= z.etiqueta %></option><% }) %></select></div>
+<div data-when="modo=puesto" hidden><label for="al-pu">Puesto</label><select id="al-pu" name="puesto_id" data-buscar><option value="">Selecciona el puesto</option><% o.puestos.forEach(p => { %><option value="<%= p.id %>" data-a="<%= p.id %>"<%= String(v.puesto_id) === String(p.id) ? ' selected' : '' %>><%= p.etiqueta %></option><% }) %></select>
+<div class="g2"><div><label for="al-m">Modalidad</label><select id="al-m" name="modalidad"><% Object.entries(o.MODALIDADES).forEach(([k, n]) => { %><option value="<%= k %>"<%= v.modalidad === k ? ' selected' : '' %>><%= n %></option><% }) %></select></div></div></div>
+<div class="g2"><div><label for="al-em">Empresa que paga la nómina</label><select id="al-em" name="empresa_id"><option value="">La de la plaza (o la de la unidad)</option><% o.empresas.forEach(e => { %><option value="<%= e.id %>"<%= String(v.empresa_id) === String(e.id) ? ' selected' : '' %>><%= e.nombre %></option><% }) %></select></div>
+<div><label for="al-f">Fecha real de ingreso *</label><input id="al-f" name="fecha" type="date" required value="<%= v.fecha || '' %>"></div></div>
+<label for="al-s">Quién autorizó el alta y soporte *</label><input id="al-s" name="soporte" required placeholder="Directora de GH, correo del 23-11-2026" value="<%= v.soporte || '' %>"></fieldset>
+<%- include('partials/ficha_form', { cat: o.cat, v, k: 'al', exigir: true }) %>
+<% if (o.defs.length) { %><fieldset><legend>Datos adicionales</legend><%- include('partials/campos_form', { defs: o.defs, vals: cp, k: 'al' }) %></fieldset><% } %>
+<p class="act"><a class="btn" href="/empleados">Cancelar</a> <button class="btn p">Registrar empleado</button></p></form>
+<%- include('partials/foot') %>

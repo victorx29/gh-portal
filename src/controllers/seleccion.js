@@ -2,10 +2,13 @@ const r = require('express').Router(), S = require('../services/seleccion'), EM 
 const hacer = (fn, ok) => w(async (req, res) => {
   const id = +req.params.id; let reqId = req.body.req;
   try { await fn(req.user, id, req.body); flash(req, 'ok', ok); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
-  res.redirect(reqId ? '/requisiciones/' + reqId + '/seleccion' + (req.path.startsWith('/candidaturas/') ? '?modal=' + encodeURIComponent('/candidaturas/' + id) : '') : '/pipeline');
+  // Volver a la ficha del candidato (también desde «Confirmar ingreso», que lleva cand): no se pierde el contexto
+  const cand = req.path.startsWith('/candidaturas/') ? id : /^\d+$/.test(String(req.body.cand || '')) ? +req.body.cand : null;
+  res.redirect(reqId ? '/requisiciones/' + reqId + '/seleccion' + (cand ? '?modal=' + encodeURIComponent('/candidaturas/' + cand) : '') : '/pipeline');
 });
 r.get('/requisiciones/:id/seleccion', w(async (req, res) => res.render('seleccion', { title: 'Selección', nav: 'pipeline', ...await S.tablero(req.user, +req.params.id) })));
-r.get('/requisiciones/:id/candidatos/nuevo', w(async (req, res) => modal(req, res, 'cand_form', { title: 'Nuevo candidato', reqId: +req.params.id })));
+r.get('/requisiciones/:id/candidatos/nuevo', w(async (req, res) => { if (!P.esGH(req.user)) throw E(403, 'Solo Gestión Humana gestiona la selección');
+  modal(req, res, 'cand_form', { title: 'Nuevo candidato', reqId: +req.params.id, defsCand: await require('../services/ficha').campos('candidato') }); }));
 r.post('/requisiciones/:id/candidatos', w(async (req, res) => {
   try { await S.crearCandidato(req.user, +req.params.id, req.body); flash(req, 'ok', 'Candidato agregado'); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
   res.redirect('/requisiciones/' + req.params.id + '/seleccion');
@@ -13,6 +16,7 @@ r.post('/requisiciones/:id/candidatos', w(async (req, res) => {
 r.get('/candidaturas/:id', w(async (req, res) => modal(req, res, 'cand_detalle', { title: 'Candidato', ...await S.detalle(req.user, +req.params.id) })));
 r.post('/candidaturas/:id/registro', hacer((u, id, b) => S.registrar(u, id, b), 'Registro guardado'));
 r.post('/candidaturas/:id/avanzar', hacer((u, id) => S.avanzar(u, id), 'Candidato avanzó de etapa'));
+r.post('/candidaturas/:id(\\d+)/campos', hacer((u, id, b) => S.guardarCampos(u, id, b), 'Datos del candidato guardados'));
 r.post('/candidaturas/:id/rechazar', hacer((u, id, b) => S.rechazar(u, id, b.motivo), 'Candidatura rechazada'));
 // ---- CV, consentimiento y análisis con IA (0.9) ----
 const multer = require('multer'), path = require('path'), fs = require('fs'), crypto = require('crypto'), IA = require('../services/ia'), cfg = require('../config'), { nombreArchivo } = require('../util');
@@ -40,6 +44,6 @@ r.post('/config/ia', w(async (req, res) => {
 }));
 
 // Ingreso: GH confirma la fecha real (la persona ocupa la plaza) o registra que no se presentó
-r.post('/ingresos/:id/confirmar', hacer((u, id, b) => EM.confirmarIngreso(u, id, b.fecha), 'Ingreso confirmado: la persona ocupa la plaza'));
+r.post('/ingresos/:id/confirmar', hacer((u, id, b) => EM.confirmarIngreso(u, id, b), 'Ingreso confirmado: la persona ocupa la plaza y su ficha quedó completa'));
 r.post('/ingresos/:id/no-ingreso', hacer((u, id, b) => EM.noIngreso(u, id, b.motivo), 'Registrado: no se presentó. La plaza queda libre'));
 module.exports = r;

@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.2), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.3), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -217,6 +217,25 @@ antes funcionaba.
 | UI-07 | Al guardar desde un modal en una lista filtrada (Plantilla, Empleados, Por regularizar) o desde el diagrama, se vuelve a la misma vista con los mismos filtros y el modal abierto. | H · A | 0.9.2 |
 | UI-08 | Al guardar, si tarda, aparece la «O» con «Guardando…» por encima del modal y el botón queda deshabilitado; con «Atrás» del navegador desaparece. | C | 0.9.2 |
 
+### Ficha, campos personalizados, alta manual y conciliación (0.9.3)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| FIC-01 | Confirmar ingreso sin fecha de nacimiento, sexo, hijos, nivel académico, título, ubicación o tipo de empleado se rechaza con la lista de lo que falta; «Contratado» exige fin de contrato (también en el navegador); con todo, la ficha queda guardada y la persona ocupa la plaza. | H · A | 0.9.3 |
+| FIC-02 | Ubicación y tipo de empleado solo aceptan valores de sus catálogos (Configuración › Ubicaciones y Tipos de empleado); la migración los llena con los valores del Listado importado. | C · A | 0.9.3 |
+| FIC-03 | Empleados activos con datos obligatorios faltantes muestran «Ficha incompleta» (lista y ficha) y el filtro «Solo fichas incompletas»; «Editar ficha» permite guardar a medias; el historial registra qué datos se tocaron, sin sus valores. | H · A | 0.9.3 |
+| CPE-01 | Campos personalizados: solo GH los crea; tipo lista exige opciones; nombre único entre los activos; no se quitan opciones en uso; el tipo no cambia; desactivar conserva los valores. | C · A | 0.9.3 |
+| CPE-02 | Un campo obligatorio del candidato se exige al agregarlo y al guardar sus datos; uno del empleado, al confirmar el ingreso y en el alta manual (no al editar la ficha). | H · A | 0.9.3 |
+| CPE-03 | Los campos personalizados no viajan a la IA ni a n8n (tampoco dentro de `candidato_datos` de los eventos de selección). | H · A | 0.9.3 |
+| ALT-01 | Alta manual: solo GH; cédula, nombre, fecha no futura, soporte y ficha completa obligatorios; cédula con relación activa se rechaza (usar Reubicar); un egresado reutiliza su ficha; plaza vacante autorizada o, sin ella, plaza «por regularizar» en el puesto; sale `empleado.alta_manual`; un error vuelve al formulario sin perder lo escrito. | H · A | 0.9.3 |
+| CNC-01 | Conciliación: lista a quienes están en plazas «por regularizar» con hasta 3 vacantes parecidas de su misma área; «Corregir aquí» abre la revisión de Reubicar y, al confirmar, vuelve a Conciliación. | H | 0.9.3 |
+| CNC-02 | Regularizar varias: marcar todas, un soporte; regulariza las que cumplen e informa las que no (perfil sin descripción). | H · A | 0.9.3 |
+| CNC-03 | Reubicar a una plaza de otra empresa: la casilla «la plaza toma la empresa de la persona» cambia la empresa de la plaza con motivo en su historial. | C · A | 0.9.3 |
+| CNC-04 | Importación: una persona de una empresa sin estructura propia que entra por una equivalencia general aparece como advertencia en la vista previa. | C · A | 0.9.3 |
+| PL-14 | Cerrar una plaza con ocupante, ingreso en curso o requisición abierta se rechaza (Acciones lo explica); la carga masiva cierra solo plazas vacías y da error si no alcanzan. | H · A | 0.9.3 |
+| UI-09 | Al ir a otra página del portal aparece la «O» con «Cargando…» si tarda; no aparece en descargas de Excel, CV o adjuntos ni en pestañas nuevas. | C | 0.9.3 |
+| ORG-04 | La leyenda del organigrama explica ⚑ (por regularizar) y el borde naranja punteado (nivel igual o superior al del jefe). | C | 0.9.3 |
+
 ## 10d. Postulados con análisis de CV por IA (0.9.0)
 
 | ID | Prueba | Tipo | Origen |
@@ -269,3 +288,4 @@ antes funcionaba.
 | 0.9.0 | 20-11-2026 | H + nuevas (EMP, IMP, REG, EGR, ORG, LIM-02, IA-01 a 07, EV-05) | Pasa. Copia de la base de EasyPanel (0.8.0) → migraciones 014 y 015 sin errores; importación del Listado real en la copia (252 personas, 66 por regularizar, 106 pendientes, idempotente); 50 pruebas de servicio, 38 de pantallas (escritorio y móvil, sin errores JS), 5 de alcance del organigrama, 3 de seguridad; código de los nodos de n8n probado fuera de n8n; envío de eventos a dos webhooks simulados (cv.* al de IA, el resto al general). Instalación desde cero (15 migraciones). Regresión: 0.8.0 (23/23) por la ruta de actualización, 0.7.12 (18/18) y humo de requisiciones en instalación nueva. No probado: EasyPanel, n8n real con un modelo (IA-08), imprimir/PDF, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.1 | 23-11-2026 | Nuevas REU-01 a 10 + INS-01/02 + LIM-01 | Pasa. Base 0.9.0 con estructura de Tecnología y un Listado FICTICIOS cargados con el código 0.9.0 → migración 016 sin errores; 16 pruebas de servicio (ruta de actualización e instalación desde cero, 16 migraciones); pantallas en escritorio y móvil (corrección, intercambio, traslado con supervisor sugerido, error sin fecha), sin errores JS. `limpiar -- transacciones` se detiene si hay traslados reales. No probado: la base real de EasyPanel (no hubo volcado), EasyPanel, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.2 | 23-11-2026 | Nuevas CNG, EGR-03 a 05, PL-13, UI-06 a 08 + regresión REU (0.9.1) + INS-01/02 | Pasa. Base 0.9.1 con datos ficticios → migración 017 sin errores; 13 pruebas de servicio; regresión 0.9.1 (16/16) por la ruta 0.9.0 → 0.9.2 y en instalación desde cero (17 migraciones); pantallas en escritorio y móvil (acciones de plaza, egreso con nombre, anular, regularizar, «O» de carga en claro y oscuro, volver a la vista en Plantilla y en el diagrama), sin errores JS. No probado: EasyPanel, envío real de `egreso.anulado` a n8n, restaurar la posición de desplazamiento, «Atrás» con la «O» puesta, anular con requisición abierta, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.9.3 | 23-11-2026 | Nuevas FIC, CPE, ALT, CNC, PL-14, UI-09, ORG-04 + regresión 0.9.2 (13/13) y 0.9.1 (16/16) + INS-01/02 | Pasa. 14 pruebas de servicio; flujo completo con datos ficticios (requisición → aprobación → selección → candidato con campo obligatorio → ingreso con ficha completa); rutas 0.9.0 → 0.9.3 y 0.9.1 → 0.9.3 e instalación desde cero (18 migraciones); pantallas en escritorio y móvil (campos personalizados, confirmar ingreso, ficha incompleta y edición, alta manual con error que conserva datos, regularizar varias, conciliación con «Corregir aquí», leyenda, «O» al navegar y no en descargas), sin errores JS. Corregido en la revisión: los eventos de selección llevaban todos los datos del candidato (ahora sin campos personalizados). No probado: EasyPanel, n8n real, Safari. | — | Claude (entorno aislado, PostgreSQL 16 y Chromium) |

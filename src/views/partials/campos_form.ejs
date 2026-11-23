@@ -1,0 +1,8 @@
+<%# Campos personalizados que define GH (0.9.3). defs: definiciones; vals: valores guardados { id: valor }; k: prefijo único de los id %>
+<% if (defs.length) { %><div class="g2"><% defs.forEach(d => { const v = (vals || {})[d.id], id = k + '-cp' + d.id, req = d.obligatorio && (typeof exigir === 'undefined' || exigir !== false) ? ' required' : ''; %>
+<div><% if (d.tipo === 'si_no') { %><fieldset><legend><%= d.etiqueta %><%= d.obligatorio ? ' *' : '' %></legend>
+<label class="chk"><input type="radio" name="cp_<%= d.id %>" value="si"<%= v === true ? ' checked' : '' %><%= req %>>Sí</label><label class="chk"><input type="radio" name="cp_<%= d.id %>" value="no"<%= v === false ? ' checked' : '' %>>No</label></fieldset>
+<% } else { %><label for="<%= id %>"><%= d.etiqueta %><%= d.obligatorio ? ' *' : '' %><%= d.sensible ? ' (solo GH)' : '' %></label>
+<% if (d.tipo === 'lista') { %><select id="<%= id %>" name="cp_<%= d.id %>"<%= req %>><option value="">Elige</option><% d.opciones.forEach(o => { %><option<%= v === o ? ' selected' : '' %>><%= o %></option><% }) %></select>
+<% } else { %><input id="<%= id %>" name="cp_<%= d.id %>" type="<%= d.tipo === 'numero' ? 'number' : d.tipo === 'fecha' ? 'date' : 'text' %>"<%- d.tipo === 'numero' ? ' step="any"' : '' %> value="<%= v == null ? '' : v %>"<%= req %>><% } %><% } %>
+<% if (d.ayuda) { %><p class="sub"><%= d.ayuda %></p><% } %></div><% }) %></div><% } %>

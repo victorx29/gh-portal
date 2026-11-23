@@ -1,0 +1,3 @@
+<div class="mh"><div><h2>Editar campo</h2><p class="sub"><%= c.etiqueta %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<form method="post" action="/config/campos/<%= c.id %>"><input type="hidden" name="_csrf" value="<%= csrf %>"><%- include('partials/campo_campos', { c, nuevo: false }) %>
+<p class="act"><button class="btn p">Guardar</button></p></form>

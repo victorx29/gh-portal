@@ -1,8 +1,10 @@
-const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), IA = require('./ia'), { E } = require('../util');
+const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), IA = require('./ia'), FI = require('./ficha'), { E } = require('../util');
 const ghOnly = u => { if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana gestiona la selección'); };
 const histC = (c, u, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(id), accion, detalle || {}]);
 const evento = (c, tipo, p) => c.query('insert into evento_outbox(tipo,payload) values($1,$2)', [tipo, p]);
-const CA = `select ca.*, c.nombre, c.email, c.telefono, c.cedula, c.consentimiento_en, c.consentimiento_ref, cv.nombre_original cv_nombre, cv.subido_en cv_subido_en, r.empresa_id, r.codigo, r.plazas, r.estado req_estado, pf.nombre cargo
+// Los campos personalizados nunca salen del portal (0.9.3): se quitan de los datos del candidato que viajan a n8n
+const sinCampos = cd => { const { campos, ...resto } = cd; void campos; return resto; };
+const CA = `select ca.*, c.nombre, c.email, c.telefono, c.cedula, c.campos, c.consentimiento_en, c.consentimiento_ref, cv.nombre_original cv_nombre, cv.subido_en cv_subido_en, r.empresa_id, r.codigo, r.plazas, r.estado req_estado, pf.nombre cargo
   from candidatura ca join candidato c on c.id=ca.candidato_id join requisicion r on r.id=ca.requisicion_id left join cv_archivo cv on cv.id=ca.cv_archivo_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id`;
 
@@ -19,6 +21,7 @@ async function crearCandidato(u, reqId, b) {
   ghOnly(u); const nombre = String(b.nombre || '').trim(); if (!nombre) throw E(400, 'El nombre es obligatorio');
   const cedula = EM.cedulaNorm(b.cedula); if (!cedula) throw E(400, 'La cédula es obligatoria: identifica al candidato en todas sus postulaciones');
   const t = k => String(b[k] || '').trim() || null;
+  const defs = await FI.campos('candidato');
   return tx(async c => {
     const r = await RS.lock(c, reqId); if (r.estado !== 'seleccion') throw E(400, 'La requisición no está en Selección');
     const pl = await PL.resolver(r.empresa_id, 'seleccion', c);
@@ -26,8 +29,9 @@ async function crearCandidato(u, reqId, b) {
     let cd = (await c.query('select id from candidato where cedula=$1 for update', [cedula])).rows[0];
     if (cd) {
       if ((await c.query('select 1 from candidatura where requisicion_id=$1 and candidato_id=$2', [reqId, cd.id])).rowCount) throw E(400, 'Esa cédula ya está postulada en esta requisición');
-      await c.query('update candidato set email=coalesce($2,email), telefono=coalesce($3,telefono) where id=$1', [cd.id, t('email'), t('telefono')]);
-    } else cd = (await c.query('insert into candidato(nombre,email,telefono,cedula) values($1,$2,$3,$4) returning id', [nombre, t('email'), t('telefono'), cedula])).rows[0];
+      const prev = (await c.query('select campos from candidato where id=$1', [cd.id])).rows[0].campos;
+      await c.query('update candidato set email=coalesce($2,email), telefono=coalesce($3,telefono), campos=$4 where id=$1', [cd.id, t('email'), t('telefono'), FI.leerCampos(defs, b, prev, true)]);
+    } else cd = (await c.query('insert into candidato(nombre,email,telefono,cedula,campos) values($1,$2,$3,$4,$5) returning id', [nombre, t('email'), t('telefono'), cedula, FI.leerCampos(defs, b, {}, true)])).rows[0];
     const ca = (await c.query('insert into candidatura(requisicion_id,candidato_id,etapa) values($1,$2,$3) returning id', [reqId, cd.id, pl.flujo[0].clave])).rows[0];
     await histC(c, u, ca.id, 'crear', { requisicion: reqId }); return ca.id;
   });
@@ -44,7 +48,20 @@ async function detalle(u, id) {
   const empleado = ca.cedula ? (await q(`select rl.cargo, un.nombre unidad, rl.fecha_ingreso from relacion_laboral rl join trabajador t on t.id=rl.trabajador_id left join unidad un on un.id=rl.unidad_id
     where t.cedula=$1 and rl.estado='activo' order by rl.fecha_ingreso desc limit 1`, [ca.cedula])).rows[0] || null : null;
   const ingreso = et && et.clase === 'exito' ? await EM.deCandidatura(id) : null;
-  return { ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso, ia: await IA.ultimo(id) };
+  // 0.9.3: ficha que GH completa al confirmar el ingreso (si la persona ya tuvo ficha, viene precargada) y campos personalizados
+  const ficha = ingreso ? (await q('select t.*, r.ubicacion, r.tipo_empleado, r.fecha_fin_contrato from trabajador t join relacion_laboral r on r.trabajador_id=t.id where r.id=$1', [ingreso.id])).rows[0] : null;
+  return { ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso, ia: await IA.ultimo(id), ficha,
+    cat: ficha ? await FI.catalogos() : null, defsEmp: ficha ? await FI.campos('empleado') : [], defsCand: await FI.campos('candidato'), mostrar: FI.mostrar };
+}
+// Campos personalizados del candidato (GH)
+async function guardarCampos(u, id, b) {
+  ghOnly(u); const defs = await FI.campos('candidato');
+  return tx(async c => {
+    const ca = (await c.query('select candidato_id from candidatura where id=$1', [id])).rows[0]; if (!ca) throw E(404, 'Candidatura no encontrada');
+    const prev = (await c.query('select campos from candidato where id=$1 for update', [ca.candidato_id])).rows[0].campos;
+    await c.query('update candidato set campos=$2 where id=$1', [ca.candidato_id, FI.leerCampos(defs, b, prev, true)]);
+    await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidato', String(ca.candidato_id), 'campos', { campos: Object.keys(b).filter(k => k.startsWith('cp_')).length }]);
+  });
 }
 async function registrar(u, id, b) { const d = await detalle(u, id); if (!d.activa) throw E(400, 'Esta etapa no admite registro'); await PL.registrar(u, 'candidatura', id, d.et, b); }
 
@@ -59,7 +76,7 @@ async function avanzar(u, id) {
     await c.query('update candidatura set etapa=$2, actualizada_en=now() where id=$1', [id, nxt.clave]);
     await histC(c, u, id, 'avanzar', { de: ca.etapa, a: nxt.clave });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
-    await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, etapa_anterior: ca.etapa, candidato: cd.nombre, email: cd.email, candidato_datos: cd, url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
+    await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, etapa_anterior: ca.etapa, candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
     if (nxt.clase === 'exito') {   // ingreso: la persona queda «por ingresar» en la plaza; GH confirma después la fecha real
       await EM.porIngresarC(c, u, { id }, cd, r);
       const n = (await c.query('select count(*)::int n from candidatura where requisicion_id=$1 and etapa=$2', [r.id, nxt.clave])).rows[0].n;
@@ -77,7 +94,7 @@ async function rechazar(u, id, motivo) {
     await c.query('update candidatura set etapa=$2, motivo_rechazo=$3, actualizada_en=now() where id=$1', [id, pl.cierre.clave, motivo.trim()]);
     await histC(c, u, id, 'rechazar', { de: ca.etapa, motivo: motivo.trim() });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
-    await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa_anterior: ca.etapa, motivo: motivo.trim(), candidato: cd.nombre, email: cd.email, candidato_datos: cd, url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
+    await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa_anterior: ca.etapa, motivo: motivo.trim(), candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
   });
 }
-module.exports = { tablero, crearCandidato, detalle, registrar, avanzar, rechazar };
+module.exports = { guardarCampos, tablero, crearCandidato, detalle, registrar, avanzar, rechazar };

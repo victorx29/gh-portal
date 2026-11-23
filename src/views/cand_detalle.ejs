@@ -25,11 +25,18 @@
 <% R.criterios.forEach(c => { %><tr><td><%= c.nombre %></td><td><%= c.peso %></td><td><span class="chip<%= c.puntaje >= 3 ? '' : ' w' %>"><%= c.puntaje %>/5</span></td><td><%= c.evidencia || '—' %></td></tr><% }) %></table></div>
 <% [['Fortalezas', R.fortalezas], ['Brechas frente al perfil', R.brechas], ['Preguntas sugeridas para la entrevista', R.preguntas], ['Alertas', R.alertas]].forEach(([t, l]) => { if ((l || []).length) { %><details<%= t === 'Brechas frente al perfil' || t === 'Alertas' ? ' open' : '' %>><summary><%= t %> (<%= l.length %>)</summary><ul><% l.forEach(x => { %><li><%= x %></li><% }) %></ul></details><% } }) %>
 <% } } %></section>
+<% if (defsCand.length) { %><details class="blk"><summary>Datos adicionales del candidato</summary><table class="kv"><% defsCand.forEach(d => { %><tr><th><%= d.etiqueta %></th><td><%= mostrar(d, (ca.campos || {})[d.id]) %></td></tr><% }) %></table>
+<form method="post" action="/candidaturas/<%= ca.id %>/campos"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<%- include('partials/campos_form', { defs: defsCand, vals: ca.campos, k: 'cc' + ca.id }) %><p class="act"><button class="btn p">Guardar datos</button></p></form></details><% } %>
 <% if (ingreso) { %><section class="blk"><h3>Ingreso</h3>
 <% if (ingreso.estado === 'por_ingresar') { %><p class="sub">Por ingresar<%= ingreso.plaza_codigo ? ' en la plaza ' + ingreso.plaza_codigo : '' %>. Confirma la fecha real cuando la persona empiece: entonces ocupa la plaza.</p>
-<form method="post" action="/ingresos/<%= ingreso.id %>/confirmar" class="row"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
-<div><label for="fi-<%= ingreso.id %>">Fecha de ingreso</label><input id="fi-<%= ingreso.id %>" name="fecha" type="date" required></div><p class="act"><button class="btn p">Confirmar ingreso</button></p></form>
-<details><summary>No se presentó</summary><form method="post" action="/ingresos/<%= ingreso.id %>/no-ingreso" data-confirm="La plaza queda libre. La requisición no se reabre: si hace falta, pide otra." data-ok="Registrar" data-peligro><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>">
+<form method="post" action="/ingresos/<%= ingreso.id %>/confirmar"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><input type="hidden" name="cand" value="<%= ca.id %>">
+<div class="g2"><div><label for="fi-<%= ingreso.id %>">Fecha real de ingreso *</label><input id="fi-<%= ingreso.id %>" name="fecha" type="date" required></div></div>
+<p class="sub">Para confirmar el ingreso, la ficha del empleado debe quedar completa. Estos datos no se piden al candidato ni llegan a la IA.</p>
+<%- include('partials/ficha_form', { cat, v: ficha, k: 'fi' + ingreso.id, exigir: true }) %>
+<% if (defsEmp.length) { %><fieldset><legend>Datos adicionales del empleado</legend><%- include('partials/campos_form', { defs: defsEmp, vals: ficha.campos, k: 'fe' + ingreso.id }) %></fieldset><% } %>
+<p class="act"><button class="btn p">Confirmar ingreso</button></p></form>
+<details><summary>No se presentó</summary><form method="post" action="/ingresos/<%= ingreso.id %>/no-ingreso" data-confirm="La plaza queda libre. La requisición no se reabre: si hace falta, pide otra." data-ok="Registrar" data-peligro><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><input type="hidden" name="cand" value="<%= ca.id %>">
 <label for="ni-<%= ingreso.id %>">Motivo</label><input id="ni-<%= ingreso.id %>" name="motivo" required><p class="act"><button class="btn d">Registrar</button></p></form></details>
 <% } else if (ingreso.estado === 'activo') { %><p>Ingresó el <b><%= fd(ingreso.fecha_ingreso) %></b><%= ingreso.plaza_codigo ? ' en la plaza ' + ingreso.plaza_codigo : '' %>. Confirmó: <%= ingreso.confirmado_por_nombre || '—' %>.</p>
 <% } else { %><p class="mu">Ingreso cerrado (<%= ingreso.estado === 'no_ingreso' ? 'no se presentó' : ingreso.estado %>)<%= ingreso.motivo_cierre ? ': ' + ingreso.motivo_cierre : '' %>.</p><% } %></section><% } %>

@@ -12,7 +12,7 @@
 <div id="dg-wrap"><div class="dg-bar noprint"><button class="btn" type="button" id="dg-fs" aria-pressed="false">Pantalla completa</button><button class="btn" type="button" data-z="1.2" aria-label="Acercar">+</button><button class="btn" type="button" data-z="0.83" aria-label="Alejar">−</button><button class="btn" type="button" data-z="fit">Ajustar</button>
 <label class="chk"><input type="checkbox" id="dg-dot" checked>Líneas punteadas (funcionales)</label><span class="mu">Arrastra para moverte · rueda o botones para el zoom</span></div>
 <div class="dg-area"><div class="dg" id="dg" tabindex="0" aria-label="Organigrama de empleados"><svg id="dg-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Organigrama de empleados"></svg></div></div></div>
-<div class="dg-ley"><span>Bajo cada cargo: las personas que lo ocupan</span><span style="color:#b36b00">Vacante = plaza autorizada sin ocupante registrado</span><span>★ Puesto jefe de la unidad</span></div>
+<div class="dg-ley"><span>Bajo cada cargo: las personas que lo ocupan</span><span style="color:#b36b00">Vacante = plaza autorizada sin ocupante registrado</span><span>★ Puesto jefe de la unidad</span><span>⚑ Plaza por regularizar (no cuenta en el HC)</span><span style="color:#b36b00">Borde naranja punteado = su nivel jerárquico es igual o superior al de su jefe (revisa el nivel del perfil)</span></div>
 <%- include('partials/dg_control') %>
 <script type="application/json" id="dg-data"><%- JSON.stringify({ nodes: dg.nodes, links: dg.links, esHoy: dg.esHoy, fecha: dg.fecha, disp: 'h', ver: 'puestos', editar: false, soloVer: true }).replace(/</g, '\\u003c') %></script>
 <script src="/js/diagrama.js" defer></script><% } } } %>

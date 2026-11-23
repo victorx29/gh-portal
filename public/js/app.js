@@ -66,7 +66,7 @@
     el.hidden = !f || !v.split('|').includes(val);
   });
   async function abrir(url, target) {
-    const t = setTimeout(() => cargando(true), 300);   // si tarda, la «O» de carga
+    const t = setTimeout(() => cargando(true, 'Cargando…'), 300);   // si tarda, la «O» de carga
     try {
       const r = await fetch(url, { headers: { 'X-Modal': '1' }, credentials: 'same-origin' });
       if (!r.ok) { if (target === dlg) location.href = url; return; }
@@ -75,12 +75,12 @@
   }
   // ---- Indicador de carga (0.9.2): la «O» del logo girando, por encima de todo (también de los modales) ----
   let veloT = null;
-  function cargando(on) {
+  function cargando(on, texto) {
     let v = d.getElementById('gh-carga');
     if (on && !v) { v = d.createElement('dialog'); v.id = 'gh-carga'; v.className = 'carga'; v.setAttribute('aria-label', 'Cargando');
       v.innerHTML = '<span class="carga-o" aria-hidden="true"></span><span class="carga-t" role="status">Guardando…</span>'; v.oncancel = e => e.preventDefault(); d.body.appendChild(v); }
     if (!v) return;
-    if (on) { if (!v.open) v.showModal(); } else if (v.open) v.close();
+    if (on) { v.querySelector('.carga-t').textContent = texto || 'Guardando…'; if (!v.open) v.showModal(); } else if (v.open) v.close();
   }
   // ---- Al guardar, volver a la misma vista (0.9.2): filtros, modal abierto y posición ----
   // Cada formulario POST de una página abierta con GET lleva _volver = la dirección actual (sin el modal); el servidor la usa al redirigir.
@@ -118,6 +118,13 @@
     }
     const f = e.target.closest('form'); if (f) cond(f);
   });
+  // Ficha del empleado (0.9.3): el fin de contrato es obligatorio si el tipo de empleado lo pide (data-fin="1")
+  const finContrato = f => { const t = f && f.querySelector('select[name=tipo_empleado]'), ff = f && f.querySelector('input[name=fecha_fin_contrato]'); if (!t || !ff) return;
+    const o = t.selectedOptions[0]; ff.required = !!(o && o.dataset.fin === '1'); };
+  d.addEventListener('change', e => { if (e.target.matches('select[name=tipo_empleado]')) finContrato(e.target.form); });
+  // Marcar todas las casillas name=… del mismo formulario (0.9.3)
+  d.addEventListener('change', e => { const m = e.target.closest('[data-marcar-todos]'); if (!m) return;
+    (m.form || d).querySelectorAll('input[type=checkbox][name="' + m.dataset.marcarTodos + '"]').forEach(x => { x.checked = m.checked; }); });
   // Filtro de listas de casillas: <input data-filtra> seguido de .chklist
   d.addEventListener('input', e => {
     if (!e.target.matches('[data-filtra]')) return;
@@ -159,9 +166,18 @@
   d.addEventListener('submit', e => {
     if (e.defaultPrevented) return;
     const f = e.target; marcarVolver(f);
-    if ((f.getAttribute('method') || '').toLowerCase() !== 'post') return;
+    if ((f.getAttribute('method') || '').toLowerCase() !== 'post') { if (!f.target) { clearTimeout(veloT); veloT = setTimeout(() => cargando(true, 'Cargando…'), 300); } return; }   // filtros (GET)
     setTimeout(() => f.querySelectorAll('button, input[type=submit]').forEach(b => { b.disabled = true; }), 0);   // después: el botón pulsado aún viaja con el formulario
     clearTimeout(veloT); veloT = setTimeout(() => cargando(true), 250);
+  });
+  // (0.9.3) Al ir a otra página del portal: la «O» en lugar del parpadeo, si tarda más de 300 ms. No en descargas ni pestañas nuevas.
+  d.addEventListener('click', e => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest('a[href]'); if (!a || a.target || a.hasAttribute('download') || a.hasAttribute('data-modal') || a.hasAttribute('data-modal2') || a.hasAttribute('data-sin-carga')) return;
+    const u = new URL(a.href, location.href);
+    if (u.origin !== location.origin || /\.(xlsx|docx|pdf|csv|png|zip)$/i.test(u.pathname) || /^\/(cv|adjuntos?)\//.test(u.pathname)) return;
+    if (u.pathname === location.pathname && u.search === location.search && u.hash) return;   // ancla en la misma página
+    clearTimeout(veloT); veloT = setTimeout(() => cargando(true, 'Cargando…'), 300);
   });
   // Al volver con «Atrás» la página puede salir de la caché con el velo puesto
   window.addEventListener('pageshow', () => { clearTimeout(veloT); cargando(false); d.querySelectorAll('button[disabled]').forEach(b => { b.disabled = false; }); });

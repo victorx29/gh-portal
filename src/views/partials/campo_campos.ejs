@@ -1,0 +1,9 @@
+<div class="g2"><div><label for="cf-e<%= c.id || '' %>">Nombre del campo</label><input id="cf-e<%= c.id || '' %>" name="etiqueta" required maxlength="80" value="<%= c.etiqueta || '' %>" placeholder="Talla de camisa"></div>
+<div><label for="cf-t<%= c.id || '' %>">Tipo</label><% if (nuevo) { %><select id="cf-t<%= c.id || '' %>" name="tipo" required><option value="">Elige</option><% Object.entries(TIPOS).forEach(([k, n]) => { %><option value="<%= k %>"><%= n %></option><% }) %></select>
+<% } else { %><input id="cf-t<%= c.id %>" value="<%= TIPOS[c.tipo] %>" disabled><p class="sub">El tipo no cambia: los valores guardados dependen de él.</p><% } %></div>
+<div><label for="cf-a<%= c.id || '' %>">Aplica a</label><select id="cf-a<%= c.id || '' %>" name="aplica" required><% Object.entries(APLICA).forEach(([k, n]) => { %><option value="<%= k %>"<%= c.aplica === k ? ' selected' : '' %>><%= n %></option><% }) %></select></div>
+<div><label for="cf-o<%= c.id || '' %>">Orden</label><input id="cf-o<%= c.id || '' %>" name="orden" type="number" value="<%= c.orden || 0 %>"></div></div>
+<div<%- nuevo ? ' data-when="tipo=lista" hidden' : (c.tipo === 'lista' ? '' : ' hidden') %>><label for="cf-l<%= c.id || '' %>">Opciones (una por línea)<%= nuevo ? '' : ' · solo se pueden agregar' %></label><textarea id="cf-l<%= c.id || '' %>" name="opciones" rows="4"><%= (c.opciones || []).join('\n') %></textarea></div>
+<label for="cf-y<%= c.id || '' %>">Ayuda (opcional)</label><input id="cf-y<%= c.id || '' %>" name="ayuda" value="<%= c.ayuda || '' %>" placeholder="Se muestra debajo del campo">
+<label class="chk"><input type="checkbox" name="obligatorio"<%= c.obligatorio ? ' checked' : '' %>>Obligatorio (sin él no se agrega el candidato o no se confirma el ingreso)</label>
+<label class="chk"><input type="checkbox" name="sensible"<%= c.sensible ? ' checked' : '' %>>Sensible: solo Gestión Humana lo ve</label>

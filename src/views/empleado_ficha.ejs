@@ -1,10 +1,13 @@
 <% const fd = s => !s ? '—' : s instanceof Date ? s.toLocaleDateString('es-VE') : String(s).slice(0, 10).split('-').reverse().join('/'), t = d.t, act = d.rels.find(x => x.estado === 'activo'); %>
 <div class="mh"><div><h2><%= t.nombres %></h2><p class="sub"><%= act ? act.cargo + ' · ' + (act.unidad || '—') : 'Sin relación activa' %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 <p class="sub">Datos personales: solo Gestión Humana. Esta consulta quedó registrada.</p>
+<% if (d.faltan.length) { %><p class="flash err" role="status"><b>Ficha incompleta.</b> Falta: <%= d.faltan.join(', ') %>.</p><% } %>
+<p class="act"><a class="btn" href="/empleados/<%= t.id %>/editar" data-modal>Editar ficha</a></p>
 <section class="blk"><h3>Datos personales</h3><table class="kv">
 <tr><th>Cédula</th><td><%= t.cedula || '—' %></td></tr><tr><th>Fecha de nacimiento</th><td><%= fd(t.fecha_nacimiento) %></td></tr><tr><th>Sexo</th><td><%= t.sexo || '—' %></td></tr>
 <tr><th>Hijos</th><td><%= t.hijos ?? '—' %></td></tr><tr><th>Nivel académico</th><td><%= t.nivel_academico || '—' %></td></tr><tr><th>Título</th><td><%= t.titulo || '—' %></td></tr>
-<tr><th>Correo</th><td><%= t.email || '—' %></td></tr><tr><th>Teléfono</th><td><%= t.telefono || '—' %></td></tr></table>
+<tr><th>Correo</th><td><%= t.email || '—' %></td></tr><tr><th>Teléfono</th><td><%= t.telefono || '—' %></td></tr>
+<% d.defs.forEach(c => { %><tr><th><%= c.etiqueta %></th><td><%= d.mostrar(c, (t.campos || {})[c.id]) %></td></tr><% }) %></table>
 <% const extra = Object.entries(t.datos || {}); if (extra.length) { %><details><summary>Fila completa del Listado de Activos (<%= extra.length %> datos)</summary><table class="kv"><% extra.forEach(([k, v]) => { %><tr><th><%= k %></th><td><%= v %></td></tr><% }) %></table></details><% } %></section>
 <section class="blk"><h3>Trayectoria en el grupo</h3>
 <% d.rels.forEach(r => { %><div class="rel blk"><p><span class="chip<%= r.estado === 'activo' ? '' : ' w' %>"><%= ESTADOS[r.estado] || r.estado %></span> <b><%= r.cargo %></b> · <%= r.unidad || '—' %> · <%= r.siglas || r.empresa || '—' %></p>

@@ -1,10 +1,10 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 23-11-2026, contra el código `gh-portal` 0.9.2 (package.json 0.9.2, migraciones 001–017).
+Última revisión: 23-11-2026, contra el código `gh-portal` 0.9.3 (package.json 0.9.3, migraciones 001–018).
 
 ## Versión
-- **Última entregada:** 0.9.2 (23-11-2026): reglas de congelar, egreso con confirmación por nombre, anular egreso, puesto creado
-  por error, acciones en modal, volver a la misma vista y la «O» de carga.
+- **Última entregada:** 0.9.3 (23-11-2026): ficha completa al ingresar, campos personalizados, alta manual, conciliación y
+  regularizar varias, solo se cierra una plaza vacía, «O» al navegar.
 - **Desplegada en EasyPanel:** 0.9.1 (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
   reubicados por Victor). La importación de la 0.9.0 se aplicó sin respaldo previo: respaldo antes de cada despliegue.
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
@@ -73,6 +73,12 @@
   `egreso.anulado`); el organigrama no dibuja puestos con todas sus plazas cerradas; desactivar puesto con «creado por error»;
   acciones de plaza y «Regularizar» en modal propio; al guardar se vuelve a la misma vista (filtros, modal y posición);
   indicador de carga con la «O» del logo. Migración 017.
+- **0.9.3:** ficha del empleado completa al confirmar un ingreso (nacimiento, sexo, hijos, nivel académico, título, ubicación,
+  tipo de empleado; fin de contrato si el tipo lo pide), «Ficha incompleta» y «Editar ficha»; catálogos Ubicaciones y Tipos de
+  empleado; campos personalizados de GH (candidato, empleado o ambos; nunca a la IA ni a n8n); alta manual por GH (plaza vacante
+  o plaza «por regularizar»); «Regularizar varias»; Conciliación de personas y plazas con sugerencias; Reubicar con «la plaza toma
+  la empresa de la persona»; aviso en la importación por equivalencias generales; solo se cierra una plaza vacía (también en la
+  carga masiva); «O» al navegar; leyenda del organigrama. Migración 018.
 
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
@@ -80,17 +86,13 @@
   Probados en una copia de la base de EasyPanel. Son para validar el sistema con GH: la plantilla 2027 cambiará.
 - Fuera de esta carga: Silos de Portuguesa, Corpomax y F21 (sin organigrama ni unidades).
 
-## Pendiente para la 0.9.3 y siguientes (antes de la 1.0)
-- **0.9.3 Alta manual de un empleado por GH** (sin requisición, con plaza, motivo y soporte). Primer caso: la Directora de
-  Finanzas, que atiende APB y ARO: se registra por separado en cada instalación, sin vínculo entre ambas. Falta el dato:
-  qué empresa paga su nómina en APB. La regla de exclusión «APB/ARO GROUP» de la importación se mantiene.
-- Datos (en el portal, sin código): plaza de telecomunicaciones de Jose Gabriel Barreto ya regularizada (confirmar quién);
-  cerrar las 2 plazas que sobran de Analista de Servicios Tecnológicos en la Gerencia de Tecnología si el organigrama oficial
-  no las tiene; desactivar el puesto «Analista de Software» de la Dirección de Tecnología como «creado por error»;
-  razón social de CIM en Empresas (las cajas muestran «CIM»); nombre del perfil «Analista de Calidad de Sofware»;
-  equivalencia «Analista de Software» → GH-PF-003 en `4-equivalencias-para-cargar.xlsx`.
-- Visto en la 0.9.2 y sin decidir: cerrar una plaza ocupada (a mano o con la carga masiva) hoy se permite y deja a la persona
-  en una plaza cerrada. Propuesta: misma regla que congelar.
+## Pendiente después de la 0.9.3 (antes de la 1.0)
+- Datos en el portal (sin código): Directora de Finanzas por alta manual (falta la empresa que paga su nómina en APB);
+  Gerente General de Concesionario (GH-PF-052) al nivel «Gerencia General» (aprobación de Victor pendiente); Gerente de
+  Mercadeo (CIM) bajo Gerente de Mercadeo (MDV): decisión de GH; 36 perfiles sin nivel jerárquico; las 64 plazas «por
+  regularizar» con Conciliación y Regularizar varias; desactivar como «creado por error» los puestos que queden vacíos.
+- Estructura de Contraloría Agroindustrial y SDP (GH) para reubicar a su personal.
+- Plantilla 2027: cargarla y pasar por Conciliación.
 - Después: módulo de egreso (Victor lo detallará), reportería en vistas y exportación puntual solo GH.
 
 ## Pendiente sin clasificar
@@ -143,6 +145,13 @@
 - Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
   nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
 
+## Decisiones del 23-11-2026 (Victor), 0.9.3
+- Los datos del Listado (nacimiento, sexo, hijos, nivel académico, título, ubicación, tipo de empleado) se piden al CONFIRMAR EL
+  INGRESO, no al candidato; todos obligatorios; fin de contrato solo si el tipo lo pide.
+- Campos personalizados: los define GH para el candidato, el empleado o ambos; nunca van a la IA ni a n8n.
+- Alta manual sin plaza vacante: crea una plaza «por regularizar». Solo se cierra una plaza vacía.
+- Nivel jerárquico «Gerencia General» por encima de «Gerencia» (aplicado al Gerente de Post Venta).
+
 ## Decisiones del 23-11-2026 (Victor), continuación
 - Congelar = la plaza existe pero no se autoriza usarla ni pedir su requisición: solo una plaza vacía.
 - Egreso: confirmación escribiendo el nombre de la persona. Anular egreso: solo con motivo y confirmación por nombre.
@@ -191,8 +200,7 @@
   (aprobación por estructura, reserva de plazas, nada se borra, rechazo de usuarios no registrados).
 - **0.8 y 0.9: entregadas en la 0.9.0.** Pendiente de la 0.8.2: enlace usuario ↔ ficha de empleado (no entró).
 - **0.9.1 (entregada):** reubicar empleados (corrige el organigrama tras la importación).
-- **0.9.2 (entregada).** **0.9.3:** alta manual por GH. Después, versiones propias antes de la 1.0: módulo de egreso,
-  reportería y exportación.
+- **0.9.2 y 0.9.3 (entregadas).** Después, versiones propias antes de la 1.0: módulo de egreso, reportería y exportación.
 - **1.0** Notificaciones, plantillas y SSO Microsoft 365 (enlace por `oid`, sin alta automática, rechazo de
   cuentas no registradas) = salida a producción.
 - **Después:** instalación ARO.

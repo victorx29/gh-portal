@@ -7,8 +7,8 @@ const gh = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Ges
 const empresasActivas = async () => (await q('select id, siglas, coalesce(razon_social, nombre) nombre from empresa where activa order by 3')).rows;
 
 r.get('/empleados', gh, w(async (req, res) => {
-  const f = { q: String(req.query.q || '').trim(), empresa: req.query.empresa || '', estado: ['activo', 'egresado', 'todos'].includes(req.query.estado) ? req.query.estado : 'activo' };
-  res.render('empleados', { title: 'Empleados', nav: 'empleados', f, es: await EM.listar(req.user, f), empresas: await empresasActivas(),
+  const f = { q: String(req.query.q || '').trim(), empresa: req.query.empresa || '', estado: ['activo', 'egresado', 'todos'].includes(req.query.estado) ? req.query.estado : 'activo', incompleta: req.query.incompleta === '1' };
+  res.render('empleados', { title: 'Empleados', nav: 'empleados', f, es: (await EM.listar(req.user, f)).filter(x => !f.incompleta || x.incompleta), empresas: await empresasActivas(),
     porReg: (await q("select count(*)::int n from plaza where por_regularizar and (hasta is null or hasta > current_date)")).rows[0].n });
 }));
 r.get('/empleados/:id(\\d+)', gh, w(async (req, res) => modal(req, res, 'empleado_ficha', { title: 'Empleado', nav: 'empleados', d: await EM.ficha(req.user, +req.params.id),
@@ -44,6 +44,40 @@ r.post('/empleados/relacion/:id(\\d+)/reubicar', gh, w(async (req, res) => {
     res.redirect(fichaDe(x.trabajador_id));
   } catch (e) { errNegocio(req, res, e, formReubicar(+req.params.id)); }
 }));
+
+// ---- Alta manual (0.9.3) ----
+r.get('/empleados/nuevo', gh, w(async (req, res) => res.render('empleado_alta', { title: 'Alta manual', nav: 'empleados', o: await EM.opcionesAlta() })));
+r.post('/empleados/nuevo', gh, w(async (req, res) => {
+  try {
+    const x = await EM.altaManual(req.user, req.body);
+    flash(req, 'ok', 'Empleado registrado en la plaza ' + x.plaza + (x.porRegularizar ? ' («por regularizar»: no cuenta en el HC hasta regularizarla)' : ''));
+    res.redirect('/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + x.trabajador_id));
+  } catch (e) {
+    if (!e.status || e.status >= 500) throw e;
+    // Se vuelve a mostrar el formulario con lo escrito (sin perder datos)
+    res.status(400).render('empleado_alta', { title: 'Alta manual', nav: 'empleados', o: await EM.opcionesAlta(), b: req.body, error: e.message });
+  }
+}));
+
+// ---- Campos personalizados (0.9.3): los define GH para el candidato, el empleado o ambos ----
+const FI = require('../services/ficha');
+r.get('/config/campos', gh, w(async (req, res) => res.render('config_campos', { title: 'Campos personalizados', nav: 'config', sub: 'campos', cs: await FI.listarCampos(), TIPOS: FI.TIPOS_CAMPO, APLICA: FI.APLICA })));
+r.get('/config/campos/:id(\\d+)', gh, w(async (req, res) => {
+  const c = (await q('select * from campo_personalizado where id=$1', [+req.params.id])).rows[0]; if (!c) throw E(404, 'Campo no encontrado');
+  modal(req, res, 'campo_form', { title: 'Editar campo', nav: 'config', sub: 'campos', c, TIPOS: FI.TIPOS_CAMPO, APLICA: FI.APLICA });
+}));
+r.post('/config/campos', gh, hacer(req => FI.crearCampo(req.user, req.body), 'Campo creado', '/config/campos'));
+r.post('/config/campos/:id(\\d+)', gh, hacer(req => FI.editarCampo(req.user, +req.params.id, req.body), 'Campo actualizado', '/config/campos'));
+r.post('/config/campos/:id(\\d+)/activo', gh, hacer(req => FI.activarCampo(req.user, +req.params.id), 'Campo actualizado', '/config/campos'));
+// Editar la ficha del empleado (completar datos)
+r.get('/empleados/:id(\\d+)/editar', gh, w(async (req, res) => {
+  const t = (await q('select * from trabajador where id=$1', [+req.params.id])).rows[0]; if (!t) throw E(404, 'Empleado no encontrado');
+  const r0 = (await q("select ubicacion, tipo_empleado, fecha_fin_contrato from relacion_laboral where trabajador_id=$1 and estado='activo' order by id desc limit 1", [t.id])).rows[0] || {};
+  modal(req, res, 'empleado_editar', { title: 'Editar ficha', nav: 'empleados', t, v: { ...t, ...r0 }, activo: !!r0.tipo_empleado || !!r0.ubicacion || !!(await q("select 1 from relacion_laboral where trabajador_id=$1 and estado='activo'", [t.id])).rowCount,
+    cat: await FI.catalogos(), defs: await FI.campos('empleado') });
+}));
+r.post('/empleados/:id(\\d+)/editar', gh, hacer(async req => { await FI.editarFicha(req.user, +req.params.id, req.body); return '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + req.params.id); },
+  'Ficha actualizada', req => '/empleados?estado=todos&modal=' + encodeURIComponent('/empleados/' + req.params.id + '/editar')));
 
 // ---- Importación del Listado de Activos ----
 const pagina = (req, res, extra) => {
@@ -86,10 +120,18 @@ r.post('/empleados/equivalencias/aplicar', gh, hacer(async req => {
 }, 'Equivalencias guardadas. Vuelve a subir el Listado para revisarlo con ellas', '/empleados/importar'));
 
 // ---- Plazas por regularizar (las crea la carga inicial) ----
+r.get('/config/plantilla/conciliacion', gh, w(async (req, res) => res.render('conciliacion', { title: 'Conciliación de personas y plazas', nav: 'config', sub: 'conciliacion', c: await EM.conciliacion(req.user) })));
 r.get('/config/plantilla/por-regularizar', gh, w(async (req, res) => res.render('por_regularizar', { title: 'Plazas por regularizar', nav: 'config', sub: 'porreg', zs: await PL.porRegularizar() })));
 r.get('/config/plazas/:id(\\d+)/regularizar', gh, w(async (req, res) => {
   const z = (await PL.porRegularizar()).find(x => x.id === +req.params.id); if (!z) throw E(404, 'La plaza no está por regularizar');
   modal(req, res, 'plaza_regularizar', { title: 'Regularizar plaza', nav: 'config', sub: 'porreg', z });
+}));
+r.post('/config/plazas/regularizar-varias', gh, w(async (req, res) => {
+  try {
+    const x = await PL.regularizarVarias(req.user, req.body.ids, req.body.autorizado);
+    flash(req, x.fallan.length ? 'err' : 'ok', (x.ok ? x.ok + ' plaza(s) regularizada(s).' : 'Ninguna plaza regularizada.') + (x.fallan.length ? ' No se pudo: ' + x.fallan.join(' · ') : ''));
+  } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
+  res.redirect('/config/plantilla/por-regularizar');
 }));
 r.post('/config/plazas/:id(\\d+)/regularizar', gh, hacer(async req => '/config/plantilla?modal=' + encodeURIComponent('/config/plantilla/puesto/' + await PL.regularizar(req.user, +req.params.id, req.body.autorizado)),
   'Plaza regularizada: ya cuenta en el HC autorizado', '/config/plantilla/por-regularizar'));

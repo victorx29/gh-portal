@@ -30,7 +30,8 @@
 <tr><th>Plaza <%= rl.plaza_codigo || '' %></th><td><%= p.otro ? 'La ocupa ' + p.otro.nombres : p.cierra ? 'Queda vacía y, por ser «por regularizar», se cierra sola con motivo' : 'Queda vacante' %></td></tr>
 <tr><th>Motivo</th><td><%= p.motivo %></td></tr></table></section>
 <form method="post" action="/empleados/relacion/<%= rl.id %>/reubicar" data-confirm="<%= TIPOS[p.tipo] %>: <%= rl.nombres %> pasa a la plaza <%= z.codigo %>. Queda en el historial y no se deshace desde el portal." data-ok="Reubicar">
-<input type="hidden" name="_csrf" value="<%= csrf %>"><% ['tipo', 'plaza_correccion', 'plaza_traslado', 'fecha', 'motivo'].forEach(k => { %><input type="hidden" name="<%= k %>" value="<%= b[k] || '' %>"><% }) %>
+<input type="hidden" name="_csrf" value="<%= csrf %>"><% ['tipo', 'plaza_correccion', 'plaza_traslado', 'fecha', 'motivo', '_volver'].filter(k => k !== '_volver' || /^\/config\/plantilla\/conciliacion/.test(b._volver || '')).forEach(k => { %><input type="hidden" name="<%= k %>" value="<%= b[k] || '' %>"><% }) %>
+<% if (p.empresaDistinta) { %><label class="chk"><input type="checkbox" name="empresa_persona"<%= p.empresaPersona ? ' checked' : '' %>>La plaza <%= z.codigo %> toma la empresa de la persona (<%= rl.empresa %>) en lugar de <%= z.empresa %>; queda en el historial de la plaza</label><% } %>
 <fieldset><legend>Supervisor inmediato</legend>
 <% const sug = p.sugerido && p.sugerido.id !== rl.supervisor_id ? p.sugerido : null, porSug = sug && p.tipo === 'traslado'; %>
 <label class="chk"><input type="radio" name="supervisor" value="mantener"<%= porSug ? '' : ' checked' %>>Mantener: <%= rl.supervisor_nombre || rl.supervisor_texto || 'sin supervisor' %></label>

@@ -196,6 +196,17 @@ async function regularizar(u, plazaId, autorizado) {
     return z.puesto_id;
   });
 }
+// Regularizar varias de una vez con el mismo soporte (0.9.3): las que no cumplen se informan y no se tocan
+async function regularizarVarias(u, ids, autorizado) {
+  autorizado = String(autorizado || '').trim(); if (!autorizado) throw E(400, 'Indica quién autorizó las plazas y con qué soporte (queda en el historial)');
+  ids = [...new Set([].concat(ids || []).map(Number).filter(Boolean))]; if (!ids.length) throw E(400, 'Marca las plazas que quieres regularizar');
+  const ok = [], fallan = [];
+  for (const id of ids) {
+    try { await regularizar(u, id, autorizado); ok.push(id); }
+    catch (e) { if (!e.status) throw e; const z = (await q('select codigo from plaza where id=$1', [id])).rows[0]; fallan.push((z ? z.codigo : '#' + id) + ': ' + e.message); }
+  }
+  return { ok: ok.length, fallan };
+}
 const porRegularizar = () => q(`select z.id, z.codigo, z.desde, z.modalidad, coalesce(e.siglas, e.razon_social) empresa, p.id puesto_id, pf.codigo perfil_codigo, pf.nombre perfil, un.codigo unidad_codigo, un.nombre unidad,
     oc.nombres ocupante, oc.trabajador_id ocupante_id, oc.id ocupante_rel
   from plaza z join puesto p on p.id=z.puesto_id join perfil pf on pf.id=p.perfil_id join unidad un on un.id=p.unidad_id left join empresa e on e.id=z.empresa_id
@@ -265,11 +276,22 @@ async function congelarC(c, u, plazaId, on, motivo) {
   return z;
 }
 const congelar = (u, plazaId, on, motivo) => tx(async c => (await congelarC(c, u, plazaId, on, motivo)).puesto_id);
+// Una plaza ocupada no se cierra (0.9.3): primero egreso o reubicación. Tampoco con ingreso en curso o requisición abierta.
+async function motivoOcupada(c, plazaId) {
+  const x = (await c.query(`select (select t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=$1 and r.estado='activo' limit 1) ocupante,
+      (select t.nombres from relacion_laboral r join trabajador t on t.id=r.trabajador_id where r.plaza_id=$1 and r.estado='por_ingresar' limit 1) por_ingresar,
+      (select r.codigo from requisicion r where r.plaza_id=$1 and ${ABIERTA} limit 1) requisicion`, [plazaId])).rows[0];
+  if (x.ocupante) return `la ocupa ${x.ocupante}: registra su egreso o reubícalo antes de cerrarla`;
+  if (x.por_ingresar) return `tiene a ${x.por_ingresar} por ingresar`;
+  if (x.requisicion) return `tiene abierta la requisición ${x.requisicion}`;
+  return null;
+}
 async function cerrarPlaza(u, plazaId, motivo) {
   motivo = String(motivo || '').trim(); if (!motivo) throw E(400, 'Indica el motivo del cierre');
   return tx(async c => {
     const z = (await c.query('select * from plaza where id=$1 for update', [plazaId])).rows[0]; if (!z) throw E(404, 'Plaza no encontrada');
     if (z.hasta) throw E(400, 'La plaza ya está cerrada');
+    const m = await motivoOcupada(c, plazaId); if (m) throw E(400, `La plaza ${z.codigo} ${m}`);
     await c.query('update plaza set hasta=greatest(current_date, desde), cerrado_por=$2, motivo_cierre=$3 where id=$1', [plazaId, u.id, motivo]);
     await hist(c, u, 'plaza', plazaId, 'cerrar', { codigo: z.codigo, motivo }); return z.puesto_id;
   });
@@ -285,6 +307,7 @@ async function plazaAcciones(id) {
     where r.plaza_id=$1 and r.estado in ('activo','por_ingresar') order by r.estado`, [id])).rows;
   z.req = (await q(`select r.id, r.codigo from requisicion r where r.plaza_id=$1 and ${ABIERTA} limit 1`, [id])).rows[0] || null;
   z.noCongelable = z.congelada || z.hasta ? null : await motivoNoCongelable({ query: q }, id);   // q tiene la misma firma que c.query
+  z.noCerrable = z.hasta ? null : await motivoOcupada({ query: q }, id);
   return z;
 }
 // ---------- Empresa de la plaza ----------
@@ -534,7 +557,10 @@ async function procesar(c, filas, usr, aplicar) {
     for (const ck of claves) {
       const e0 = ck.split('|')[0], gr = pl.grupos.find(x => x.empId + '|' + x.mod === ck) || { empId: e0 === 'null' ? null : +e0, mod: ck.split('|')[1], nP: 0, nC: 0, nY: 0 };
       const act = actuales.filter(z => z.empresa_id + '|' + z.modalidad === ck), vig = act.filter(z => z.desde <= hoy), pro = act.filter(z => z.desde > hoy);
-      const op = { gr, abrir: Math.max(0, gr.nP - vig.length), cerrar: vig.length > gr.nP ? vig.filter(z => !z.congelada).concat(vig.filter(z => z.congelada)).slice(-(vig.length - gr.nP)) : [],
+      // Cerrar (0.9.3): solo plazas vacías, empezando por las congeladas; si no alcanzan, error en la fila
+      const sobran = Math.max(0, vig.length - gr.nP), cerrables = vig.filter(z => !enUso.has(z.id)).sort((a, b) => (b.congelada - a.congelada) || b.id - a.id);
+      if (sobran > cerrables.length) err(gr.fila || pl.fila, `Plazas: hay que cerrar ${sobran}, pero solo ${cerrables.length} están vacías. Una plaza ocupada no se cierra: egreso o reubicación primero`);
+      const op = { gr, abrir: Math.max(0, gr.nP - vig.length), cerrar: cerrables.slice(0, sobran),
         abrirY: Math.max(0, gr.nY - pro.length), cerrarY: pro.length > gr.nY ? pro.slice(-(pro.length - gr.nY)) : [] };
       const quedan = vig.filter(z => !op.cerrar.includes(z)), congAct = quedan.filter(z => z.congelada).length;
       const congelables = quedan.filter(z => !z.congelada && !enUso.has(z.id)), faltan = gr.nC - congAct;
@@ -601,5 +627,5 @@ const analizar = filas => tx(c => procesar(c, filas, null, false));
 async function aplicarCarga(filas, usr) {
   return tx(async c => { const r = await procesar(c, filas, usr, true); if (r.errs.length) throw E(400, 'La plantilla cambió desde la vista previa. Vuelve a subir el archivo'); return r; });
 }
-module.exports = { plazaAcciones, congelarC, motivoNoCongelable, regularizar, porRegularizar, crearPlazasC, agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
+module.exports = { regularizarVarias, motivoOcupada, plazaAcciones, congelarC, motivoNoCongelable, regularizar, porRegularizar, crearPlazasC, agregarFuncional, cerrarFuncional, moverPuesto, ABIERTA, POR_DEFINIR, cambiarEmpresaC, cambiarEmpresaPlaza, plazasParaSolicitud, validarPlazaC, alAprobar, __cargar: cargar, unidadesConPlazas, MODALIDADES, ESTADOS, estado, contar, resumenTxt, resumenUnidades, listar, detalle, opcionesPuestos, crearPuesto, editarPuesto, desactivarPuesto, agregarPlazas, congelar, cerrarPlaza,
   diagramaPuestos, plantilla, leer, analizar, aplicarCarga };
