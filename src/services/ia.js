@@ -48,15 +48,16 @@ const candidaturaDe = async (c, id) => { const x = (await c.query(`select ca.*, 
   join candidato cd on cd.id=ca.candidato_id where ca.id=$1`, [id])).rows[0]; if (!x) throw E(404, 'Candidatura no encontrada'); return x; };
 async function subirCv(u, candId, file, nombre) {
   ghOnly(u);
-  if (!file) throw E(400, 'Selecciona el CV (PDF, Word o texto)');
+  if (!file) throw E(400, 'Selecciona el CV (PDF, Word, texto o imagen)');
   const ext = path.extname(nombre || file.originalname).toLowerCase();
   let texto = null;
   try { if (ext === '.docx') texto = await textoDocx(fs.readFileSync(file.path)); else if (ext === '.txt') texto = fs.readFileSync(file.path, 'utf8'); }
   catch (e) { throw E(400, 'No se pudo leer el Word: ¿está dañado?'); }
   return tx(async c => {
     const ca = await candidaturaDe(c, candId);
-    const id = (await c.query(`insert into cv_archivo(requisicion_id,candidato_id,nombre_original,ruta,mime,tamano,texto,subido_por,estado) values($1,$2,$3,$4,$5,$6,$7,$8,'listo') returning id`,
-      [ca.requisicion_id, ca.candidato_id, nombre, file.filename, file.mimetype, file.size, texto ? texto.slice(0, MAX_TEXTO) : null, u.id])).rows[0].id;
+    const hash = crypto.createHash('sha256').update(fs.readFileSync(file.path)).digest('hex');
+    const id = (await c.query(`insert into cv_archivo(requisicion_id,candidato_id,nombre_original,ruta,mime,tamano,texto,subido_por,estado,hash) values($1,$2,$3,$4,$5,$6,$7,$8,'listo',$9) returning id`,
+      [ca.requisicion_id, ca.candidato_id, nombre, file.filename, file.mimetype, file.size, texto ? texto.slice(0, MAX_TEXTO) : null, u.id, hash])).rows[0].id;
     await c.query('update candidatura set cv_archivo_id=$2, actualizada_en=now() where id=$1', [candId, id]);
     await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(candId), 'cv', { archivo: nombre }]);
     return id;
@@ -65,7 +66,7 @@ async function subirCv(u, candId, file, nombre) {
 async function cvDe(u, cvId) { ghOnly(u); const a = (await q('select * from cv_archivo where id=$1', [cvId])).rows[0]; if (!a) throw E(404, 'CV no encontrado'); return a; }
 async function consentimiento(u, candId, ref, retirar) {
   ghOnly(u);
-  ref = String(ref || '').trim(); if (!retirar && !ref) throw E(400, 'Indica cómo autorizó el postulado el tratamiento de sus datos');
+  ref = String(ref || '').trim(); if (!retirar && !ref) throw E(400, 'Confirma que notificaste al postulado sobre el uso de sus datos');
   return tx(async c => {
     const ca = await candidaturaDe(c, candId);
     await c.query('update candidato set consentimiento_en=$2, consentimiento_por=$3, consentimiento_ref=$4 where id=$1', [ca.candidato_id, retirar ? null : new Date(), retirar ? null : u.id, retirar ? null : ref]);
@@ -81,6 +82,8 @@ async function solicitar(u, candId) {
     const ca = await candidaturaDe(c, candId);
     if (!ca.consentimiento_en) throw E(400, 'Registra primero el consentimiento del postulado para tratar sus datos');
     if (!ca.cv_archivo_id) throw E(400, 'Sube primero el CV del postulado');
+    // 0.9.4: si n8n está leyendo el CV (OCR), se espera su texto para no leerlo dos veces
+    if ((await c.query(`select 1 from cv_archivo where id=$1 and lectura='pendiente' and lectura_pedida_en > now() - interval '${VENCE_MIN} minutes'`, [ca.cv_archivo_id])).rowCount) throw E(400, 'El CV se está leyendo: pide el análisis cuando termine la lectura');
     // Un análisis sin respuesta de n8n en VENCE_MIN minutos se da por vencido y se puede volver a pedir
     await c.query(`update ia_analisis set estado='error', error='Sin respuesta de n8n en ${VENCE_MIN} minutos', recibido_en=now()
       where candidatura_id=$1 and estado='pendiente' and solicitado_en < now() - interval '${VENCE_MIN} minutes'`, [candId]);
@@ -98,6 +101,18 @@ async function solicitar(u, candId) {
     await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(candId), 'ia.solicitar', { analisis_id: id }]);
     return id;
   });
+}
+
+// Reintentar (0.9.4): GH da por fallido el análisis en curso (n8n no respondió, o se está probando el flujo) y pide otro.
+// Si n8n contesta después al pedido anterior, el portal lo rechaza: ese análisis ya terminó.
+async function reintentar(u, candId) {
+  ghOnly(u);
+  await tx(async c => {
+    await candidaturaDe(c, candId);
+    const r = await c.query(`update ia_analisis set estado='error', error='Reintentado por Gestión Humana', recibido_en=now() where candidatura_id=$1 and estado='pendiente' returning id`, [candId]);
+    if (r.rowCount) await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(candId), 'ia.reintentar', { analisis_id: r.rows[0].id }]);
+  });
+  return solicitar(u, candId);
 }
 
 // ---------- API para n8n (clave compartida + token del análisis) ----------
@@ -149,4 +164,4 @@ const ultimo = candId => q(`select a.*, us.nombre solicitado_por_nombre from ia_
 const puntajes = reqId => q(`select distinct on (a.candidatura_id) a.candidatura_id, a.puntaje, a.estado from ia_analisis a join candidatura ca on ca.id=a.candidatura_id
   where ca.requisicion_id=$1 order by a.candidatura_id, a.id desc`, [reqId]).then(r => new Map(r.rows.map(x => [x.candidatura_id, x])));
 
-module.exports = { redactar, requisito, rubricaConfig, guardarRubrica, subirCv, cvDe, consentimiento, solicitar, datosParaN8n, recibirResultado, recibirError, ultimo, puntajes, iguales };
+module.exports = { BASE, reintentar, textoDocx, redactar, requisito, rubricaConfig, guardarRubrica, subirCv, cvDe, consentimiento, solicitar, datosParaN8n, recibirResultado, recibirError, ultimo, puntajes, iguales };

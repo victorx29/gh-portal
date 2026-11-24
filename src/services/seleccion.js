@@ -1,21 +1,28 @@
-const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), IA = require('./ia'), FI = require('./ficha'), { E } = require('../util');
+const { q, tx } = require('../db'), P = require('./perm'), PL = require('./pipelines'), RS = require('./requisiciones'), EM = require('./empleados'), IA = require('./ia'), FI = require('./ficha'), LE = require('./lectura'), { E } = require('../util');
 const ghOnly = u => { if (!P.esGH(u)) throw E(403, 'Solo Gestión Humana gestiona la selección'); };
 const histC = (c, u, id, accion, detalle) => c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidatura', String(id), accion, detalle || {}]);
 const evento = (c, tipo, p) => c.query('insert into evento_outbox(tipo,payload) values($1,$2)', [tipo, p]);
 // Los campos personalizados nunca salen del portal (0.9.3): se quitan de los datos del candidato que viajan a n8n
 const sinCampos = cd => { const { campos, ...resto } = cd; void campos; return resto; };
-const CA = `select ca.*, c.nombre, c.email, c.telefono, c.cedula, c.campos, c.consentimiento_en, c.consentimiento_ref, cv.nombre_original cv_nombre, cv.subido_en cv_subido_en, r.empresa_id, r.codigo, r.plazas, r.estado req_estado, pf.nombre cargo
+const CA = `select ca.*, ca.codigo cand_codigo, c.nombre, c.email, c.telefono, c.cedula, c.campos, c.consentimiento_en, c.consentimiento_ref, cv.nombre_original cv_nombre, cv.subido_en cv_subido_en, cv.lectura, cv.lectura_error, cv.lectura_modelo, cv.lectura_recibida_en, cv.lectura_pedida_en, cv.lectura_datos, cv.alertas, cv.alertas_revisadas_en, c.nombre_provisional, r.empresa_id, r.codigo, r.plazas, r.estado req_estado, pf.nombre cargo
   from candidatura ca join candidato c on c.id=ca.candidato_id join requisicion r on r.id=ca.requisicion_id left join cv_archivo cv on cv.id=ca.cv_archivo_id
   join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id`;
 
 async function tablero(u, reqId) {
   ghOnly(u); const req = await RS.obtener(u, reqId), pl = await PL.resolver(req.empresa_id, 'seleccion');
-  const cands = (await q('select ca.*, c.nombre, c.email from candidatura ca join candidato c on c.id=ca.candidato_id where ca.requisicion_id=$1 order by ca.id', [reqId])).rows;
+  // 0.9.4: número del candidato, lectura del CV en n8n y alertas sin revisar
+  const cands = (await q(`select ca.*, c.nombre, c.email, c.cedula, c.nombre_provisional, cv.lectura, cv.lectura_error,
+      (cv.lectura='pendiente' and cv.lectura_pedida_en < now() - interval '${LE.VENCE_MIN} minutes') lectura_vencida,
+      case when cv.alertas_revisadas_en is null then jsonb_array_length(coalesce(cv.alertas,'[]')) else 0 end alertas
+    from candidatura ca join candidato c on c.id=ca.candidato_id left join cv_archivo cv on cv.id=ca.cv_archivo_id where ca.requisicion_id=$1 order by ca.correlativo`, [reqId])).rows;
   // Puntaje orientativo de la IA: ordena las tarjetas de cada columna (mayor primero); GH decide
   const pts = await IA.puntajes(reqId); cands.forEach(x => { const a = pts.get(x.id); x.ia = a || null; });
   cands.sort((a, b) => ((b.ia && b.ia.estado === 'listo' ? +b.ia.puntaje : -1) - (a.ia && a.ia.estado === 'listo' ? +a.ia.puntaje : -1)) || a.id - b.id);
   const ing = cands.filter(x => pl.exito && x.etapa === pl.exito.clave).length;
-  return { req, pl, cands, ing };
+  const activas = new Set(pl.flujo.filter(e => e.clase !== 'exito').map(e => String(e.clave))), act = cands.filter(x => activas.has(String(x.etapa)));
+  const resumen = { leyendo: act.filter(x => x.lectura === 'pendiente' && !x.lectura_vencida).length, fallas: act.filter(x => x.lectura === 'error' || x.lectura_vencida).length,
+    alertas: act.filter(x => x.alertas > 0).length, sinCedula: act.filter(x => !x.cedula).length, sinLectura: act.filter(x => x.lectura === 'sin_lectura').length };
+  return { req, pl, cands, ing, resumen, lectura: LE.configurada(), firma: (await LE.estado(u, reqId)).firma, sondeo: resumen.leyendo > 0 || cands.some(x => x.ia && x.ia.estado === 'pendiente') };
 }
 async function crearCandidato(u, reqId, b) {
   ghOnly(u); const nombre = String(b.nombre || '').trim(); if (!nombre) throw E(400, 'El nombre es obligatorio');
@@ -43,14 +50,17 @@ async function detalle(u, id) {
   const registro = activa ? (await q('select * from etapa_registro where tipo=$1 and entidad_id=$2 and etapa=$3', ['candidatura', id, et.clave])).rows[0] || null : null;
   const bloqueos = nxt ? await PL.problemas({ query: q }, 'candidatura', id, et) : [];
   // Otras postulaciones de la misma persona y si ya es empleado (movimiento interno)
-  const otras = (await q(`select ca.id, ca.etapa, r.codigo, pf.nombre cargo, ca.actualizada_en from candidatura ca join requisicion r on r.id=ca.requisicion_id
+  const otras = (await q(`select ca.id, ca.etapa, ca.codigo, pf.nombre cargo, ca.actualizada_en from candidatura ca join requisicion r on r.id=ca.requisicion_id
     join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id where ca.candidato_id=$1 and ca.id<>$2 order by ca.id desc`, [ca.candidato_id, id])).rows;
   const empleado = ca.cedula ? (await q(`select rl.cargo, un.nombre unidad, rl.fecha_ingreso from relacion_laboral rl join trabajador t on t.id=rl.trabajador_id left join unidad un on un.id=rl.unidad_id
     where t.cedula=$1 and rl.estado='activo' order by rl.fecha_ingreso desc limit 1`, [ca.cedula])).rows[0] || null : null;
   const ingreso = et && et.clase === 'exito' ? await EM.deCandidatura(id) : null;
   // 0.9.3: ficha que GH completa al confirmar el ingreso (si la persona ya tuvo ficha, viene precargada) y campos personalizados
   const ficha = ingreso ? (await q('select t.*, r.ubicacion, r.tipo_empleado, r.fecha_fin_contrato from trabajador t join relacion_laboral r on r.trabajador_id=t.id where r.id=$1', [ingreso.id])).rows[0] : null;
-  return { ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso, ia: await IA.ultimo(id), ficha,
+  // 0.9.4: ficha anterior con la misma cédula que leyó n8n (para unir si GH confirma que es la misma persona)
+  const dup = !ca.cedula && ca.lectura_datos && ca.lectura_datos.duplicado_de ? (await q('select id, nombre, cedula from candidato where id=$1', [ca.lectura_datos.duplicado_de])).rows[0] || null : null;
+  const lecturaVencida = ca.lectura === 'pendiente' && ca.lectura_pedida_en < new Date(Date.now() - LE.VENCE_MIN * 60000);
+  return { EXT: LE.EXT, dup, lecturaVencida, lecturaOk: LE.configurada(), ca, et, activa, siguiente: nxt, registro, bloqueos, otras, empleado, ingreso, ia: await IA.ultimo(id), ficha,
     cat: ficha ? await FI.catalogos() : null, defsEmp: ficha ? await FI.campos('empleado') : [], defsCand: await FI.campos('candidato'), mostrar: FI.mostrar };
 }
 // Campos personalizados del candidato (GH)
@@ -61,6 +71,44 @@ async function guardarCampos(u, id, b) {
     const prev = (await c.query('select campos from candidato where id=$1 for update', [ca.candidato_id])).rows[0].campos;
     await c.query('update candidato set campos=$2 where id=$1', [ca.candidato_id, FI.leerCampos(defs, b, prev, true)]);
     await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidato', String(ca.candidato_id), 'campos', { campos: Object.keys(b).filter(k => k.startsWith('cp_')).length }]);
+  });
+}
+// Datos del candidato (0.9.4): nombre, cédula, correo y teléfono. Si la cédula ya tiene ficha de otra postulación y GH confirma
+// que es la misma persona («unir»), esta candidatura pasa a esa ficha; la provisional queda marcada como unida (no se borra).
+async function editarDatos(u, id, b) {
+  ghOnly(u);
+  const nombre = String(b.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 120); if (nombre.length < 3) throw E(400, 'Escribe el nombre completo');
+  const ced = EM.cedulaNorm(b.cedula), t = k => String(b[k] || '').trim().slice(0, 160) || null, email = t('email');
+  if (ced && (ced.length < 6 || ced.length > 10)) throw E(400, 'La cédula debe tener entre 6 y 10 dígitos');
+  if (email && !LE.RX_EMAIL.test(email)) throw E(400, 'El correo no es válido');
+  return tx(async c => {
+    const ca = (await c.query('select * from candidatura where id=$1 for update', [id])).rows[0]; if (!ca) throw E(404, 'Candidatura no encontrada');
+    const cd = (await c.query('select * from candidato where id=$1 for update', [ca.candidato_id])).rows[0];
+    const conIngreso = async cid => (await c.query('select 1 from relacion_laboral where candidatura_id in (select id from candidatura where candidato_id=$1)', [cid])).rowCount > 0;
+    if (cd.cedula && ced !== cd.cedula && await conIngreso(cd.id)) throw E(400, 'La cédula no se cambia: la persona ya tiene un ingreso registrado');
+    if (cd.cedula && !ced) throw E(400, 'La cédula no se puede dejar vacía una vez registrada');
+    const otro = ced && ced !== cd.cedula ? (await c.query('select * from candidato where cedula=$1 and id<>$2 for update', [ced, cd.id])).rows[0] : null;
+    if (otro) {
+      const pos = (await c.query('select codigo, requisicion_id from candidatura where candidato_id=$1 order by id desc', [otro.id])).rows;
+      const aqui = pos.find(p => p.requisicion_id === ca.requisicion_id);
+      if (aqui) throw E(400, `Esa persona ya está en esta requisición como ${aqui.codigo}: rechaza esta candidatura como duplicada`);
+      if (b.unir !== 'on') throw E(400, `La cédula ya tiene ficha de candidato (${otro.nombre}${pos.length ? ', postuló a ' + pos.slice(0, 3).map(p => p.codigo).join(', ') : ''}). Si es la misma persona, marca «Unir con esa ficha»`);
+      if ((await c.query('select count(*)::int n from candidatura where candidato_id=$1', [cd.id])).rows[0].n > 1) throw E(400, 'Esta ficha tiene otras postulaciones: no se puede unir desde aquí');
+      // Unir: la candidatura y su CV pasan a la ficha anterior; se completan sus datos vacíos y el consentimiento si no lo tenía
+      await c.query('update candidatura set candidato_id=$2, actualizada_en=now() where id=$1', [id, otro.id]);
+      await c.query('update cv_archivo set candidato_id=$2 where candidato_id=$1', [cd.id, otro.id]);
+      await c.query(`update candidato set email=coalesce(email,$2), telefono=coalesce(telefono,$3),
+        consentimiento_en=coalesce(consentimiento_en,$4), consentimiento_por=case when consentimiento_en is null then $5 else consentimiento_por end, consentimiento_ref=case when consentimiento_en is null then $6 else consentimiento_ref end where id=$1`,
+        [otro.id, email || cd.email, t('telefono') || cd.telefono, cd.consentimiento_en, cd.consentimiento_por, cd.consentimiento_ref]);
+      await c.query('update candidato set unido_a=$2 where id=$1', [cd.id, otro.id]);
+      await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidato', String(cd.id), 'unir', { con: otro.id, candidatura: ca.codigo }]);
+      await histC(c, u, id, 'unir', { de: cd.id, a: otro.id });
+      return { unido: otro.nombre };
+    }
+    await c.query('update candidato set nombre=$2, cedula=$3, email=$4, telefono=$5, nombre_provisional=false where id=$1', [cd.id, nombre, ced || cd.cedula, email, t('telefono')]);
+    const cambios = ['nombre', 'cedula', 'email', 'telefono'].filter(k => String((k === 'cedula' ? ced || cd.cedula : k === 'nombre' ? nombre : k === 'email' ? email : t(k)) || '') !== String(cd[k] || ''));
+    await c.query('insert into historial(usuario_id,entidad,entidad_id,accion,detalle) values($1,$2,$3,$4,$5)', [u.id, 'candidato', String(cd.id), 'datos', { campos: cambios }]);
+    return {};
   });
 }
 async function registrar(u, id, b) { const d = await detalle(u, id); if (!d.activa) throw E(400, 'Esta etapa no admite registro'); await PL.registrar(u, 'candidatura', id, d.et, b); }
@@ -76,7 +124,9 @@ async function avanzar(u, id) {
     await c.query('update candidatura set etapa=$2, actualizada_en=now() where id=$1', [id, nxt.clave]);
     await histC(c, u, id, 'avanzar', { de: ca.etapa, a: nxt.clave });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
-    await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, etapa_anterior: ca.etapa, candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
+    await evento(c, 'candidatura.' + nxt.clave, { candidatura_id: id, candidatura_codigo: ca.codigo, requisicion_id: r.id, codigo: r.codigo, etapa: nxt.nombre, etapa_anterior: ca.etapa, candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
+    // 0.9.4: el nombre que vino del archivo no llega a la ficha del empleado
+    if (nxt.clase === 'exito' && cd.nombre_provisional) throw E(400, 'El nombre del candidato es el del archivo del CV: corrígelo en «Editar datos» antes de pasarlo a Ingreso');
     if (nxt.clase === 'exito') {   // ingreso: la persona queda «por ingresar» en la plaza; GH confirma después la fecha real
       await EM.porIngresarC(c, u, { id }, cd, r);
       const n = (await c.query('select count(*)::int n from candidatura where requisicion_id=$1 and etapa=$2', [r.id, nxt.clave])).rows[0].n;
@@ -94,7 +144,7 @@ async function rechazar(u, id, motivo) {
     await c.query('update candidatura set etapa=$2, motivo_rechazo=$3, actualizada_en=now() where id=$1', [id, pl.cierre.clave, motivo.trim()]);
     await histC(c, u, id, 'rechazar', { de: ca.etapa, motivo: motivo.trim() });
     const cd = (await c.query('select * from candidato where id=$1', [ca.candidato_id])).rows[0];
-    await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, requisicion_id: r.id, codigo: r.codigo, etapa_anterior: ca.etapa, motivo: motivo.trim(), candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
+    await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, candidatura_codigo: ca.codigo, requisicion_id: r.id, codigo: r.codigo, etapa_anterior: ca.etapa, motivo: motivo.trim(), candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
   });
 }
-module.exports = { guardarCampos, tablero, crearCandidato, detalle, registrar, avanzar, rechazar };
+module.exports = { editarDatos, guardarCampos, tablero, crearCandidato, detalle, registrar, avanzar, rechazar };

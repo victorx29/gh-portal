@@ -1,11 +1,13 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 23-11-2026, contra el código `gh-portal` 0.9.3 (package.json 0.9.3, migraciones 001–018).
+Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.4 (package.json 0.9.4, migraciones 001–019).
 
 ## Versión
-- **Última entregada:** 0.9.3 (23-11-2026): ficha completa al ingresar, campos personalizados, alta manual, conciliación y
-  regularizar varias, solo se cierra una plaza vacía, «O» al navegar.
-- **Desplegada en EasyPanel:** 0.9.1 (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
+- **Última entregada:** 0.9.4 (24-11-2026): carga masiva de CV con lectura en n8n (OCR local), número de candidato
+  REQ-xxxxx-Cnn, alertas, «Analizar todos con IA», «Reintentar análisis» y «Reintentar lectura».
+- **Desplegada en EasyPanel:** 0.9.3 (según Victor, 23-11-2026). Pendiente: configurar en n8n el flujo de análisis
+  (`gh-analisis-cv.json`) y, con la 0.9.4, el de lectura (`gh-lectura-cv.json`).
+- **Antes:** 0.9.1 en EasyPanel (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
   reubicados por Victor). La importación de la 0.9.0 se aplicó sin respaldo previo: respaldo antes de cada despliegue.
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
   0.7.12 subida a GitHub (commit «Update 0.7.12»). (confirmar despliegue de 0.7.12 y 0.7.13)
@@ -80,6 +82,14 @@
   la empresa de la persona»; aviso en la importación por equivalencias generales; solo se cierra una plaza vacía (también en la
   carga masiva); «O» al navegar; leyenda del organigrama. Migración 018.
 
+- **0.9.4:** «Cargar CV» en Selección (varios archivos; PDF, Word .doc/.docx, texto e imágenes; 5 MB c/u; hasta 30): un candidato
+  por CV con nombre provisional sacado del archivo, consentimiento con una casilla («Confirmo haber notificado…»), repetidos
+  omitidos; número de candidato por requisición (REQ-00001-C03) asignado por la base; lectura en n8n (evento `cv.leer`, API
+  `/api/cv/lectura`, flujo `n8n/gh-lectura-cv.json` con OCR local y modelo local) que llena solo datos vacíos y deja alertas;
+  cruce de cédula con postulados anteriores (unir con la ficha anterior, decide GH) y empleados activos; «Editar datos del
+  candidato»; el nombre provisional no pasa a Ingreso; «Analizar todos con IA»; «Reintentar análisis» y «Reintentar lectura»;
+  aviso de resultados nuevos en el tablero. Corrige el deadlock del historial con escrituras en paralelo. Migración 019.
+
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
   1 unidad nueva (UO-0061, Gerencia de Ventas de IM), 50 perfiles mínimos y la plantilla (214 plazas, 9 vacantes).
@@ -145,6 +155,15 @@
 - Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
   nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
 
+## Decisiones del 23/24-11-2026 (Victor), 0.9.4
+- Carga masiva de CV: un candidato por CV; «Analizar todos con IA» es un botón (no automático al subir).
+- Número de candidato = requisición + correlativo (REQ-00001-C03), independiente de la cédula. La cédula se valida cuando
+  existe, contra postulados anteriores (base de elegibles) y empleados actuales.
+- Consentimiento: una casilla «Confirmo haber notificado al postulado sobre el uso de sus datos», y ya.
+- Todo el CV va a n8n; allí lo leen los modelos locales (Mistral OCR ya instalado). Formatos: PDF y Word de preferencia;
+  se aceptan otros si hace falta (texto, JPG, PNG).
+- Botón para reintentar el análisis (también para probar el flujo en n8n).
+
 ## Decisiones del 23-11-2026 (Victor), 0.9.3
 - Los datos del Listado (nacimiento, sexo, hijos, nivel académico, título, ubicación, tipo de empleado) se piden al CONFIRMAR EL
   INGRESO, no al candidato; todos obligatorios; fin de contrato solo si el tipo lo pide.
@@ -175,6 +194,11 @@
   «organigrama» se reserva para el de empleados (ISO). Definir el nombre.
 
 ## Pendientes técnicos fuera de entrega
+- 0.9.4, supuestos a validar: la casilla de consentimiento reemplaza el texto «cómo lo autorizó» también en la ficha individual;
+  los candidatos de la carga masiva no exigen los campos personalizados obligatorios hasta que GH guarda sus «Datos
+  adicionales»; el texto que va a n8n para la lectura no va tachado (debe leer la cédula). (confirmar)
+- 0.9.4, para después: el formato de la API del OCR local quedó como el de Mistral (`/v1/ocr`); si el servidor de Victor usa
+  otro, se ajustan dos nodos del flujo. El nombre provisional puede quedar con palabras del archivo («perfil», «otro»).
 - Consultas en paralelo sobre la misma transacción (aviso de pg en el log; dejará de funcionar con pg 9):
   `requisiciones.js` (detalleEvento), `perfiles.js` (carga masiva), `plantilla.js` (carga masiva). Para la
   versión de estabilización; no actualizar pg a la 9 antes. (El código nuevo de la 0.9.0 ya no lo hace.)

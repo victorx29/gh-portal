@@ -1,8 +1,18 @@
 <%- include('partials/head') %>
 <div class="top"><div><h1>Selección · <%= req.codigo %></h1><p class="sub"><%= req.cargo %> · <%= req.empresa %> · Ingresos <%= ing %> de <%= req.plazas %> plaza<%= req.plazas > 1 ? 's' : '' %></p></div>
-<div class="row"><a class="btn" href="/pipeline">Volver al pipeline</a><% if (req.estado === 'seleccion') { %><a class="btn p" href="/requisiciones/<%= req.id %>/candidatos/nuevo" data-modal>+ Candidato</a><% } %></div></div>
+<div class="row"><a class="btn" href="/pipeline">Volver al pipeline</a><% if (req.estado === 'seleccion') { %>
+<a class="btn" href="/requisiciones/<%= req.id %>/cv-lote" data-modal><%- ic('subir') %>Cargar CV</a>
+<form method="post" action="/requisiciones/<%= req.id %>/analizar-todos" class="inl" data-confirm="Se pide el análisis de los candidatos activos con CV y consentimiento que aún no tienen análisis de su CV actual. La IA compara con el perfil y no decide." data-ok="Analizar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">Analizar todos con IA</button></form>
+<a class="btn p" href="/requisiciones/<%= req.id %>/candidatos/nuevo" data-modal>+ Candidato</a><% } %></div></div>
+<% const av = []; if (resumen.leyendo) av.push(resumen.leyendo + (resumen.leyendo > 1 ? ' CV se están leyendo' : ' CV se está leyendo')); if (resumen.alertas) av.push(resumen.alertas + ' con alertas por revisar'); if (resumen.fallas) av.push(resumen.fallas + (resumen.fallas > 1 ? ' lecturas fallaron' : ' lectura falló')); if (resumen.sinCedula) av.push(resumen.sinCedula + ' sin cédula (se exige para Ingreso)'); %>
+<% if (av.length) { %><p class="flash<%= resumen.fallas ? ' err' : '' %>" role="status"><span><%= av.join(' · ') %>.<% if (resumen.sinLectura && !lectura) { %> La lectura automática no está configurada.<% } %></span></p><% } %>
+<% if (sondeo) { %><p class="flash ok" role="status" data-sondeo="/requisiciones/<%= req.id %>/seleccion/estado" data-firma="<%= firma %>" hidden><span>Llegaron resultados nuevos de la lectura o del análisis.</span><button type="button" class="btn" data-recargar>Actualizar</button></p><% } %>
 <div class="board"><% pl.etapas.forEach(c => { const L = cands.filter(x => x.etapa === c.clave); %>
 <section class="col k-<%= c.clase === 'cierre' ? 'cancelado' : c.clase === 'exito' ? 'ingreso' : 'seleccion' %>"><div class="ch"><%= c.nombre %><span><%= L.length %></span></div>
-<% L.forEach(x => { %><a class="card" href="/candidaturas/<%= x.id %>" data-modal><h4><%= x.nombre %></h4><p><%= x.email || 'Sin correo' %></p><% if (x.ia && x.ia.estado === 'listo') { %><p><span class="chip" title="Puntaje orientativo de la IA frente al perfil; decide Gestión Humana">IA <%= Number(x.ia.puntaje).toFixed(0) %>/100</span></p><% } else if (x.ia && x.ia.estado === 'pendiente') { %><p><span class="chip w">IA en curso</span></p><% } %></a><% }) %>
+<% L.forEach(x => { %><a class="card" href="/candidaturas/<%= x.id %>" data-modal><p class="cod"><%= x.codigo %></p><h4><%= x.nombre %></h4><p><%= x.email || 'Sin correo' %></p>
+<p><% if (x.lectura === 'pendiente' && !x.lectura_vencida) { %><span class="chip">Leyendo CV…</span><% } else if (x.lectura === 'error' || x.lectura_vencida) { %><span class="chip r" title="<%= x.lectura_error || 'n8n no respondió' %>"><%- ic('alerta') %>La lectura falló</span><% } %>
+<% if (x.nombre_provisional) { %><span class="chip w" title="Es el nombre del archivo: corrígelo en «Editar datos»">Nombre provisional</span><% } %>
+<% if (x.alertas > 0) { %><span class="chip w"><%- ic('alerta') %><%= x.alertas %> alerta<%= x.alertas > 1 ? 's' : '' %></span><% } %>
+<% if (x.ia && x.ia.estado === 'listo') { %><span class="chip" title="Puntaje orientativo de la IA frente al perfil; decide Gestión Humana">IA <%= Number(x.ia.puntaje).toFixed(0) %>/100</span><% } else if (x.ia && x.ia.estado === 'pendiente') { %><span class="chip w">IA en curso</span><% } %></p></a><% }) %>
 <% if (!L.length) { %><div class="empty">Sin candidatos</div><% } %></section><% }) %></div>
 <%- include('partials/foot') %>

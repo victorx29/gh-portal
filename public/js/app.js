@@ -168,8 +168,21 @@
     const f = e.target; marcarVolver(f);
     if ((f.getAttribute('method') || '').toLowerCase() !== 'post') { if (!f.target) { clearTimeout(veloT); veloT = setTimeout(() => cargando(true, 'Cargando…'), 300); } return; }   // filtros (GET)
     setTimeout(() => f.querySelectorAll('button, input[type=submit]').forEach(b => { b.disabled = true; }), 0);   // después: el botón pulsado aún viaja con el formulario
-    clearTimeout(veloT); veloT = setTimeout(() => cargando(true), 250);
+    clearTimeout(veloT); veloT = setTimeout(() => cargando(true, f.dataset.carga), 250);   // data-carga: texto propio («Subiendo los CV…»)
   });
+  // (0.9.4) Resultados que llegan de n8n (lectura y análisis de CV): se consulta cada 15 s y, si hay algo nuevo, se ofrece actualizar.
+  // No recarga sola: no se pierde lo que el usuario esté haciendo.
+  const sondeo = d.querySelector('[data-sondeo]');
+  if (sondeo && window.fetch) {
+    let firma = sondeo.dataset.firma || null, n = 0;
+    const mirar = () => fetch(sondeo.dataset.sondeo, { headers: { accept: 'application/json' }, credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(x => {
+      if (!x) return;
+      if (firma === null) firma = x.firma; else if (x.firma !== firma) { sondeo.hidden = false; return; }
+      if (++n < 120 && x.pendientes > 0) setTimeout(mirar, 15000);
+    }).catch(() => {});
+    setTimeout(mirar, 15000);
+    const b = sondeo.querySelector('[data-recargar]'); if (b) b.addEventListener('click', () => { cargando(true, 'Cargando…'); location.reload(); });
+  }
   // (0.9.3) Al ir a otra página del portal: la «O» en lugar del parpadeo, si tarda más de 300 ms. No en descargas ni pestañas nuevas.
   d.addEventListener('click', e => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
