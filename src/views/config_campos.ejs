@@ -3,11 +3,11 @@
 <p class="sub">Datos adicionales que Gestión Humana pide al candidato, al empleado o a ambos. Nunca se envían a la IA ni a n8n. Un campo no se borra: se desactiva y sus valores quedan guardados.</p></div></div>
 <%- include('partials/config_nav') %>
 <% if (!cs.length) { %><div class="empty">Aún no hay campos personalizados. Crea el primero abajo.</div><% } else { %>
-<div class="tw"><table class="mid"><tr><th>Campo</th><th>Tipo</th><th>Aplica a</th><th>Obligatorio</th><th>Sensible</th><th>Estado</th><th></th></tr>
+<section class="caja"><div class="caja-h"><h2>Campos <span class="chip n"><%= cs.length %></span></h2></div><div class="tw"><table class="mid"><tr><th>Campo</th><th>Tipo</th><th>Aplica a</th><th>Obligatorio</th><th>Sensible</th><th>Estado</th><th></th></tr>
 <% cs.forEach(c => { %><tr<%- c.activo ? '' : ' class="off"' %>><td><b><%= c.etiqueta %></b><% if (c.tipo === 'lista') { %><br><small class="mu"><%= c.opciones.join(' · ') %></small><% } %></td><td><%= TIPOS[c.tipo] %></td><td><%= APLICA[c.aplica] %></td>
 <td><%= c.obligatorio ? 'Sí' : 'No' %></td><td><%= c.sensible ? 'Solo GH' : 'No' %></td><td><%= c.activo ? 'Activo' : 'Inactivo' %></td>
-<td class="acts"><a class="btn" href="/config/campos/<%= c.id %>" data-modal>Editar</a> <form method="post" action="/config/campos/<%= c.id %>/activo" class="inl"<%- c.activo ? ' data-confirm="El campo deja de pedirse. Los valores ya guardados se conservan." data-ok="Desactivar"' : '' %>><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn<%= c.activo ? ' d' : '' %>"><%= c.activo ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %></table></div><% } %>
-<details class="blk"<%= cs.length ? '' : ' open' %>><summary><%- ic('mas') %> Nuevo campo</summary>
+<td class="acts"><a class="btn" href="/config/campos/<%= c.id %>" data-modal>Editar</a> <form method="post" action="/config/campos/<%= c.id %>/activo" class="inl"<%- c.activo ? ' data-confirm="El campo deja de pedirse. Los valores ya guardados se conservan." data-ok="Desactivar"' : '' %>><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn<%= c.activo ? ' d' : '' %>"><%= c.activo ? 'Desactivar' : 'Activar' %></button></form></td></tr><% }) %></table></div></section><% } %>
+<details class="caja form-max"<%= cs.length ? '' : ' open' %>><summary><%- ic('mas') %> Nuevo campo</summary>
 <form method="post" action="/config/campos"><input type="hidden" name="_csrf" value="<%= csrf %>"><%- include('partials/campo_campos', { c: {}, nuevo: true }) %>
 <p class="act"><button class="btn p">Crear campo</button></p></form></details>
 <%- include('partials/foot') %>

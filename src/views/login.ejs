@@ -1,8 +1,8 @@
 <%- include('partials/head') %>
-<form class="panel login" method="post" action="/login"><h1>Gestión Humana</h1><p class="sub">Ingresa con tu cuenta</p>
+<form class="login" method="post" action="/login"><div class="brand login-b" aria-hidden="true">GH<i></i></div><h1 class="login-t">Gestión Humana</h1><p class="sub login-s">Ingresa con tu cuenta del portal</p>
 <input type="hidden" name="_csrf" value="<%= csrf %>">
 <% if (error) { %><div class="flash err" role="alert"><%= error %></div><% } %>
 <label for="email">Correo</label><input id="email" name="email" type="email" autocomplete="username" required autofocus>
 <label for="password">Clave</label><input id="password" name="password" type="password" autocomplete="current-password" required>
-<p><button class="btn p" type="submit">Ingresar</button></p></form>
+<button class="btn p login-btn" type="submit">Ingresar</button></form>
 <%- include('partials/foot') %>

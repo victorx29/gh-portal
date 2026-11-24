@@ -1,10 +1,11 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.5 (package.json 0.9.5, migraciones 001–020).
+Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.5.1 (package.json 0.9.5.1, migraciones 001–020).
 
 ## Versión
-- **Última entregada:** 0.9.5 (24-11-2026): instrucciones de la IA y criterios editables por GH, resumen general con terna
-  orientativa, tablero de Selección que se actualiza solo y «O» pequeña.
+- **Última entregada:** 0.9.5.1 (24-11-2026): rediseño visual «A + B» con la marca APB (Roboto, claro y oscuro) en todo el
+  portal y pantallas de bajo riesgo reorganizadas en cajas y secciones. Sin migración.
+- **Entregada antes:** 0.9.5 (24-11-2026), en pruebas de Victor.
 - **Desplegada en EasyPanel:** 0.9.4 (según Victor, 24-11-2026). Pendiente en n8n: importar `gh-analisis-cv.json` 0.9.5 (análisis y
   resumen) y `gh-lectura-cv.json` 0.9.5, con la URL del modelo local y del OCR; variable `N8N_WEBHOOK_LECTURA_URL`.
 - **Antes:** 0.9.1 en EasyPanel (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
@@ -98,6 +99,14 @@
   avisos de versiones distintas, desactualizado y terna fuera del orden de puntajes). Tablero que se actualiza solo con avance
   «Lectura: n de N» y la «O» pequeña. Los flujos de n8n llaman al modelo por la API compatible con OpenAI. Migración 020.
 
+- **0.9.5.1:** rediseño visual aprobado (dirección A + B sobre la previa `propuesta-AB-0.9.5.1.html`): paleta del grupo (azul
+  profundo #005791 como acción, ámbar #FFB600 como acento, carbón #1C242A en menú y cabecera de modales), Roboto alojada en el portal,
+  tema claro y oscuro revisados (AA), botones con jerarquía (principal, secundario, normal, discreto, rechazar, peligro,
+  deshabilitado), campos con anillo de foco, tablas con encabezado en mayúsculas, avisos con borde, chips redondeados, cajas con
+  sombra, franja de marca. Reorganizadas en cajas y secciones: inicio de sesión, menú (grupo «Administración»), error, Configuración
+  (catálogos, empresas —formulario en 3 secciones—, usuarios, campos personalizados, Análisis de CV con IA) y listas de perfiles y
+  empleados; filtros en su caja. DESIGN.md reescrito. Sin migración.
+
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
   1 unidad nueva (UO-0061, Gerencia de Ventas de IM), 50 perfiles mínimos y la plantilla (214 plazas, 9 vacantes).
@@ -162,6 +171,13 @@
 - La ficha completa es solo de GH; gerentes y directores ven nombre y cargo de quien ocupa cada plaza en el organigrama.
 - Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
   nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
+
+## Decisiones del 24-11-2026 (Victor), 0.9.5.1
+- Rediseño visual en una versión de cuatro números, solo esta vez. Colores del sitio del grupo (apbgroup.net).
+- De tres propuestas (A Institucional APB, B Claro y moderno, C Colores por módulo) se eligió **A + B**; C se descartó porque sus
+  colores de módulo se confunden con los de estado. Roboto. Tema claro y oscuro. Previa aprobada antes de programar.
+- Reorganizar pantallas por fases: en la 0.9.5.1 las de bajo riesgo; después, fase 2 Requisiciones y Selección, fase 3 Empleados y
+  Conciliación, fase 4 Estructura, plantilla, perfiles, organigrama, pipelines y cargas.
 
 ## Decisiones del 24-11-2026 (Victor), 0.9.5
 - Indicador mientras la IA procesa: «O» pequeña que no bloquea, avance «Leyendo n de N» y tablero que se actualiza solo.

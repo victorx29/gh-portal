@@ -10,9 +10,9 @@
   <div><label class="chk"><input type="checkbox" name="incompleta" value="1"<%= f.incompleta ? ' checked' : '' %>>Solo fichas incompletas</label></div>
   <div class="end"><button class="btn">Aplicar</button><% if (f.q || f.empresa || f.estado !== 'activo' || f.incompleta) { %> <a class="btn" href="/empleados">Limpiar</a><% } %></div>
 </form>
-<p class="sub"><%= es.length %> persona<%= es.length === 1 ? '' : 's' %></p>
-<% if (!es.length) { %><div class="empty">No hay empleados con esos filtros.<% if (!f.q && !f.empresa) { %> Importa el Listado de Activos para empezar.<% } %></div>
+<section class="caja"><div class="caja-h"><h2>Personas <span class="chip n"><%= es.length %></span></h2></div>
+<% if (!es.length) { %><div class="caja-b"><div class="empty">No hay empleados con esos filtros.<% if (!f.q && !f.empresa) { %> Importa el Listado de Activos para empezar.<% } %></div></div>
 <% } else { %><div class="tw"><table class="mid"><tr><th>Nombre</th><th>Cargo</th><th>Unidad</th><th>Empresa</th><th>Plaza</th><th>Ingreso</th><th>Estado</th></tr>
 <% es.forEach(x => { %><tr<%- x.estado === 'activo' ? '' : ' class="off"' %>><td><a href="/empleados/<%= x.id %>" data-modal><b><%= x.nombres %></b></a><% if (x.incompleta) { %> <span class="chip w" title="Le faltan datos obligatorios de la ficha">Ficha incompleta</span><% } %></td><td><%= x.cargo %></td><td><%= x.unidad || '—' %></td><td><%= x.empresa || '—' %></td>
-<td class="cod"><%= x.plaza || '—' %><% if (x.por_regularizar) { %> <span class="chip w" title="No cuenta en el HC hasta que GH la regularice">⚑</span><% } %></td><td><%= fd(x.fecha_ingreso) %></td><td><span class="chip<%= x.estado === 'activo' ? '' : ' w' %>"><%= { activo: 'Activo', egresado: 'Egresado', movido: 'Movido', no_ingreso: 'No ingresó', por_ingresar: 'Por ingresar', corregida: 'Corregida', egreso_anulado: 'Egreso anulado' }[x.estado] || x.estado %></span></td></tr><% }) %></table></div><% } %>
+<td class="cod"><%= x.plaza || '—' %><% if (x.por_regularizar) { %> <span class="chip w" title="No cuenta en el HC hasta que GH la regularice">⚑</span><% } %></td><td><%= fd(x.fecha_ingreso) %></td><td><span class="chip<%= x.estado === 'activo' ? '' : ' w' %>"><%= { activo: 'Activo', egresado: 'Egresado', movido: 'Movido', no_ingreso: 'No ingresó', por_ingresar: 'Por ingresar', corregida: 'Corregida', egreso_anulado: 'Egreso anulado' }[x.estado] || x.estado %></span></td></tr><% }) %></table></div><% } %></section>
 <%- include('partials/foot') %>

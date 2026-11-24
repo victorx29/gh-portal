@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.5), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.5.1), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -311,6 +311,17 @@ antes funcionaba.
 | UI-04 | Móvil: menú horizontal, formularios en una columna, tablas como tarjetas, sin desplazamiento lateral del documento. | C | Instrucciones |
 | UI-05 | Las pantallas nuevas respetan DESIGN.md (colores por token, componentes existentes). | H | DESIGN.md |
 
+### Diseño visual A + B (0.9.5.1)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| VIS-01 | Tema claro y oscuro (botón del menú y preferencia del sistema): textos, botones, chips, avisos, tablas y modales legibles en las pantallas principales; el botón principal azul con texto blanco y el de peligro rojo en los dos temas. | H | 0.9.5.1 |
+| VIS-02 | Roboto se carga desde el propio portal (`/fonts/…woff2`, sin pedir nada a Google); con la red cortada, la letra no cambia. | C | 0.9.5.1 |
+| VIS-03 | Pantallas reorganizadas siguen funcionando: inicio de sesión; agregar a un catálogo; crear usuario; editar empresa (3 secciones); crear campo personalizado; filtros de perfiles y empleados; criterios e instrucciones de la IA. | H · A | 0.9.5.1 |
+| VIS-04 | Menú carbón con el activo marcado en ámbar y el grupo «Administración»; colapsado sigue funcionando; en móvil pasa a barra superior sin el grupo. | H | 0.9.5.1 |
+| VIS-05 | Modales: cabecera carbón con borde ámbar, fija al desplazar; «Cerrar» visible y con foco visible. | H | 0.9.5.1 |
+| VIS-06 | Impresión del diagrama, del organigrama y de la descripción de cargo: hoja blanca, sin menú ni franja de marca. | C | 0.9.5.1 |
+
 ## Obsoletas
 
 | ID | Prueba | Motivo |
@@ -337,3 +348,4 @@ antes funcionaba.
 | 0.9.3 | 23-11-2026 | Nuevas FIC, CPE, ALT, CNC, PL-14, UI-09, ORG-04 + regresión 0.9.2 (13/13) y 0.9.1 (16/16) + INS-01/02 | Pasa. 14 pruebas de servicio; flujo completo con datos ficticios (requisición → aprobación → selección → candidato con campo obligatorio → ingreso con ficha completa); rutas 0.9.0 → 0.9.3 y 0.9.1 → 0.9.3 e instalación desde cero (18 migraciones); pantallas en escritorio y móvil (campos personalizados, confirmar ingreso, ficha incompleta y edición, alta manual con error que conserva datos, regularizar varias, conciliación con «Corregir aquí», leyenda, «O» al navegar y no en descargas), sin errores JS. Corregido en la revisión: los eventos de selección llevaban todos los datos del candidato (ahora sin campos personalizados). No probado: EasyPanel, n8n real, Safari. | — | Claude (entorno aislado, PostgreSQL 16 y Chromium) |
 | 0.9.4 | 24-11-2026 | Nuevas IA-09/10, CVL-01 a 13, EV-06, HIS-01 + regresión 0.9.3 (14/14), 0.9.2 (13/13), 0.9.1 (16/16) + INS-01/02 | Pasa. 15 pruebas de servicio con PostgreSQL 16; ruta 0.9.3 → 0.9.4 (migración 019), ruta 0.9.0 → 0.9.4 e instalación desde cero (19 migraciones); flujo completo en Chromium con un n8n simulado por HTTP (carga de 6 CV + 1 formato no admitido, lecturas en paralelo, alertas, lectura fallida y reintento, «Analizar todos», «Reintentar análisis», aviso de resultados nuevos), escritorio y móvil, sin errores JS; nodos de código de `gh-lectura-cv.json` probados fuera de n8n. Encontrado y corregido: deadlock del historial con escrituras en paralelo (HIS-01). No probado: EasyPanel, n8n real con Mistral OCR y el modelo local (CVL-14), Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.5 | 24-11-2026 | Nuevas IAC-01 a 06, RSG-01 a 04, TAB-01/02, LIM-03 + regresión 0.9.4 (15/15), 0.9.3 (14/14), 0.9.2 (13/13), 0.9.1 (16/16), HIS-01 + INS-01/02 | Pasa. 11 pruebas de servicio con PostgreSQL 16; ruta 0.9.3 → 0.9.5 (migraciones 019 y 020) e instalación desde cero (20 migraciones); flujo completo en Chromium con un n8n simulado por HTTP con el contrato 0.9.5 (criterio nuevo y pesos, versión nueva de las instrucciones, carga de 5 CV, tablero que se actualiza solo durante la lectura, el análisis y el resumen, terna con avisos), escritorio y móvil, sin errores JS; nodos de código de los dos flujos de n8n probados fuera de n8n. No probado: EasyPanel, n8n real con tu modelo y tu OCR (N8N-01, CVL-14), Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.9.5.1 | 24-11-2026 | Nuevas VIS-01 a 06 + flujo 0.9.5 (TAB-01, RSG, IAC) en el navegador | Pasa. Sin cambios de servicios ni de base. 67 vistas compiladas; 19 pantallas y 4 modales revisados en claro y oscuro (1366 px) y 6 en móvil (390 px), sin errores de consola ni respuestas 500; formularios reorganizados probados (catálogo, usuario, empresa, campo, filtros, tema); flujo completo 0.9.5 repetido con el diseño nuevo (criterios, instrucciones, carga de CV, tablero que se actualiza solo, resumen). No probado: impresión (VIS-06), Safari, EasyPanel. | — | Claude (entorno aislado, PostgreSQL 16) |

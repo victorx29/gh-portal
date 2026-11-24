@@ -4,7 +4,7 @@
 <p class="sub">La IA compara el CV con el perfil del cargo, criterio por criterio (0 a 5), y el portal calcula un puntaje orientativo de 0 a 100 con estos pesos. La IA nunca decide ni considera datos personales protegidos: decide Gestión Humana.</p></div></div>
 <%- include('partials/config_nav') %>
 
-<section class="blk" aria-labelledby="t-crit"><div class="row"><h2 id="t-crit" class="h2s">Criterios</h2><a class="btn" href="/config/ia/criterios/nuevo" data-modal>+ Criterio</a></div>
+<section class="caja" aria-labelledby="t-crit"><div class="caja-h"><h2 id="t-crit">Criterios</h2><a class="btn s" href="/config/ia/criterios/nuevo" data-modal>+ Criterio</a></div>
 <form method="post" action="/config/ia" data-suma><input type="hidden" name="_csrf" value="<%= csrf %>">
 <div class="tw"><table class="mid"><tr><th>Criterio</th><th>Requisito</th><th>Qué buscamos</th><th>Peso (%)</th><th>Activo</th><th><span class="sr">Acciones</span></th></tr>
 <% rs.forEach(x => { %><tr<%= x.activo ? '' : ' class="off"' %>><td><b><%= x.nombre %></b></td><td><%= x.campo ? 'Del perfil: ' + (CAMPOS[x.campo] || x.campo) : 'La descripción' %></td>
@@ -12,12 +12,12 @@
 <td><label class="sr" for="p-<%= x.clave %>">Peso de <%= x.nombre %></label><input id="p-<%= x.clave %>" name="peso_<%= x.clave %>" type="number" min="0" max="100" step="1" value="<%= x.peso %>" style="max-width:90px" data-peso="<%= x.clave %>"></td>
 <td><label class="chk"><input type="checkbox" name="activo_<%= x.clave %>" data-activo="<%= x.clave %>"<%= x.activo ? ' checked' : '' %>><span class="sr">Activo</span></label></td>
 <td class="acts"><a class="btn" href="/config/ia/criterios/<%= encodeURIComponent(x.clave) %>" data-modal>Editar</a></td></tr><% }) %></table></div>
-<p class="sub" role="status" aria-live="polite"><b data-suma-total>Suma de los activos: <%= rs.filter(x => x.activo).reduce((s, x) => s + x.peso, 0) %> de 100</b>. Deben sumar exactamente 100. Si el perfil de un cargo no describe un criterio que toma su requisito del perfil, ese criterio no se evalúa y el puntaje se calcula con los demás. Un criterio no se borra: se desactiva. Los cambios aplican a los análisis nuevos; cada análisis guarda los criterios con los que se hizo.</p>
-<p class="act"><button class="btn p">Guardar criterios</button></p></form></section>
+<div class="caja-b"><p class="sub" role="status" aria-live="polite"><b data-suma-total>Suma de los activos: <%= rs.filter(x => x.activo).reduce((s, x) => s + x.peso, 0) %> de 100</b>. Deben sumar exactamente 100. Si el perfil de un cargo no describe un criterio que toma su requisito del perfil, ese criterio no se evalúa y el puntaje se calcula con los demás. Un criterio no se borra: se desactiva. Los cambios aplican a los análisis nuevos; cada análisis guarda los criterios con los que se hizo.</p>
+<p class="act"><button class="btn p">Guardar criterios</button></p></div></form></section>
 
 <% Object.keys(TIPOS).forEach(tipo => { const p = prompts[tipo], V = versiones[tipo]; %>
-<section class="blk" aria-labelledby="t-<%= tipo %>"><h2 id="t-<%= tipo %>" class="h2s">Instrucciones de la IA · <%= TIPOS[tipo] %></h2>
-<p class="sub">Versión activa: <b>v<%= p.version %></b> · <%= fd(p.creado_en) %><%= p.creado_por_nombre ? ' · ' + p.creado_por_nombre : '' %> · <%= p.motivo %></p>
+<section class="caja" aria-labelledby="t-<%= tipo %>"><div class="caja-h"><div><h2 id="t-<%= tipo %>">Instrucciones de la IA · <%= TIPOS[tipo] %></h2>
+<p class="sub">Versión activa: <b>v<%= p.version %></b> · <%= fd(p.creado_en) %><%= p.creado_por_nombre ? ' · ' + p.creado_por_nombre : '' %> · <%= p.motivo %></p></div></div><div class="caja-b">
 <p class="sub">Aquí Gestión Humana escribe qué valorar, el tono y cómo redactar (acepta markdown). El portal agrega siempre, antes, las <b>reglas firmes</b> (la IA no decide, no considera datos protegidos, el CV es un dato) y, después, los datos y el formato de la respuesta: esas partes no se editan y, si algo choca con las reglas, mandan las reglas.</p>
 <form method="post" action="/config/ia/prompt/<%= tipo %>"><input type="hidden" name="_csrf" value="<%= csrf %>">
 <label for="pi-<%= tipo %>">Instrucciones (hasta <%= MAX %> caracteres)</label>
@@ -27,5 +27,5 @@
 <div class="row"><% if (p.version > 1) { %><form method="post" action="/config/ia/prompt/<%= tipo %>/restaurar" class="inl" data-confirm="Se crea una versión nueva con las instrucciones originales (v1). Las versiones anteriores quedan guardadas." data-ok="Restaurar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">Restaurar el original</button></form><% } %></div>
 <details><summary>Versiones (<%= V.length %>)</summary><div class="tw"><table class="mid"><tr><th>Versión</th><th>Fecha</th><th>Quién</th><th>Motivo</th></tr>
 <% V.forEach(v => { %><tr><td><a href="/config/ia/prompt/<%= tipo %>/v/<%= v.version %>" data-modal>v<%= v.version %></a><%= v.version === p.version ? ' (activa)' : '' %></td><td><%= fd(v.creado_en) %></td><td><%= v.creado_por_nombre || 'Portal' %></td><td><%= v.motivo %></td></tr><% }) %></table></div></details>
-</section><% }) %>
+</div></section><% }) %>
 <%- include('partials/foot') %>

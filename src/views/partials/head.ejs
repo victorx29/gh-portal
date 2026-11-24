@@ -4,7 +4,7 @@
 <div class="app"><aside class="side" id="side" aria-label="Menú principal">
   <div class="brand t">GH<i></i></div>
   <div class="who t"><b><%= user.nombre %></b><br><small><%= user.rolesTxt %></small></div>
-  <% items.forEach(i => { %><a class="nav<%= nav === i[1] ? ' on' : '' %>" href="<%= i[0] %>" title="<%= i[2] %>"<%- nav === i[1] ? ' aria-current="page"' : '' %>><%- ic(i[3]) %><span class="t"><%= i[2] %></span></a><% }) %>
+  <% items.forEach(i => { %><% if (i[1] === 'config') { %><div class="grp t">Administración</div><% } %><a class="nav<%= nav === i[1] ? ' on' : '' %>" href="<%= i[0] %>" title="<%= i[2] %>"<%- nav === i[1] ? ' aria-current="page"' : '' %>><%- ic(i[3]) %><span class="t"><%= i[2] %></span></a><% }) %>
   <div class="sp"></div>
   <button class="nav" type="button" id="th" title="Cambiar tema"><%- ic('luna') %><span class="t">Tema claro u oscuro</span></button>
   <button class="nav" type="button" id="cl" title="Colapsar menú"><%- ic('colapsar') %><span class="t">Colapsar menú</span></button>
