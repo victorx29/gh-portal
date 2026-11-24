@@ -1,0 +1,9 @@
+<div class="mh"><h2><%= x ? 'Editar criterio' : 'Nuevo criterio' %></h2><button type="button" class="btn" data-close>Cerrar</button></div>
+<form method="post" action="/config/ia/criterios<%= x ? '/' + encodeURIComponent(x.clave) : '' %>"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<label for="cn">Nombre</label><input id="cn" name="nombre" required maxlength="60" value="<%= x ? x.nombre : '' %>" placeholder="Por ejemplo: Experiencia en concesionarios">
+<label for="cc">Requisito</label><select id="cc" name="campo" aria-describedby="cc-a"><option value="">Ninguno del perfil: la IA evalúa con «qué buscamos»</option>
+<% Object.entries(CAMPOS).forEach(([k, v]) => { %><option value="<%= k %>"<%= x && x.campo === k ? ' selected' : '' %>>Del perfil del cargo: <%= v %></option><% }) %></select>
+<p class="sub" id="cc-a">Ligado al perfil, cada cargo pone su propio requisito (y si el perfil no lo describe, el criterio no se evalúa). Sin ligar, vale igual para todos los cargos.</p>
+<label for="cd">Qué buscamos (contexto para la IA)</label><textarea id="cd" name="descripcion" rows="4" maxlength="600" placeholder="Qué valora Gestión Humana en este criterio y qué evidencia del CV cuenta"><%= x ? x.descripcion : '' %></textarea>
+<% if (!x) { %><p class="sub">Se crea inactivo y con peso 0: después dale peso en la tabla (la suma de los activos debe quedar en 100) y actívalo.</p><% } else { %><p class="sub">La clave del criterio (<code><%= x.clave %></code>) no cambia. Los análisis ya hechos conservan el nombre y la descripción con que se hicieron.</p><% } %>
+<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p">Guardar</button></p></form>

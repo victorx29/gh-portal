@@ -13,6 +13,11 @@ const j = fn => async (req, res) => {
 r.get('/ia/analisis/:id(\\d+)', j((id, t) => IA.datosParaN8n(id, t)));
 r.post('/ia/analisis/:id(\\d+)/resultado', j((id, t, b) => IA.recibirResultado(id, t, b)));
 r.post('/ia/analisis/:id(\\d+)/error', j((id, t, b) => IA.recibirError(id, t, b)));
+// Resumen general de la selección (0.9.5)
+const RES = require('../services/resumen');
+r.get('/ia/resumen/:id(\\d+)', j((id, t) => RES.datosParaN8n(id, t)));
+r.post('/ia/resumen/:id(\\d+)/resultado', j((id, t, b) => RES.recibirResultado(id, t, b)));
+r.post('/ia/resumen/:id(\\d+)/error', j((id, t, b) => RES.recibirError(id, t, b)));
 // Lectura del CV (0.9.4): OCR y datos de contacto con los modelos locales de n8n
 r.get('/cv/lectura/:id(\\d+)', j((id, t) => LE.datosParaN8n(id, t)));
 r.post('/cv/lectura/:id(\\d+)/resultado', j((id, t, b) => LE.recibirResultado(id, t, b)));

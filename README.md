@@ -46,16 +46,27 @@ DATABASE_URL=postgres://gh:gh@localhost:5432/gh npm run dev
 6. Backups programados del servicio PostgreSQL y prueba de restauración antes de producción.
 
 ## Contrato con n8n
-La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url`, `detalle.plaza` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.empresa_cambiada`, `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`. Desde la 0.8: `ingreso.confirmado` y `egreso.registrado` (sin tipo ni motivo del egreso). Desde la 0.9: `cv.analizar` (va a `N8N_WEBHOOK_IA_URL` si existe). Desde la 0.9.4: `cv.leer` (solo a `N8N_WEBHOOK_LECTURA_URL`; sin ella espera sin gastar intentos) y `candidatura_codigo` (REQ-xxxxx-Cnn) en los eventos de candidatura.
+La app guarda cada cambio en `evento_outbox` y lo envía por POST al webhook (`x-api-key`), con reintentos (hasta 10). Cuerpo: `{ id, tipo, payload }`. Usa `id` para no duplicar avisos. Todos los eventos de requisición traen `url`, `detalle.plaza` (requiere `PORTAL_URL`) y `detalle` completo. Tipos actuales: `requisicion.empresa_cambiada`, `requisicion.sin_aprobador`, `requisicion.pend_director` (con `aprobadores`), `pend_presidencia`, `aprobado`, `publicacion`, `convocatoria`, `seleccion`, `rechazada`, `borrador` (devuelta), `cancelado`, `ingreso`. Desde la 0.8: `ingreso.confirmado` y `egreso.registrado` (sin tipo ni motivo del egreso). Desde la 0.9: `cv.analizar` (va a `N8N_WEBHOOK_IA_URL` si existe). Desde la 0.9.5: `cv.resumen` (va a `N8N_WEBHOOK_IA_URL`, como `cv.analizar`). Desde la 0.9.4: `cv.leer` (solo a `N8N_WEBHOOK_LECTURA_URL`; sin ella espera sin gastar intentos) y `candidatura_codigo` (REQ-xxxxx-Cnn) en los eventos de candidatura.
 
 ### API para n8n (0.9)
 `cv.analizar` no lleva datos personales: trae `analisis_id`, `requisicion`, `url_datos`, `url_resultado` y `url_error` (con `?t=` token propio del análisis).
 n8n llama con la cabecera `x-api-key` (= `N8N_API_KEY`):
 - `GET url_datos` → perfil, rúbrica, escala 0–5, reglas y el CV (texto ya tachado de datos protegidos; si es PDF, el archivo en base64).
-- `POST url_resultado` con `{ resumen, criterios: [{ clave, puntaje 0–5, evidencia }], fortalezas, brechas, preguntas, alertas, modelo, texto_cv? }`.
+  Desde la 0.9.5 trae además `prompt: { version, sistema, usuario, marca_cv }`: el prompt lo arma el portal (reglas firmes + instrucciones
+  de Gestión Humana editables en Configuración › Análisis de CV con IA + datos y formato). n8n reemplaza `marca_cv` por el texto del CV y llama al modelo.
+- `POST url_resultado` con `{ resumen, criterios: [{ clave, puntaje 0–5, evidencia }], fortalezas, brechas, preguntas, alertas, modelo, texto_cv? }`
+  o, desde la 0.9.5, `{ respuesta: <ese mismo JSON del modelo>, modelo, texto_cv? }`.
   El portal calcula el puntaje 0–100 con los pesos de la rúbrica. Un análisis terminado no se modifica.
 - `POST url_error` con `{ mensaje }`. Sin respuesta en 30 minutos, el análisis vence y GH puede pedirlo de nuevo.
 Flujo importable: `n8n/gh-analisis-cv.json` (ver `UPDATE_0.9.0.md`). La IA analiza y resume; nunca mueve ni descarta postulados.
+
+### Resumen general de la selección (0.9.5)
+`cv.resumen` trae `resumen_id`, `requisicion`, `url_datos`, `url_resultado` y `url_error` (con `?t=`).
+- `GET url_datos` → `{ tipo: 'resumen', codigos, prompt: { sistema, usuario } }`. Solo números de candidato y sus análisis: sin nombres ni datos personales.
+- `POST url_resultado` con `{ respuesta: { resumen, terna: [{ candidato, motivo }] (máx. 3, solo de `codigos`), verificar, alertas }, modelo }`. La terna es orientativa: decide GH.
+- `POST url_error` con `{ mensaje }`.
+Flujo importable (análisis y resumen, el mismo webhook): `n8n/gh-analisis-cv.json` 0.9.5. Desde la 0.9.5 los dos flujos llaman al modelo local por la
+API compatible con OpenAI (`/v1/chat/completions`: Ollama, vLLM, LM Studio), no con el nodo de modelo de n8n: así el JSON del prompt no se interpreta como plantilla.
 
 ### Lectura de CV (0.9.4)
 `cv.leer` trae `cv_id`, `requisicion`, `url_datos`, `url_resultado` y `url_error` (con `?t=` token propio de la lectura).

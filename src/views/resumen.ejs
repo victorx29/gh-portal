@@ -1,0 +1,32 @@
+<% const fd = s => !s ? '—' : new Date(s).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }); %>
+<div class="mh"><div><h2>Resumen general · <%= r.codigo %></h2><p class="sub"><%= r.cargo %> · <%= listos.length %> candidato<%= listos.length === 1 ? '' : 's' %> con análisis listo</p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<p class="flash" role="note"><span><b>La IA no decide.</b> Compara los análisis de los CV frente al perfil y propone una terna orientativa, basada solo en esos datos. Decide Gestión Humana.</span></p>
+<% avisos.forEach(a => { %><p class="flash err" role="alert"><span><%= a %></span></p><% }) %>
+<h3>Comparativo</h3>
+<% if (listos.length) { %><div class="tw"><table><tr><th>Candidato</th><th>Etapa</th><th>Puntaje</th><% columnas.forEach(c => { %><th><%= c.nombre %></th><% }) %><th>Brechas</th><th>Alertas</th></tr>
+<% listos.forEach(x => { %><tr><td><a href="/candidaturas/<%= x.id %>" data-modal2 style="white-space:nowrap"><%= x.codigo %></a><br><small><%= x.nombre %></small></td><td><%= x.etapa_nombre %></td><td><b><%= x.puntaje.toFixed(0) %>/100</b></td>
+<% columnas.forEach(c => { const v = x.porCriterio[c.clave]; %><td><%= v == null ? '—' : v + '/5' %></td><% }) %><td><%= x.n_brechas %></td><td><%= x.n_alertas ? x.n_alertas : '—' %></td></tr><% }) %></table></div>
+<% } else { %><p class="empty">Todavía no hay candidatos con análisis listo.</p><% } %>
+<% if (resto.length) { %><p class="sub">Sin análisis listo de su CV actual: <%= resto.map(x => x.codigo + (x.ia_estado === 'pendiente' ? ' (en curso)' : x.ia_estado === 'error' ? ' (falló)' : '')).join(', ') %>.</p><% } %>
+<% if (fuera) { %><p class="sub"><%= fuera %> candidatura<%= fuera > 1 ? 's' : '' %> rechazada<%= fuera > 1 ? 's' : '' %> o ingresada<%= fuera > 1 ? 's' : '' %> no se compara<%= fuera > 1 ? 'n' : '' %>.</p><% } %>
+
+<h3>Resumen y terna de la IA</h3>
+<% if (pendiente) { %><p class="flash" role="status"><span class="o-mini" aria-hidden="true"></span><span>Generando el resumen. El tablero avisa cuando llegue.</span></p>
+<% } else if (r.estado === 'seleccion') { %><form method="post" action="/requisiciones/<%= r.id %>/resumen" class="act" data-confirm="La IA compara los análisis listos de <%= listos.length %> candidatos (solo sus números, sin nombres ni datos personales) y propone una terna orientativa. El resumen queda guardado." data-ok="Generar"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<button class="btn p"<%= puedePedir ? '' : ' disabled' %>>Generar resumen con IA</button><% if (!puedePedir) { %> <span class="sub">Hacen falta al menos <%= MIN_CANDIDATOS %> candidatos con análisis listo.</span><% } %></form><% } %>
+<% const ver = (s, abierto) => { %>
+<p class="sub"><%= fd(s.recibido_en || s.solicitado_en) %> · pedido por <%= s.solicitado_por_nombre || '—' %> · instrucciones del resumen v<%= s.prompt_version %><%= s.modelo ? ' · ' + s.modelo : '' %> · compara <%= s.incluidos.map(i => i.codigo).join(', ') %></p>
+<% if (s.estado === 'error' || s.vencido) { %><p class="flash err" role="alert"><span>El resumen falló: <%= s.vencido ? 'n8n no respondió' : s.error %></span></p>
+<% } else if (s.estado === 'listo') { const R = s.resultado; %>
+<% if (s.desactualizado) { %><p class="flash err" role="status"><span>Hay análisis nuevos o distintos desde este resumen: genera otro para incluirlos.</span></p><% } %>
+<p><%= R.resumen %></p>
+<% if (R.terna.length) { const pts = Object.fromEntries(s.incluidos.map(i => [i.codigo, Number(i.puntaje)])), minT = Math.min(...R.terna.map(t => pts[t.candidato] ?? 0));
+  const fueraT = s.incluidos.filter(i => !R.terna.some(t => t.candidato === i.codigo) && Number(i.puntaje) > minT); %><h4>Terna orientativa (no es una decisión: decide Gestión Humana)</h4>
+<% if (fueraT.length) { %><p class="flash err" role="note"><span>Ojo: la terna no sigue el orden de los puntajes. Fuera de ella hay candidatos con más puntaje: <%= fueraT.map(i => i.codigo + ' (' + Number(i.puntaje).toFixed(0) + ')').join(', ') %>. Revisa el porqué antes de usarla.</span></p><% } %><ol><% R.terna.forEach(t => { const n = nombres[t.candidato]; %><li><b><%= t.candidato %></b><%= n ? ' · ' + n.nombre : '' %><%= pts[t.candidato] != null ? ' · ' + pts[t.candidato].toFixed(0) + '/100' : '' %> — <%= t.motivo %></li><% }) %></ol><% } %>
+<% if (R.verificar.length) { %><details<%= abierto ? ' open' : '' %>><summary>Qué verificar en las entrevistas (<%= R.verificar.length %>)</summary><ul><% R.verificar.forEach(v => { %><li><%= v %></li><% }) %></ul></details><% } %>
+<% if (R.alertas.length) { %><details open><summary>Alertas (<%= R.alertas.length %>)</summary><ul><% R.alertas.forEach(v => { %><li><%= v %></li><% }) %></ul></details><% } %>
+<% } %>
+<% }; %>
+<% const hechos = resumenes.filter(s => !(s.estado === 'pendiente' && !s.vencido)); %>
+<% if (hechos.length) { ver(hechos[0], true); } else if (!pendiente) { %><p class="sub">Aún no se ha generado ningún resumen para esta requisición.</p><% } %>
+<% if (hechos.length > 1) { %><details><summary>Resúmenes anteriores (<%= hechos.length - 1 %>)</summary><% hechos.slice(1).forEach(s => { %><div class="blk"><% ver(s, false); %></div><% }) %></details><% } %>

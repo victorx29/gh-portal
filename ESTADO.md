@@ -1,12 +1,12 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.4 (package.json 0.9.4, migraciones 001–019).
+Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.5 (package.json 0.9.5, migraciones 001–020).
 
 ## Versión
-- **Última entregada:** 0.9.4 (24-11-2026): carga masiva de CV con lectura en n8n (OCR local), número de candidato
-  REQ-xxxxx-Cnn, alertas, «Analizar todos con IA», «Reintentar análisis» y «Reintentar lectura».
-- **Desplegada en EasyPanel:** 0.9.3 (según Victor, 23-11-2026). Pendiente: configurar en n8n el flujo de análisis
-  (`gh-analisis-cv.json`) y, con la 0.9.4, el de lectura (`gh-lectura-cv.json`).
+- **Última entregada:** 0.9.5 (24-11-2026): instrucciones de la IA y criterios editables por GH, resumen general con terna
+  orientativa, tablero de Selección que se actualiza solo y «O» pequeña.
+- **Desplegada en EasyPanel:** 0.9.4 (según Victor, 24-11-2026). Pendiente en n8n: importar `gh-analisis-cv.json` 0.9.5 (análisis y
+  resumen) y `gh-lectura-cv.json` 0.9.5, con la URL del modelo local y del OCR; variable `N8N_WEBHOOK_LECTURA_URL`.
 - **Antes:** 0.9.1 en EasyPanel (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
   reubicados por Victor). La importación de la 0.9.0 se aplicó sin respaldo previo: respaldo antes de cada despliegue.
 - **Desplegada en el entorno de desarrollo (EasyPanel):** 0.7.11 según el respaldo del 19-11-2026 (migración 012);
@@ -90,6 +90,14 @@
   candidato»; el nombre provisional no pasa a Ingreso; «Analizar todos con IA»; «Reintentar análisis» y «Reintentar lectura»;
   aviso de resultados nuevos en el tablero. Corrige el deadlock del historial con escrituras en paralelo. Migración 019.
 
+- **0.9.5:** Configuración › Análisis de CV con IA: criterios que agrega GH (nombre, «qué buscamos», campo del perfil opcional;
+  activos suman exactamente 100; no se borran) e instrucciones de la IA editables para el análisis y para el resumen (versiones con
+  motivo, «Restaurar el original», «Ver prompt completo»); el portal arma el prompt (reglas firmes fijas + instrucciones de GH + datos
+  y formato) y n8n solo llama al modelo; cada análisis guarda su versión. «Resumen general» de la requisición: tabla comparativa al
+  instante y, con un botón, resumen y terna orientativa de la IA (aviso «La IA no decide», solo números de candidato a la IA, guardado,
+  avisos de versiones distintas, desactualizado y terna fuera del orden de puntajes). Tablero que se actualiza solo con avance
+  «Lectura: n de N» y la «O» pequeña. Los flujos de n8n llaman al modelo por la API compatible con OpenAI. Migración 020.
+
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
   1 unidad nueva (UO-0061, Gerencia de Ventas de IM), 50 perfiles mínimos y la plantilla (214 plazas, 9 vacantes).
@@ -155,6 +163,16 @@
 - Organigrama de empleados (ISO) sobre el diagrama de cargos: nombre del ocupante en cada plaza y «vacante» donde no hay
   nadie; filtros por división, empresa y unidad; imprimible con bloque de control (elaborado, revisado, aprobado).
 
+## Decisiones del 24-11-2026 (Victor), 0.9.5
+- Indicador mientras la IA procesa: «O» pequeña que no bloquea, avance «Leyendo n de N» y tablero que se actualiza solo.
+- Resumen general en un modal, guardado: tabla del portal + texto de la IA con un botón. Enfoque mixto: comparativo orientativo y
+  **terna sugerida** con aviso de que la IA solo se basa en los datos y **no decide: decide GH**. (Cambia la regla «la IA no
+  recomienda» de las instrucciones del proyecto: falta el visto bueno de la Directora de GH; ver AGENDA.)
+- Prompt de la IA desde el portal, no fijo en n8n: GH edita solo las instrucciones (reglas firmes y formato fijos), para el análisis y
+  para el resumen; guardar = versión nueva activa; área de texto + «Ver prompt completo». La lectura de CV queda con prompt fijo.
+- Criterios: GH agrega varios, con descripción («qué buscamos»); los activos suman exactamente 100; una sola rúbrica global.
+- «Talla (prueba)» es un dato que GH pidió: se queda; solo se le quita «(prueba)» del nombre.
+
 ## Decisiones del 23/24-11-2026 (Victor), 0.9.4
 - Carga masiva de CV: un candidato por CV; «Analizar todos con IA» es un botón (no automático al subir).
 - Número de candidato = requisición + correlativo (REQ-00001-C03), independiente de la cédula. La cédula se valida cuando
@@ -197,6 +215,9 @@
 - 0.9.4, supuestos a validar: la casilla de consentimiento reemplaza el texto «cómo lo autorizó» también en la ficha individual;
   los candidatos de la carga masiva no exigen los campos personalizados obligatorios hasta que GH guarda sus «Datos
   adicionales»; el texto que va a n8n para la lectura no va tachado (debe leer la cédula). (confirmar)
+- 0.9.5, para después: si GH cambia las instrucciones o los criterios a mitad de una selección, los análisis dejan de ser del todo
+  comparables (el resumen lo avisa; «Reintentar análisis» los rehace con la versión activa). Un prompt largo deja menos espacio al CV
+  en modelos locales de contexto corto (límite de 6000 caracteres en las instrucciones). [Probable]
 - 0.9.4, para después: el formato de la API del OCR local quedó como el de Mistral (`/v1/ocr`); si el servidor de Victor usa
   otro, se ajustan dos nodos del flujo. El nombre provisional puede quedar con palabras del archivo («perfil», «otro»).
 - Consultas en paralelo sobre la misma transacción (aviso de pg en el log; dejará de funcionar con pg 9):

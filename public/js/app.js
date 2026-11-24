@@ -170,18 +170,35 @@
     setTimeout(() => f.querySelectorAll('button, input[type=submit]').forEach(b => { b.disabled = true; }), 0);   // después: el botón pulsado aún viaja con el formulario
     clearTimeout(veloT); veloT = setTimeout(() => cargando(true, f.dataset.carga), 250);   // data-carga: texto propio («Subiendo los CV…»)
   });
-  // (0.9.4) Resultados que llegan de n8n (lectura y análisis de CV): se consulta cada 15 s y, si hay algo nuevo, se ofrece actualizar.
-  // No recarga sola: no se pierde lo que el usuario esté haciendo.
-  const sondeo = d.querySelector('[data-sondeo]');
-  if (sondeo && window.fetch) {
-    let firma = sondeo.dataset.firma || null, n = 0;
-    const mirar = () => fetch(sondeo.dataset.sondeo, { headers: { accept: 'application/json' }, credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(x => {
-      if (!x) return;
-      if (firma === null) firma = x.firma; else if (x.firma !== firma) { sondeo.hidden = false; return; }
-      if (++n < 120 && x.pendientes > 0) setTimeout(mirar, 15000);
-    }).catch(() => {});
-    setTimeout(mirar, 15000);
-    const b = sondeo.querySelector('[data-recargar]'); if (b) b.addEventListener('click', () => { cargando(true, 'Cargando…'); location.reload(); });
+  // (0.9.5) Criterios de la IA: suma de los pesos activos en vivo; en rojo si no da 100 (el servidor también lo valida)
+  d.querySelectorAll('form[data-suma]').forEach(f => {
+    const out = f.querySelector('[data-suma-total]'); if (!out) return;
+    const calc = () => { let s = 0;
+      f.querySelectorAll('[data-peso]').forEach(i => { const a = f.querySelector('[data-activo="' + i.dataset.peso + '"]'); if (a && a.checked) s += parseInt(i.value, 10) || 0; });
+      out.textContent = 'Suma de los activos: ' + s + ' de 100'; out.style.color = s === 100 ? '' : 'var(--rd)'; };
+    f.addEventListener('input', calc); f.addEventListener('change', calc); calc();
+  });
+  // (0.9.5) El tablero de Selección se actualiza solo cuando llega un resultado de n8n (lectura, análisis o resumen): se consulta
+  // cada 10 s mientras haya algo en curso y, si cambió, se vuelve a dibujar solo el tablero (no la página: un modal abierto sigue igual).
+  const tb = d.getElementById('tablero');
+  if (tb && tb.dataset.sondeo && window.fetch) {
+    let firma = tb.dataset.firma, vueltas = 0;
+    const pedir = u => fetch(u, { headers: { accept: 'application/json' }, credentials: 'same-origin' }).then(r => r.ok ? r.json() : null);
+    const seguir = (ms) => { if (++vueltas < 360) setTimeout(mirar, ms); };
+    function mirar() {
+      if (d.hidden) return seguir(10000);   // pestaña en segundo plano: no se consulta
+      pedir(tb.dataset.sondeo).then(x => {
+        if (!x || x.firma === firma) return x;
+        return pedir(tb.dataset.sondeo + '?html=1').then(y => {
+          if (!y || typeof y.html !== 'string') return x;
+          const b0 = tb.querySelector('.board'), sl = b0 ? b0.scrollLeft : 0;
+          tb.innerHTML = y.html; firma = y.firma;
+          const b1 = tb.querySelector('.board'); if (b1) b1.scrollLeft = sl;
+          return y;
+        });
+      }).then(x => { if (x && x.pendientes > 0) seguir(10000); }).catch(() => seguir(30000));
+    }
+    if (tb.dataset.activo === '1') setTimeout(mirar, 10000);
   }
   // (0.9.3) Al ir a otra página del portal: la «O» en lugar del parpadeo, si tarda más de 300 ms. No en descargas ni pestañas nuevas.
   d.addEventListener('click', e => {

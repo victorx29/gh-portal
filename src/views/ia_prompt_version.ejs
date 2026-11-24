@@ -1,0 +1,3 @@
+<% const fd = s => !s ? '—' : new Date(s).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }); %>
+<div class="mh"><div><h2><%= TIPOS[tipo] %> · v<%= p.version %></h2><p class="sub"><%= fd(p.creado_en) %> · <%= p.creado_por_nombre || 'Portal' %> · <%= p.motivo %></p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<div class="pre"><%= p.instrucciones %></div>

@@ -206,10 +206,14 @@ async function analizarTodos(u, reqId) {
 // Para el tablero: aviso de resultados nuevos (lecturas y análisis) sin recargar a ciegas
 async function estado(u, reqId) {
   ghOnly(u);
+  // 0.9.5: también el resumen general con IA. La firma cambia cuando llega o se pide algo: el tablero se actualiza solo.
   const x = (await q(`select (select count(*)::int from cv_archivo where requisicion_id=$1 and lectura='pendiente' and lectura_pedida_en > now() - interval '${VENCE_MIN} minutes') leyendo,
     (select count(*)::int from ia_analisis a join candidatura ca on ca.id=a.candidatura_id where ca.requisicion_id=$1 and a.estado='pendiente' and a.solicitado_en > now() - interval '30 minutes') analizando,
-    (select coalesce(max(lectura_recibida_en)::text,'') from cv_archivo where requisicion_id=$1) l, (select coalesce(max(a.recibido_en)::text,'') from ia_analisis a join candidatura ca on ca.id=a.candidatura_id where ca.requisicion_id=$1) a`, [reqId])).rows[0];
-  return { pendientes: x.leyendo + x.analizando, firma: crypto.createHash('sha1').update([x.leyendo, x.analizando, x.l, x.a].join('|')).digest('hex').slice(0, 12) };
+    (select count(*)::int from ia_resumen where requisicion_id=$1 and estado='pendiente' and solicitado_en > now() - interval '30 minutes') resumiendo,
+    (select coalesce(max(lectura_recibida_en)::text,'') from cv_archivo where requisicion_id=$1) l,
+    (select coalesce(max(a.recibido_en)::text,'') || count(*) from ia_analisis a join candidatura ca on ca.id=a.candidatura_id where ca.requisicion_id=$1) a,
+    (select coalesce(max(recibido_en)::text,'') || count(*) from ia_resumen where requisicion_id=$1) s`, [reqId])).rows[0];
+  return { pendientes: x.leyendo + x.analizando + x.resumiendo, firma: crypto.createHash('sha1').update([x.leyendo, x.analizando, x.resumiendo, x.l, x.a, x.s].join('|')).digest('hex').slice(0, 12) };
 }
 
 const pedir = (u, cvId) => tx(c => pedirC(c, u, cvId));

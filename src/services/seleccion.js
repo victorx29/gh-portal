@@ -22,7 +22,15 @@ async function tablero(u, reqId) {
   const activas = new Set(pl.flujo.filter(e => e.clase !== 'exito').map(e => String(e.clave))), act = cands.filter(x => activas.has(String(x.etapa)));
   const resumen = { leyendo: act.filter(x => x.lectura === 'pendiente' && !x.lectura_vencida).length, fallas: act.filter(x => x.lectura === 'error' || x.lectura_vencida).length,
     alertas: act.filter(x => x.alertas > 0).length, sinCedula: act.filter(x => !x.cedula).length, sinLectura: act.filter(x => x.lectura === 'sin_lectura').length };
-  return { req, pl, cands, ing, resumen, lectura: LE.configurada(), firma: (await LE.estado(u, reqId)).firma, sondeo: resumen.leyendo > 0 || cands.some(x => x.ia && x.ia.estado === 'pendiente') };
+  // 0.9.5: avance de lo que está en curso («Lectura: 7 de 10 CV») y estado del resumen general con IA
+  const enCurso = x => x.ia && x.ia.estado === 'pendiente' && !x.ia.vencido;
+  const conLectura = act.filter(x => ['pendiente', 'lista', 'error'].includes(x.lectura)), conIA = act.filter(x => x.ia);
+  const avance = { lectura: { n: conLectura.filter(x => x.lectura !== 'pendiente' || x.lectura_vencida).length, N: conLectura.length },
+    analisis: { n: conIA.filter(x => !enCurso(x)).length, N: conIA.length } };
+  const ult = (await q(`select estado, recibido_en, (estado='pendiente' and solicitado_en < now() - interval '30 minutes') vencido,
+    (estado='listo' and recibido_en > now() - interval '15 minutes') reciente from ia_resumen where requisicion_id=$1 order by id desc limit 1`, [reqId])).rows[0] || null;
+  const st = await LE.estado(u, reqId);
+  return { req, pl, cands, ing, resumen, avance, enCurso, ultimoResumen: ult, lectura: LE.configurada(), firma: st.firma, sondeo: st.pendientes > 0 };
 }
 async function crearCandidato(u, reqId, b) {
   ghOnly(u); const nombre = String(b.nombre || '').trim(); if (!nombre) throw E(400, 'El nombre es obligatorio');

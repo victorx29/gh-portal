@@ -1,6 +1,6 @@
 # PRUEBAS.md — Pruebas de regresión del Portal de Gestión Humana
 
-Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.4), ordenada por módulo. Mientras
+Lista acumulada de las pruebas críticas de todas las entregas (0.3 a 0.9.5), ordenada por módulo. Mientras
 el portal no tenga pruebas automáticas, esta lista es la única forma de saber si una versión rompió algo que
 antes funcionaba.
 
@@ -246,7 +246,7 @@ antes funcionaba.
 | IA-04 | API: sin `x-api-key` 401; token equivocado 404; datos del CV con fecha de nacimiento, estado civil y cédula tachados; reglas para el modelo incluidas. | H · A | 0.9.0 |
 | IA-05 | Resultado: puntaje fuera de 0–5 o sin resumen → 400; válido → puntaje 0–100 ponderado por la rúbrica; repetido → 409; el análisis no se modifica ni se borra (base). | H · A | 0.9.0 |
 | IA-06 | La ficha del postulado muestra puntaje, criterios con evidencia, resumen, brechas, preguntas y alertas, con el aviso de que la IA no decide; la tarjeta muestra «IA n/100». La IA no mueve al postulado. | H | 0.9.0 |
-| IA-07 | Configuración › Análisis de CV con IA: pesos 0–100 (el servidor rechaza otros valores); al menos una dimensión activa con peso; cada análisis guarda la rúbrica con la que se hizo. | C | 0.9.0 |
+| ~~IA-07~~ | (Obsoleta en 0.9.5: ver IAC-01.) Configuración › Análisis de CV con IA: pesos 0–100 (el servidor rechaza otros valores); al menos una dimensión activa con peso; cada análisis guarda la rúbrica con la que se hizo. | C | 0.9.0 |
 | IA-08 | Flujo de n8n importado: con un CV en Word y otro en PDF, el resultado llega al portal; con un PDF escaneado, llega el error «sin texto legible». | H | 0.9.0 |
 
 ### Carga masiva de CV, lectura en n8n y número de candidato (0.9.4)
@@ -265,11 +265,30 @@ antes funcionaba.
 | CVL-08 | «Editar datos del candidato»: nombre (mínimo 3 letras), cédula (6 a 10 dígitos), correo válido; la cédula no se deja vacía una vez registrada ni se cambia si la persona ya tuvo un ingreso. | C · A | 0.9.4 |
 | CVL-09 | Un candidato con nombre provisional no pasa a Ingreso (aviso: corregir en «Editar datos»). | H · A | 0.9.4 |
 | CVL-10 | Tablero: chips «Leyendo CV…», «La lectura falló», «Nombre provisional», «n alertas»; resumen arriba (leyendo, alertas, fallas, sin cédula); «Marcar alertas como revisadas» quita el chip y las alertas quedan en la ficha. | H | 0.9.4 |
-| CVL-11 | Con lecturas o análisis en curso, el tablero consulta cada 15 s y muestra «Llegaron resultados nuevos · Actualizar» sin recargar solo. | C | 0.9.4 |
+| ~~CVL-11~~ | (Obsoleta en 0.9.5: ver TAB-01.) Con lecturas o análisis en curso, el tablero consulta cada 15 s y muestra «Llegaron resultados nuevos · Actualizar» sin recargar solo. | C | 0.9.4 |
 | CVL-12 | «Analizar todos con IA» (con confirmación): pide el análisis de los candidatos activos con CV y consentimiento que no tienen análisis de su CV actual; informa los omitidos con su motivo (sin CV, sin consentimiento, CV leyéndose, ya analizado, análisis en curso); no analiza rechazados ni ingresados. | H · A | 0.9.4 |
 | CVL-13 | «Reintentar análisis» (análisis en curso o fallido): el pendiente queda en error «Reintentado por Gestión Humana» y se pide otro; si n8n responde después al anterior, el portal lo rechaza. Mientras el CV se lee, no se pide análisis. | H · A | 0.9.4 |
-| CVL-14 | Flujo de n8n `gh-lectura-cv.json` importado: con un PDF, un Word y una imagen, los datos llegan al portal; con el OCR apagado, llega el error y la tarjeta dice «La lectura falló». | H | 0.9.4 |
+| CVL-14 | Flujo de n8n `gh-lectura-cv.json` importado: con un PDF, un Word y una imagen, los datos llegan al portal; con el OCR apagado, llega el error y la tarjeta dice «La lectura falló». | H | 0.9.4 | (0.9.5: el flujo llama al modelo local por la API compatible con OpenAI.)
 | HIS-01 | Historial: 30 transacciones escribiendo a la vez terminan todas (sin «deadlock») y la cadena de hash queda sin huecos ni bifurcaciones. | C · A | 0.9.4 |
+
+### IA configurable, resumen general y tablero que se actualiza solo (0.9.5)
+
+| ID | Prueba | Tipo | Origen |
+|---|---|---|---|
+| IAC-01 | Criterios: los activos deben sumar exactamente 100; el contador «Suma de los activos: n de 100» se pone en rojo al salirse y el servidor rechaza guardar; un criterio activo con peso 0 no se acepta; solo GH. | H · A | 0.9.5 |
+| IAC-02 | «+ Criterio»: nombre único; sin campo del perfil exige «qué buscamos»; se crea inactivo y con peso 0; «Editar» cambia nombre, campo y descripción sin cambiar la clave; un criterio no se borra (base). | H · A | 0.9.5 |
+| IAC-03 | Instrucciones de la IA (análisis y resumen): guardar crea una versión nueva activa con motivo obligatorio; sin cambios o con más de 6000 caracteres no se guarda; «Restaurar el original» crea otra versión con la v1; las versiones se listan y se ven; no se modifican ni se borran (base). | H · A | 0.9.5 |
+| IAC-04 | «Ver prompt completo»: reglas firmes primero, luego las instrucciones de GH y el mensaje de datos, con un perfil de EJEMPLO (sin CV real). | H | 0.9.5 |
+| IAC-05 | El prompt del análisis lo arma el portal: reglas firmes antes que las instrucciones; cada criterio con su peso, el requisito del perfil o, si no está ligado, «qué busca GH (vale para todos los cargos)»; marca del CV que n8n reemplaza por el texto tachado; el análisis guarda la versión y la ficha dice «Hecho con las instrucciones vN». | H · A | 0.9.5 |
+| IAC-06 | Un perfil «Sin descripción» sigue sin analizarse aunque haya criterios generales de GH (la IA no tendría requisitos del cargo). | C · A | 0.9.5 |
+| RSG-01 | «Resumen general» (solo GH): tabla al instante con los candidatos activos con análisis listo, ordenados por puntaje, una columna por criterio, brechas y alertas; lista los que no tienen análisis y cuenta los rechazados o ingresados (no se comparan). En móvil la tabla se desplaza de lado. | H · A | 0.9.5 |
+| RSG-02 | «Generar resumen con IA» (con confirmación): exige al menos 2 candidatos con análisis listo; uno a la vez por requisición (vence a los 30 min); evento `cv.resumen`; a la IA solo viajan números de candidato y análisis, nunca nombres, cédulas ni correos. | H · A | 0.9.5 |
+| RSG-03 | Resultado: aviso fijo «La IA no decide…»; texto comparativo, terna orientativa (máximo 3, solo números de la comparación; otro número → 400), qué verificar y alertas; se guarda con fecha, quién, versión de las instrucciones, modelo y candidatos comparados; los anteriores se ven abajo; repetido → 409; no se borra (base). | H · A | 0.9.5 |
+| RSG-04 | Avisos del resumen: análisis con versiones distintas de las instrucciones o de los criterios («no son del todo comparables»); resumen desactualizado si cambiaron los análisis; «la terna no sigue el orden de los puntajes» si deja fuera a alguien con más puntaje. | H · A | 0.9.5 |
+| TAB-01 | Tablero de Selección: con lecturas, análisis o un resumen en curso, se actualiza solo cada 10 s sin recargar la página (un modal abierto no se cierra); muestra «Lectura: n de N CV · Análisis con IA: n de N · Generando el resumen general» con la «O» pequeña; cuando llega el resumen, «El resumen general con IA está listo · Ver». | H | 0.9.5 |
+| TAB-02 | La «O» pequeña (`.o-mini`) aparece en «Leyendo CV…», «IA en curso», el avance y la ficha; con «reducir movimiento» no gira. | C | 0.9.5 |
+| N8N-01 | Flujo `gh-analisis-cv.json` 0.9.5 importado, con tu modelo local: un análisis y un resumen llegan al portal; si el modelo devuelve algo que el portal rechaza (400), la ficha muestra el error en vez de quedar «en curso». | H | 0.9.5 |
+| LIM-03 | `npm run limpiar -- transacciones --aplicar` borra también los resúmenes de IA. | C | 0.9.5 |
 
 ## 11. Eventos hacia n8n
 
@@ -299,6 +318,8 @@ antes funcionaba.
 | — | Elegir el número de plazas en la requisición (0.4–0.7.1). | Desde la 0.7.2, una plaza por requisición. |
 | IA-01 | El consentimiento exige indicar cómo se obtuvo (0.9.0). | Desde la 0.9.4, una casilla de confirmación (IA-09). |
 | IA-02 | Subir CV: PDF, .docx o texto (0.9.0). | Desde la 0.9.4 también .doc e imágenes (IA-10). |
+| IA-07 | Pesos de 0 a 100 sin exigir suma (0.9.0). | Desde la 0.9.5 los activos suman exactamente 100 (IAC-01). |
+| CVL-11 | Aviso «Llegaron resultados nuevos · Actualizar» (0.9.4). | Desde la 0.9.5 el tablero se actualiza solo (TAB-01). |
 
 ---
 
@@ -315,3 +336,4 @@ antes funcionaba.
 | 0.9.2 | 23-11-2026 | Nuevas CNG, EGR-03 a 05, PL-13, UI-06 a 08 + regresión REU (0.9.1) + INS-01/02 | Pasa. Base 0.9.1 con datos ficticios → migración 017 sin errores; 13 pruebas de servicio; regresión 0.9.1 (16/16) por la ruta 0.9.0 → 0.9.2 y en instalación desde cero (17 migraciones); pantallas en escritorio y móvil (acciones de plaza, egreso con nombre, anular, regularizar, «O» de carga en claro y oscuro, volver a la vista en Plantilla y en el diagrama), sin errores JS. No probado: EasyPanel, envío real de `egreso.anulado` a n8n, restaurar la posición de desplazamiento, «Atrás» con la «O» puesta, anular con requisición abierta, Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
 | 0.9.3 | 23-11-2026 | Nuevas FIC, CPE, ALT, CNC, PL-14, UI-09, ORG-04 + regresión 0.9.2 (13/13) y 0.9.1 (16/16) + INS-01/02 | Pasa. 14 pruebas de servicio; flujo completo con datos ficticios (requisición → aprobación → selección → candidato con campo obligatorio → ingreso con ficha completa); rutas 0.9.0 → 0.9.3 y 0.9.1 → 0.9.3 e instalación desde cero (18 migraciones); pantallas en escritorio y móvil (campos personalizados, confirmar ingreso, ficha incompleta y edición, alta manual con error que conserva datos, regularizar varias, conciliación con «Corregir aquí», leyenda, «O» al navegar y no en descargas), sin errores JS. Corregido en la revisión: los eventos de selección llevaban todos los datos del candidato (ahora sin campos personalizados). No probado: EasyPanel, n8n real, Safari. | — | Claude (entorno aislado, PostgreSQL 16 y Chromium) |
 | 0.9.4 | 24-11-2026 | Nuevas IA-09/10, CVL-01 a 13, EV-06, HIS-01 + regresión 0.9.3 (14/14), 0.9.2 (13/13), 0.9.1 (16/16) + INS-01/02 | Pasa. 15 pruebas de servicio con PostgreSQL 16; ruta 0.9.3 → 0.9.4 (migración 019), ruta 0.9.0 → 0.9.4 e instalación desde cero (19 migraciones); flujo completo en Chromium con un n8n simulado por HTTP (carga de 6 CV + 1 formato no admitido, lecturas en paralelo, alertas, lectura fallida y reintento, «Analizar todos», «Reintentar análisis», aviso de resultados nuevos), escritorio y móvil, sin errores JS; nodos de código de `gh-lectura-cv.json` probados fuera de n8n. Encontrado y corregido: deadlock del historial con escrituras en paralelo (HIS-01). No probado: EasyPanel, n8n real con Mistral OCR y el modelo local (CVL-14), Safari. | — | Claude (entorno aislado, PostgreSQL 16) |
+| 0.9.5 | 24-11-2026 | Nuevas IAC-01 a 06, RSG-01 a 04, TAB-01/02, LIM-03 + regresión 0.9.4 (15/15), 0.9.3 (14/14), 0.9.2 (13/13), 0.9.1 (16/16), HIS-01 + INS-01/02 | Pasa. 11 pruebas de servicio con PostgreSQL 16; ruta 0.9.3 → 0.9.5 (migraciones 019 y 020) e instalación desde cero (20 migraciones); flujo completo en Chromium con un n8n simulado por HTTP con el contrato 0.9.5 (criterio nuevo y pesos, versión nueva de las instrucciones, carga de 5 CV, tablero que se actualiza solo durante la lectura, el análisis y el resumen, terna con avisos), escritorio y móvil, sin errores JS; nodos de código de los dos flujos de n8n probados fuera de n8n. No probado: EasyPanel, n8n real con tu modelo y tu OCR (N8N-01, CVL-14), Safari. | — | Claude (entorno aislado, PostgreSQL 16) |

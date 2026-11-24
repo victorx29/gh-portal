@@ -1,0 +1,14 @@
+<%# 0.9.5 · Tablero de Selección: se dibuja al abrir la página y se vuelve a pedir solo cuando llega un resultado de n8n (sin recargar) %>
+<% const av = []; if (resumen.alertas) av.push(resumen.alertas + ' con alertas por revisar'); if (resumen.fallas) av.push(resumen.fallas + (resumen.fallas > 1 ? ' lecturas fallaron' : ' lectura falló')); if (resumen.sinCedula) av.push(resumen.sinCedula + ' sin cédula (se exige para Ingreso)'); %>
+<% const curso = []; if (avance.lectura.n < avance.lectura.N) curso.push(`Lectura: ${avance.lectura.n} de ${avance.lectura.N} CV`); if (avance.analisis.n < avance.analisis.N) curso.push(`Análisis con IA: ${avance.analisis.n} de ${avance.analisis.N}`); if (ultimoResumen && ultimoResumen.estado === 'pendiente' && !ultimoResumen.vencido) curso.push('Generando el resumen general'); %>
+<% if (curso.length) { %><p class="flash" role="status"><span class="o-mini" aria-hidden="true"></span><span><%= curso.join(' · ') %>. Se actualiza solo.</span></p><% } %>
+<% if (ultimoResumen && ultimoResumen.reciente) { %><p class="flash ok" role="status"><span>El resumen general con IA está listo.</span><a class="btn" href="/requisiciones/<%= req.id %>/resumen" data-modal>Ver</a></p><% } %>
+<% if (av.length) { %><p class="flash<%= resumen.fallas ? ' err' : '' %>" role="status"><span><%= av.join(' · ') %>.<% if (resumen.sinLectura && !lectura) { %> La lectura automática no está configurada.<% } %></span></p><% } %>
+<div class="board"><% pl.etapas.forEach(c => { const L = cands.filter(x => x.etapa === c.clave); %>
+<section class="col k-<%= c.clase === 'cierre' ? 'cancelado' : c.clase === 'exito' ? 'ingreso' : 'seleccion' %>"><div class="ch"><%= c.nombre %><span><%= L.length %></span></div>
+<% L.forEach(x => { %><a class="card" href="/candidaturas/<%= x.id %>" data-modal data-card="<%= x.id %>"><p class="cod"><%= x.codigo %></p><h4><%= x.nombre %></h4><p><%= x.email || 'Sin correo' %></p>
+<p><% if (x.lectura === 'pendiente' && !x.lectura_vencida) { %><span class="chip"><span class="o-mini" aria-hidden="true"></span>Leyendo CV…</span><% } else if (x.lectura === 'error' || x.lectura_vencida) { %><span class="chip r" title="<%= x.lectura_error || 'n8n no respondió' %>"><%- ic('alerta') %>La lectura falló</span><% } %>
+<% if (x.nombre_provisional) { %><span class="chip w" title="Es el nombre del archivo: corrígelo en «Editar datos»">Nombre provisional</span><% } %>
+<% if (x.alertas > 0) { %><span class="chip w"><%- ic('alerta') %><%= x.alertas %> alerta<%= x.alertas > 1 ? 's' : '' %></span><% } %>
+<% if (x.ia && x.ia.estado === 'listo') { %><span class="chip" title="Puntaje orientativo de la IA frente al perfil; decide Gestión Humana">IA <%= Number(x.ia.puntaje).toFixed(0) %>/100</span><% } else if (enCurso(x)) { %><span class="chip w"><span class="o-mini" aria-hidden="true"></span>IA en curso</span><% } %></p></a><% }) %>
+<% if (!L.length) { %><div class="empty">Sin candidatos</div><% } %></section><% }) %></div>

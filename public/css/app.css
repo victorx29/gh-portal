@@ -145,3 +145,8 @@ details.inl-d .pop form{display:flex;gap:6px;flex-wrap:wrap}details.inl-d .pop s
 @keyframes gh-gira{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.carga-o{animation:none;border-top-color:var(--pr);opacity:.7}}
 @media print{.carga{display:none!important}}
+/* 0.9.5 · «O» pequeña: trabajo en curso que NO bloquea (lectura del CV, análisis, resumen). Mismo anillo girando de la «O» de carga,
+   del color del texto donde va (chip o aviso). Ver DESIGN.md «Indicador de trabajo en curso». */
+.o-mini{display:inline-block;flex:none;width:12px;height:12px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:gh-gira .8s linear infinite;vertical-align:-2px;margin-right:4px;box-sizing:border-box}
+.flash .o-mini{width:16px;height:16px;margin:2px 0 0}
+@media (prefers-reduced-motion:reduce){.o-mini{animation:none;border-top-color:currentColor;opacity:.6}}

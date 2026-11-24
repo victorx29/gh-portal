@@ -1,0 +1,5 @@
+<div class="mh"><div><h2>Prompt completo · <%= TIPOS[tipo] %></h2><p class="sub">Así lo recibe la IA con la versión activa (v<%= prompt.version %>), armado con un perfil<%= tipo === 'resumen' ? ' y candidatos' : '' %> de EJEMPLO.</p></div><button type="button" class="btn" data-close>Cerrar</button></div>
+<h3>Mensaje de sistema (reglas firmes + instrucciones de Gestión Humana)</h3>
+<div class="pre"><%= sistema %></div>
+<h3>Mensaje con los datos (fijo: lo arma el portal)</h3>
+<div class="pre"><%= usuario %></div>

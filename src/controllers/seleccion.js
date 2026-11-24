@@ -57,7 +57,19 @@ r.post('/requisiciones/:id(\\d+)/cv-lote', soloGH, (req, res, next) => subeLote.
   } catch (e) { files.filter(f => !f.guardado).forEach(f => fs.unlink(f.path, () => {})); if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
   res.redirect('/requisiciones/' + req.params.id + '/seleccion');
 }));
-r.get('/requisiciones/:id(\\d+)/seleccion/estado', w(async (req, res) => res.json(await LE.estado(req.user, +req.params.id))));
+// Estado para el tablero (0.9.5): con ?html=1 devuelve además el tablero ya dibujado, para actualizarlo sin recargar la página
+r.get('/requisiciones/:id(\\d+)/seleccion/estado', w(async (req, res) => {
+  if (!req.query.html) return res.json(await LE.estado(req.user, +req.params.id));
+  const t = await S.tablero(req.user, +req.params.id);
+  res.render('partials/seleccion_tablero', t, (e, html) => e ? res.status(500).json({ error: 'Error interno' }) : res.json({ firma: t.firma, pendientes: t.sondeo ? 1 : 0, html }));
+}));
+// ---- Resumen general de la selección (0.9.5): tabla comparativa + resumen y terna orientativa de la IA ----
+const RES = require('../services/resumen');
+r.get('/requisiciones/:id(\\d+)/resumen', w(async (req, res) => modal(req, res, 'resumen', { title: 'Resumen general', ...await RES.comparativo(req.user, +req.params.id) })));
+r.post('/requisiciones/:id(\\d+)/resumen', w(async (req, res) => {
+  try { await RES.solicitar(req.user, +req.params.id); flash(req, 'ok', 'Resumen pedido a la IA: llega en unos minutos y el tablero avisa'); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
+  res.redirect('/requisiciones/' + req.params.id + '/seleccion?modal=' + encodeURIComponent('/requisiciones/' + req.params.id + '/resumen'));
+}));
 r.post('/requisiciones/:id(\\d+)/analizar-todos', w(async (req, res) => {
   try {
     const x = await LE.analizarTodos(req.user, +req.params.id), om = Object.entries(x.omitidos).map(([m, l]) => `${m}: ${l.join(', ')}`).join(' · '), n = x.pedidos.length;
@@ -79,11 +91,26 @@ r.get('/cv/:id(\\d+)', w(async (req, res) => { const a = await IA.cvDe(req.user,
 r.post('/candidaturas/:id(\\d+)/consentimiento', hacer((u, id, b) => IA.consentimiento(u, id, b.confirmo === 'on' ? 'GH confirmó haber notificado al postulado sobre el uso de sus datos' : b.ref, b.retirar === '1'), 'Consentimiento actualizado'));
 r.post('/candidaturas/:id(\\d+)/analizar', hacer((u, id) => IA.solicitar(u, id), 'Análisis solicitado: el resultado llega en unos minutos (recarga la ficha)'));
 r.post('/candidaturas/:id(\\d+)/reintentar', hacer((u, id) => IA.reintentar(u, id), 'Análisis pedido de nuevo: el resultado llega en unos minutos'));
-r.get('/config/ia', w(async (req, res) => { if (!P.esGH(req.user)) throw E(403, 'Solo Gestión Humana'); res.render('config_ia', { title: 'Análisis de CV con IA', nav: 'config', sub: 'ia', rs: await IA.rubricaConfig() }); }));
-r.post('/config/ia', w(async (req, res) => {
-  try { await IA.guardarRubrica(req.user, req.body); flash(req, 'ok', 'Rúbrica guardada: se usa en los análisis nuevos'); } catch (e) { if (!e.status || e.status >= 500) throw e; flash(req, 'err', e.message); }
-  res.redirect('/config/ia');
+// ---- Configuración › Análisis de CV con IA: criterios (pesos que suman 100) e instrucciones de la IA con versiones (0.9.5) ----
+const PR = require('../services/ia_prompt'), soloGHc = (req, res, next) => P.esGH(req.user) ? next() : next(E(403, 'Solo Gestión Humana'));
+const hacerU = require('../util').hacer, aConfig = (fn, ok) => hacerU(async req => { await fn(req); }, ok, '/config/ia');   // siempre vuelve a la configuración
+r.get('/config/ia', soloGHc, w(async (req, res) => res.render('config_ia', { title: 'Análisis de CV con IA', nav: 'config', sub: 'ia', rs: await IA.rubricaConfig(), CAMPOS: IA.CAMPOS,
+  TIPOS: PR.TIPOS, MAX: PR.MAX_INSTRUCCIONES, prompts: { analisis: await PR.activo('analisis'), resumen: await PR.activo('resumen') },
+  versiones: { analisis: await PR.versiones('analisis'), resumen: await PR.versiones('resumen') } })));
+r.post('/config/ia', soloGHc, aConfig(req => IA.guardarRubrica(req.user, req.body), 'Criterios guardados: se usan en los análisis nuevos'));
+r.get('/config/ia/criterios/nuevo', soloGHc, w(async (req, res) => modal(req, res, 'ia_criterio', { title: 'Nuevo criterio', x: null, CAMPOS: IA.CAMPOS })));
+r.post('/config/ia/criterios', soloGHc, aConfig(req => IA.crearCriterio(req.user, req.body), 'Criterio creado (inactivo y con peso 0): dale peso en la tabla y actívalo'));
+r.get('/config/ia/criterios/:clave', soloGHc, w(async (req, res) => {
+  const x = (await IA.rubricaConfig()).find(d => d.clave === req.params.clave); if (!x) throw E(404, 'Criterio no encontrado');
+  modal(req, res, 'ia_criterio', { title: 'Editar criterio', x, CAMPOS: IA.CAMPOS });
 }));
+r.post('/config/ia/criterios/:clave', soloGHc, aConfig(req => IA.editarCriterio(req.user, req.params.clave, req.body), 'Criterio guardado'));
+r.post('/config/ia/prompt/:tipo(analisis|resumen)', soloGHc, aConfig(req => PR.guardar(req.user, req.params.tipo, req.body), 'Instrucciones guardadas como versión nueva: se usan desde ahora'));
+r.post('/config/ia/prompt/:tipo(analisis|resumen)/restaurar', soloGHc, aConfig(req => PR.guardar(req.user, req.params.tipo, {}, true), 'Original restaurado como versión nueva'));
+r.get('/config/ia/prompt/:tipo(analisis|resumen)/vista', soloGHc, w(async (req, res) => modal(req, res, 'ia_prompt_vista', { title: 'Prompt completo', tipo: req.params.tipo, TIPOS: PR.TIPOS,
+  ...await PR.vistaPrevia(req.user, req.params.tipo, await IA.rubricaConfig()) })));
+r.get('/config/ia/prompt/:tipo(analisis|resumen)/v/:v(\\d+)', soloGHc, w(async (req, res) => modal(req, res, 'ia_prompt_version', { title: 'Versión de las instrucciones', tipo: req.params.tipo, TIPOS: PR.TIPOS,
+  p: await PR.version(req.user, req.params.tipo, +req.params.v) })));
 
 // Ingreso: GH confirma la fecha real (la persona ocupa la plaza) o registra que no se presentó
 r.post('/ingresos/:id/confirmar', hacer((u, id, b) => EM.confirmarIngreso(u, id, b), 'Ingreso confirmado: la persona ocupa la plaza y su ficha quedó completa'));

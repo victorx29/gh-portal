@@ -137,6 +137,12 @@ transparente) girando 0,8 s por vuelta, con la etiqueta «Guardando…» (13 px 
 más de 250 ms (300 ms al abrir un modal) y el botón queda deshabilitado para no enviar dos veces. Con «reducir movimiento»
 no gira. No se imprime.
 
+**Indicador de trabajo en curso** (`.o-mini`, 0.9.5): la misma «O» en pequeño (anillo de 12 px, borde 2 px; 16 px dentro de
+un aviso) girando 0,8 s por vuelta, del color del texto donde va (`currentColor`). Marca lo que n8n está procesando y **no
+bloquea**: va dentro de un chip («Leyendo CV…», «IA en curso») o al inicio de un aviso («Lectura: 3 de 10 CV. Se actualiza
+solo.»). Siempre acompañado de texto; el anillo es decorativo (`aria-hidden`). Con «reducir movimiento» no gira. Para
+esperas de minutos se usa este indicador, nunca el velo de `.carga`.
+
 **Indicadores** (`.kpi`): fila con borde y radio 14 px; etiqueta pequeña `--mu` y valor en 22 px.
 
 **Estados vacíos** (`.empty`): texto `--mu` centrado dentro de un borde punteado.

@@ -4,7 +4,7 @@
 <% if (ca.motivo_rechazo) { %><tr><th>Motivo de rechazo</th><td><%= ca.motivo_rechazo %></td></tr><% } %></table>
 <% const al = ca.alertas || [], pendAl = al.length && !ca.alertas_revisadas_en; %>
 <% if (ca.lectura && ca.lectura !== 'no_aplica') { %><section class="blk" aria-label="Lectura del CV"><h3>Lectura del CV</h3>
-<% if (ca.lectura === 'pendiente' && !lecturaVencida) { %><p class="sub">n8n está leyendo el CV (pedido el <%= fd(ca.lectura_pedida_en) %>). Los datos y las alertas llegan en unos minutos.</p>
+<% if (ca.lectura === 'pendiente' && !lecturaVencida) { %><p class="flash" role="status"><span class="o-mini" aria-hidden="true"></span><span>n8n está leyendo el CV (pedido el <%= fd(ca.lectura_pedida_en) %>). Los datos y las alertas llegan en unos minutos.</span></p>
 <% } else if (ca.lectura === 'pendiente' || ca.lectura === 'error') { %><p class="flash err" role="alert"><span>La lectura falló: <%= ca.lectura === 'error' ? ca.lectura_error : 'n8n no respondió' %></span></p>
 <% } else if (ca.lectura === 'sin_lectura') { %><p class="sub">No se leyó: la lectura automática no estaba configurada. Completa los datos en «Editar datos».</p>
 <% } else { %><p class="sub">Leído el <%= fd(ca.lectura_recibida_en) %><%= ca.lectura_modelo ? ' · ' + ca.lectura_modelo : '' %>. Solo se llenan los datos vacíos: lo que escribe Gestión Humana no se reemplaza.</p><% } %>
@@ -37,11 +37,12 @@
 <div><label for="cv-<%= ca.id %>"><%= ca.cv_nombre ? 'Reemplazar CV' : 'Subir CV' %> (PDF, Word, texto o imagen; máx. 5 MB)</label><input id="cv-<%= ca.id %>" type="file" name="cv" accept="<%= EXT.join(',') %>" required></div><p class="act"><button class="btn"><%- ic('subir') %>Subir</button></p></form>
 <% if (ca.cv_nombre && ca.consentimiento_en && (!ia || ia.estado !== 'pendiente' || ia.cv_archivo_id !== ca.cv_archivo_id)) { %><form method="post" action="/candidaturas/<%= ca.id %>/analizar" class="act"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><button class="btn p"><%= ia && ia.cv_archivo_id === ca.cv_archivo_id ? (ia.estado === 'error' ? 'Reintentar análisis' : 'Analizar de nuevo') : 'Analizar con IA' %></button></form><% } %>
 <% if (ia) { %>
-<% if (ia.estado === 'pendiente') { %><p class="flash" role="status"><span>Análisis en curso (pedido por <%= ia.solicitado_por_nombre %> el <%= new Date(ia.solicitado_en).toLocaleString('es-VE') %>). Recarga en unos minutos.</span></p>
+<% if (ia.estado === 'pendiente') { %><p class="flash" role="status"><span class="o-mini" aria-hidden="true"></span><span>Análisis en curso (pedido por <%= ia.solicitado_por_nombre %> el <%= new Date(ia.solicitado_en).toLocaleString('es-VE') %>). Recarga en unos minutos.</span></p>
 <form method="post" action="/candidaturas/<%= ca.id %>/reintentar" class="act" data-confirm="El análisis en curso se da por fallido y se pide uno nuevo a n8n. Si n8n responde después al anterior, el portal lo ignora." data-ok="Reintentar"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="req" value="<%= ca.requisicion_id %>"><button class="btn">Reintentar análisis</button></form>
 <% } else if (ia.estado === 'error') { %><p class="flash err" role="alert">El análisis falló: <%= ia.error %></p>
 <% } else { const R = ia.resultado; %>
 <div class="kpi"><div><small>Puntaje orientativo</small><strong><%= Number(ia.puntaje).toFixed(0) %>/100</strong></div><div><small>Análisis</small><strong style="font-size:1rem"><%= fd(ia.recibido_en) %></strong></div></div>
+<p class="sub">Hecho con las instrucciones <%= ia.prompt_version ? 'v' + ia.prompt_version : 'anteriores a la 0.9.5' %><%= ia.modelo ? ' · ' + ia.modelo : '' %>.</p>
 <p class="sub">La IA compara el CV con el perfil y no decide: Gestión Humana evalúa y decide. No considera foto, edad, sexo, estado civil, nacionalidad, religión ni salud.</p>
 <p><%= R.resumen %></p>
 <div class="tw"><table class="mid"><tr><th>Criterio</th><th>Peso</th><th>Puntaje</th><th>Evidencia en el CV</th></tr>
