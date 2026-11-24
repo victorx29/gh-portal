@@ -1,11 +1,11 @@
 # ESTADO.md — actualizar en cada entrega
 
-Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.5.1 (package.json 0.9.5.1, migraciones 001–020).
+Última revisión: 24-11-2026, contra el código `gh-portal` 0.9.5.2 (package.json 0.9.5.2, migraciones 001–020).
 
 ## Versión
-- **Última entregada:** 0.9.5.1 (24-11-2026): rediseño visual «A + B» con la marca APB (Roboto, claro y oscuro) en todo el
-  portal y pantallas de bajo riesgo reorganizadas en cajas y secciones. Sin migración.
-- **Entregada antes:** 0.9.5 (24-11-2026), en pruebas de Victor.
+- **Última entregada:** 0.9.5.2 (24-11-2026): menú «Selección» con la bandeja de requisiciones en Selección, papeles de botón
+  por reglas comunes del CSS y fase visual 2 (Requisiciones y Selección en cajas y secciones). Sin migración.
+- **Entregadas antes:** 0.9.5.1 (rediseño «A + B»; Victor ya la ve en el portal, confirmar si está en EasyPanel) y 0.9.5.
 - **Desplegada en EasyPanel:** 0.9.4 (según Victor, 24-11-2026). Pendiente en n8n: importar `gh-analisis-cv.json` 0.9.5 (análisis y
   resumen) y `gh-lectura-cv.json` 0.9.5, con la URL del modelo local y del OCR; variable `N8N_WEBHOOK_LECTURA_URL`.
 - **Antes:** 0.9.1 en EasyPanel (visto en el navegador el 23-11-2026; Maria Yajure y los dos analistas de desarrollo ya
@@ -106,6 +106,15 @@
   sombra, franja de marca. Reorganizadas en cajas y secciones: inicio de sesión, menú (grupo «Administración»), error, Configuración
   (catálogos, empresas —formulario en 3 secciones—, usuarios, campos personalizados, Análisis de CV con IA) y listas de perfiles y
   empleados; filtros en su caja. DESIGN.md reescrito. Sin migración.
+- **0.9.5.2:** menú «Selección» (solo GH) con la **bandeja de selección**: una caja por requisición en Selección con días en la
+  etapa, barra de ingresos frente a plazas, candidatos activos, análisis listos, trabajo en curso, alertas y etapas; abre el
+  tablero o el resumen general. El tablero marca «Selección» en el menú y vuelve a la bandeja. Papeles de botón por **reglas
+  comunes del CSS** (encabezado, cajas, filas de acciones, filtros, secciones y tablas → secundario; Cancelar → discreto), sin
+  marcar botón por botón. **Fase visual 2:** formulario de requisición en 6 secciones; detalle de requisición con «Datos»,
+  «Tu decisión» (caja ámbar) y barra de acciones al pie (Cancelar dentro de un desplegable); ficha del candidato en cajas
+  (Datos, Lectura del CV, CV y consentimiento, Análisis con IA, Datos adicionales, Ingreso, registro de la etapa y «Decisión
+  sobre la candidatura» con «Rechazar» en un desplegable y motivo obligatorio); «Nuevo candidato» y «Cargar CV» en
+  secciones; resumen general en dos cajas. Mismos campos y acciones que la 0.9.5.1. Sin migración.
 
 ## Carga de datos de prueba (19-11-2026)
 - Archivos en `C:\Automatizaciones\carga-organigramas` (fuera del repo), generados de los organigramas 2026 (GH 2025):
@@ -179,6 +188,11 @@
 - Reorganizar pantallas por fases: en la 0.9.5.1 las de bajo riesgo; después, fase 2 Requisiciones y Selección, fase 3 Empleados y
   Conciliación, fase 4 Estructura, plantilla, perfiles, organigrama, pipelines y cargas.
 
+## Decisiones del 24-11-2026 (Victor), 0.9.5.2
+- Los botones toman su papel (principal, secundario, discreto) por **reglas comunes del CSS** según dónde están, como en la previa.
+- Menú **«Selección»** solo para GH, con una **bandeja de selección** (requisiciones en Selección con su avance; cada una abre su
+  tablero). Va en la 0.9.5.2 junto con la fase visual 2 (Requisiciones y Selección).
+
 ## Decisiones del 24-11-2026 (Victor), 0.9.5
 - Indicador mientras la IA procesa: «O» pequeña que no bloquea, avance «Leyendo n de N» y tablero que se actualiza solo.
 - Resumen general en un modal, guardado: tabla del portal + texto de la IA con un botón. Enfoque mixto: comparativo orientativo y
@@ -248,6 +262,9 @@
   sobrescribe sin historial; los eventos de selección envían a n8n todos los datos del candidato (cédula,
   teléfono); el envío a n8n mantiene la transacción abierta y un aviso que falla 10 veces se pierde sin alerta;
   `multer` 1.x → 2.x; Dockerfile con `npm ci`; ayudante `hacer` y normalizaciones duplicados.
+- 0.9.5.2, propuesto: la cabecera del detalle de requisición muestra el estado técnico («seleccion», «pendiente director») en
+  vez del nombre de la etapa del pipeline. Índice `historial(entidad, entidad_id)` cuando crezca el historial (lo leen el
+  detalle, la línea de tiempo y la bandeja). [Probable]
 - Pasar el repo gh-portal a privado (historial revisado: sin claves).
 - Configurar token o deploy key de GitHub en EasyPanel para el repo privado.
 - README desactualizado: sitúa el SSO «antes de abrir el portal a todos los gerentes»; la decisión vigente es

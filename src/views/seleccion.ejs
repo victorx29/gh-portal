@@ -1,6 +1,6 @@
 <%- include('partials/head') %>
 <div class="top"><div><h1>Selección · <%= req.codigo %></h1><p class="sub"><%= req.cargo %> · <%= req.empresa %> · Ingresos <%= ing %> de <%= req.plazas %> plaza<%= req.plazas > 1 ? 's' : '' %></p></div>
-<div class="row"><a class="btn" href="/pipeline">Volver al pipeline</a><a class="btn" href="/requisiciones/<%= req.id %>/resumen" data-modal>Resumen general</a><% if (req.estado === 'seleccion') { %>
+<div class="row"><a class="btn g" href="/seleccion">← Selección</a><a class="btn" href="/requisiciones/<%= req.id %>/resumen" data-modal>Resumen general</a><% if (req.estado === 'seleccion') { %>
 <a class="btn" href="/requisiciones/<%= req.id %>/cv-lote" data-modal><%- ic('subir') %>Cargar CV</a>
 <form method="post" action="/requisiciones/<%= req.id %>/analizar-todos" class="inl" data-confirm="Se pide el análisis de los candidatos activos con CV y consentimiento que aún no tienen análisis de su CV actual. La IA compara con el perfil y no decide." data-ok="Analizar"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn">Analizar todos con IA</button></form>
 <a class="btn p" href="/requisiciones/<%= req.id %>/candidatos/nuevo" data-modal>+ Candidato</a><% } %></div></div>

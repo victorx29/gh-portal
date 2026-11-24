@@ -2,8 +2,10 @@
 <form method="post" action="/requisiciones/<%= reqId %>/cv-lote?_csrf=<%= csrf %>" enctype="multipart/form-data" data-carga="Subiendo los CV…">
 <p class="sub">Se crea un candidato por cada CV, con su número (por ejemplo REQ-00001-C03). <% if (lectura) { %>n8n lee cada CV con los modelos locales y completa nombre, cédula, correo y teléfono; lo que no pueda leer queda como alerta en la tarjeta.<% } %></p>
 <% if (!lectura) { %><p class="flash err" role="alert"><span>La lectura automática no está configurada (falta <code>N8N_WEBHOOK_LECTURA_URL</code>, <code>N8N_API_KEY</code> o <code>PORTAL_URL</code>). Los candidatos se crean con el nombre del archivo y Gestión Humana completa sus datos.</span></p><% } %>
+<fieldset class="sec"><legend><span class="n">1</span>Archivos</legend>
 <label for="cvl">CV (hasta <%= MAX %> archivos de <%= MAX_MB %> MB c/u)</label>
 <input id="cvl" type="file" name="cvs" multiple required accept="<%= EXT.join(',') %>" aria-describedby="cvl-a">
-<p class="sub" id="cvl-a">PDF y Word (.doc, .docx) de preferencia; también texto e imágenes (JPG, PNG). Los otros formatos y los archivos repetidos se omiten y se avisa cuáles.</p>
-<label class="chk"><input type="checkbox" name="consentimiento" required> Confirmo haber notificado a los postulados sobre el uso de sus datos</label>
-<p class="act"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p"><%- ic('subir') %>Cargar</button></p></form>
+<p class="sub" id="cvl-a">PDF y Word (.doc, .docx) de preferencia; también texto e imágenes (JPG, PNG). Los otros formatos y los archivos repetidos se omiten y se avisa cuáles.</p></fieldset>
+<fieldset class="sec"><legend><span class="n">2</span>Consentimiento</legend>
+<label class="chk"><input type="checkbox" name="consentimiento" required> Confirmo haber notificado a los postulados sobre el uso de sus datos</label></fieldset>
+<p class="acts-f"><button type="button" class="btn" data-close>Cancelar</button> <button class="btn p"><%- ic('subir') %>Cargar</button></p></form>

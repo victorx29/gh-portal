@@ -6,7 +6,8 @@ const hacer = (fn, ok) => w(async (req, res) => {
   const cand = req.path.startsWith('/candidaturas/') ? id : /^\d+$/.test(String(req.body.cand || '')) ? +req.body.cand : null;
   res.redirect(reqId ? '/requisiciones/' + reqId + '/seleccion' + (cand ? '?modal=' + encodeURIComponent('/candidaturas/' + cand) : '') : '/pipeline');
 });
-r.get('/requisiciones/:id/seleccion', w(async (req, res) => res.render('seleccion', { title: 'Selección', nav: 'pipeline', ...await S.tablero(req.user, +req.params.id) })));
+r.get('/seleccion', w(async (req, res) => res.render('seleccion_bandeja', { title: 'Selección', nav: 'seleccion', ...await S.bandeja(req.user) })));
+r.get('/requisiciones/:id/seleccion', w(async (req, res) => res.render('seleccion', { title: 'Selección', nav: 'seleccion', ...await S.tablero(req.user, +req.params.id) })));
 r.get('/requisiciones/:id/candidatos/nuevo', w(async (req, res) => { if (!P.esGH(req.user)) throw E(403, 'Solo Gestión Humana gestiona la selección');
   modal(req, res, 'cand_form', { title: 'Nuevo candidato', reqId: +req.params.id, defsCand: await require('../services/ficha').campos('candidato') }); }));
 r.post('/requisiciones/:id/candidatos', w(async (req, res) => {

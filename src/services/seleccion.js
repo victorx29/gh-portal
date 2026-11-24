@@ -32,6 +32,33 @@ async function tablero(u, reqId) {
   const st = await LE.estado(u, reqId);
   return { req, pl, cands, ing, resumen, avance, enCurso, ultimoResumen: ult, lectura: LE.configurada(), firma: st.firma, sondeo: st.pendientes > 0 };
 }
+// Bandeja de selección (0.9.5.2): las requisiciones en Selección con su avance; cada una abre su tablero. Solo GH.
+async function bandeja(u) {
+  ghOnly(u);
+  // «desde»: última entrada a Selección según el historial (una sola lectura del historial, no una por requisición)
+  const R = (await q(`with sel as (select h.entidad_id, max(h.fecha) f from historial h where h.entidad='requisicion' and h.detalle->>'a'='seleccion' group by h.entidad_id)
+    select r.id, r.codigo, r.plazas, r.empresa_id, coalesce(e.razon_social, e.nombre) empresa, e.siglas, un.nombre unidad, pf.nombre cargo, coalesce(sel.f, r.creada_en) desde
+    from requisicion r join empresa e on e.id=r.empresa_id left join unidad un on un.id=r.unidad_id left join sel on sel.entidad_id=r.id::text
+    join perfil_version pv on pv.id=r.perfil_version_id join perfil pf on pf.id=pv.perfil_id
+    where r.estado='seleccion' order by desde`)).rows;
+  if (!R.length) return { reqs: [] };
+  const C = (await q(`select ca.requisicion_id, ca.etapa, cv.lectura, (cv.lectura='pendiente' and cv.lectura_pedida_en > now() - interval '${LE.VENCE_MIN} minutes') leyendo,
+      (cv.alertas_revisadas_en is null and jsonb_array_length(coalesce(cv.alertas,'[]')) > 0) alertas,
+      (select a.estado from ia_analisis a where a.candidatura_id=ca.id and a.cv_archivo_id=ca.cv_archivo_id order by a.id desc limit 1) ia
+    from candidatura ca left join cv_archivo cv on cv.id=ca.cv_archivo_id where ca.requisicion_id = any($1)`, [R.map(r => r.id)])).rows;
+  const pls = new Map();
+  for (const r of R) {
+    if (!pls.has(r.empresa_id)) pls.set(r.empresa_id, await PL.resolver(r.empresa_id, 'seleccion'));
+    const pl = pls.get(r.empresa_id), L = C.filter(c => c.requisicion_id === r.id);
+    const activas = pl.flujo.filter(e => e.clase !== 'exito'), act = L.filter(c => activas.some(e => String(e.clave) === String(c.etapa)));
+    r.ingresos = L.filter(c => pl.exito && String(c.etapa) === String(pl.exito.clave)).length;
+    r.activos = act.length; r.analizados = act.filter(c => c.ia === 'listo').length;
+    r.enCurso = act.filter(c => c.leyendo || c.ia === 'pendiente').length; r.alertas = act.filter(c => c.alertas).length;
+    r.etapas = activas.map(e => ({ nombre: e.nombre, n: act.filter(c => String(c.etapa) === String(e.clave)).length })).filter(e => e.n);
+    r.dias = Math.max(0, Math.floor((Date.now() - new Date(r.desde).getTime()) / 864e5));
+  }
+  return { reqs: R };
+}
 async function crearCandidato(u, reqId, b) {
   ghOnly(u); const nombre = String(b.nombre || '').trim(); if (!nombre) throw E(400, 'El nombre es obligatorio');
   const cedula = EM.cedulaNorm(b.cedula); if (!cedula) throw E(400, 'La cédula es obligatoria: identifica al candidato en todas sus postulaciones');
@@ -155,4 +182,4 @@ async function rechazar(u, id, motivo) {
     await evento(c, 'candidatura.' + pl.cierre.clave, { candidatura_id: id, candidatura_codigo: ca.codigo, requisicion_id: r.id, codigo: r.codigo, etapa_anterior: ca.etapa, motivo: motivo.trim(), candidato: cd.nombre, email: cd.email, candidato_datos: sinCampos(cd), url: RS.urlReq(r.id), requisicion: await RS.detalleEvento(c, r.id) });
   });
 }
-module.exports = { editarDatos, guardarCampos, tablero, crearCandidato, detalle, registrar, avanzar, rechazar };
+module.exports = { bandeja, editarDatos, guardarCampos, tablero, crearCandidato, detalle, registrar, avanzar, rechazar };

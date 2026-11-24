@@ -55,7 +55,7 @@ label{display:block;font-size:13px;font-weight:500;color:var(--tx);margin:12px 0
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}.form-max{max-width:720px}.end{align-self:end}.row select{width:auto}
 .panel{max-width:640px}.login{width:min(400px,100%);background:var(--bg);border:1px solid var(--bd);border-radius:16px;padding:28px;box-shadow:var(--shc)}
 /* 0.9.5.1 · Caja (B): panel con encabezado opcional; las pantallas reorganizadas agrupan su contenido en cajas */
-.caja{background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--shc);margin:0 0 16px}.caja>.caja-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--bd)}.caja>.caja-h h2{font-size:16px}.caja>.caja-h .sub{margin:2px 0 0}.caja>.caja-b{padding:4px 18px 18px}.caja>.tw{border-radius:0 0 14px 14px}.caja>.tw:first-child{border-radius:14px}.caja table:not(.kv) tr:last-child td{border-bottom:0}.caja .acts-f{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)}
+.caja{background:var(--bg);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--shc);margin:0 0 16px}.caja>.caja-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--bd)}.caja>.caja-h h2{font-size:16px}.caja>.caja-h .sub{margin:2px 0 0}.caja>.caja-b{padding:4px 18px 18px}.caja>.tw{border-radius:0 0 14px 14px}.caja>.tw:first-child{border-radius:14px}.caja table:not(.kv) tr:last-child td{border-bottom:0}.acts-f{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--bd)}
 dialog{border:1px solid var(--bd);border-radius:16px;background:var(--bg);color:var(--tx);width:min(760px,calc(100% - 24px));max-height:90vh;max-height:90dvh;padding:20px;overflow-y:auto;overscroll-behavior:contain;box-shadow:var(--shm)}dialog::backdrop{background:#0b101499}
 dialog>.mh:first-child{position:sticky;top:-20px;z-index:2;margin:-20px -20px 14px;padding:16px 20px;background:var(--mh);color:#fff;border-bottom:3px solid var(--ac)}dialog>.mh:first-child .sub{color:var(--mhs);margin-bottom:0}dialog>.mh:first-child .btn{background:transparent;color:#fff;border-color:#ffffff4d;box-shadow:none}dialog>.mh:first-child .btn:hover{background:#ffffff1a}dialog>.mh:first-child :focus-visible{outline-color:var(--ac)}dialog>.mh:first-child .chip{background:#ffffff1f;color:#fff}dialog>.mh:first-child a{color:#fff}
 .mh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.blk{border-top:1px solid var(--bd);margin-top:12px;padding-top:4px}
@@ -176,3 +176,26 @@ details.inl-d .pop form{display:flex;gap:6px;flex-wrap:wrap}details.inl-d .pop s
 .login .login-t{text-align:center;font-size:20px}.login .login-s{text-align:center;margin:2px auto 14px}.login .login-btn{width:100%;margin-top:18px}
 /* Filtros de las listas en su propia caja */
 .filtros{background:var(--bg);border:1px solid var(--bd);border-radius:14px;padding:4px 16px 14px;box-shadow:var(--shc)}
+/* 0.9.5.2 · Bandeja de selección: una caja por requisición, en rejilla; barra de avance de ingresos frente a plazas */
+.bandeja{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}.bandeja .caja{margin:0;display:flex;flex-direction:column}.bandeja .caja-b{flex:1;display:flex;flex-direction:column}.bandeja .acts-f{margin-top:auto}
+.bandeja .caja-h .cod{margin:0;font-size:12px}.bandeja .caja-h h2{margin:2px 0 0}
+.avance{margin:12px 0 4px}.avance-t{display:flex;justify-content:space-between;font-size:13px;color:var(--mu);margin-bottom:4px}.avance-t b{color:var(--tx)}
+.barra{height:8px;border-radius:999px;background:var(--sf);overflow:hidden}.barra>span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--bt),#0071CE)}
+/* 0.9.5.2 · Papel de los botones según dónde están (como en la previa A + B), sin marcar botón por botón:
+   acciones del encabezado de la página → secundario; Editar/Ver de las tablas → secundario compacto; Cancelar → discreto.
+   Un botón con papel explícito (.p, .s, .g, .d, .peligro) conserva el suyo. */
+.top .row .btn:not(.p):not(.s):not(.g):not(.d):not(.peligro){background:var(--pl);border-color:transparent;color:var(--pr);font-weight:600;box-shadow:none}
+.top .row .btn:not(.p):not(.s):not(.g):not(.d):not(.peligro):hover{border-color:var(--pr)}
+td.acts .btn:not(.p):not(.g):not(.d):not(.peligro){min-height:36px;padding:6px 12px;background:var(--pl);border-color:transparent;color:var(--pr);font-weight:600;box-shadow:none}
+td.acts .btn:not(.p):not(.g):not(.d):not(.peligro):hover{border-color:var(--pr)}td.acts .btn.d{min-height:36px;padding:6px 12px}
+:is(.act,.acts-f) .btn[data-close]:not(.p){background:transparent;border-color:transparent;box-shadow:none;color:var(--pr)}:is(.act,.acts-f) .btn[data-close]:not(.p):hover{background:var(--pl)}
+/* Bloques dentro de los modales: cajas sin sombra; la que pide una decisión lleva el borde ámbar */
+dialog .caja{box-shadow:none;margin:14px 0}dialog .caja>.caja-h{padding:10px 14px}dialog .caja>.caja-h h3{margin:0;font-size:15px}dialog .caja>.caja-b{padding:4px 14px 14px}
+.caja.decide{border-left:4px solid var(--ac)}
+/* 0.9.5.2 · Dentro de cajas, filas de acciones y filtros, el botón sin papel explícito es secundario;
+   «Limpiar» de los filtros (enlace) es discreto. Cerrar/Cancelar (data-close) siguen discretos. */
+:is(.caja-b,.act,.acts-f,.filtros,fieldset.sec) .btn:not(.p):not(.s):not(.g):not(.d):not(.peligro):not([data-close]){background:var(--pl);border-color:transparent;color:var(--pr);font-weight:600;box-shadow:none}
+:is(.caja-b,.act,.acts-f,.filtros,fieldset.sec) .btn:not(.p):not(.s):not(.g):not(.d):not(.peligro):not([data-close]):hover{border-color:var(--pr)}
+.filtros .end a.btn:not(.p):not(.s){background:transparent;border-color:transparent;color:var(--pr)}.filtros .end a.btn:not(.p):not(.s):hover{background:var(--pl);border-color:transparent}
+.caja-h .chip{margin:0}.caja-h h3 .chip{margin-left:6px}
+.row>p.sub{flex:1 1 280px;margin:6px 0}

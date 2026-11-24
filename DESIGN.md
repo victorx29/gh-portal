@@ -1,8 +1,9 @@
 # DESIGN.md — Portal de Gestión Humana (Grupo APB)
 
 Diseño vigente desde la **0.9.5.1: dirección «A + B»**, aprobada por Victor el 24-11-2026 sobre la previa
-`propuesta-AB-0.9.5.1.html`. Toma de **A (Institucional APB)** la marca del grupo y de **B (Claro y moderno)** las cajas, las
-sombras suaves y los formularios por secciones. Los colores salen del logo y del sitio del grupo (apbgroup.net).
+`propuesta-AB-0.9.5.1.html` (fase 2 de pantallas y papel de los botones por lugar en la 0.9.5.2). Toma de
+**A (Institucional APB)** la marca del grupo y de **B (Claro y moderno)** las cajas, las sombras suaves y los formularios por
+secciones. Los colores salen del logo y del sitio del grupo (apbgroup.net).
 
 **Regla de uso:** las pantallas usan las variables CSS (`var(--pr)`), nunca valores sueltos. Si algo nuevo no está cubierto
 aquí, se propone agregarlo a este archivo antes de usarlo.
@@ -107,6 +108,16 @@ a la izquierda con 8 px de separación. Jerarquía, de más a menos:
 - **Deshabilitado** (`[disabled]`): opacidad 0,5 y cursor «no permitido».
 - **Foco:** contorno de 2 px `--pr` separado 2 px en todos los elementos interactivos.
 
+**Papel del botón según dónde está** (0.9.5.2, reglas comunes del CSS; no se marca botón por botón). Un botón sin clase de
+papel (`.btn` solo) toma el papel del lugar:
+- En la fila de acciones del encabezado de la página (`.top .row`): **secundario**.
+- Dentro de una caja (`.caja-b`), una fila de acciones (`.act`, `.acts-f`), los filtros o una sección de formulario
+  (`fieldset.sec`): **secundario**.
+- En las acciones de una tabla (`td.acts`): **secundario compacto** (36 px).
+- «Cerrar»/«Cancelar» (`data-close`) dentro de una fila de acciones: **discreto**; «Limpiar» de los filtros (enlace): discreto.
+- El botón con clase explícita (`.p`, `.s`, `.g`, `.d`, `.peligro`) conserva la suya. El **Normal** (borde y fondo blanco)
+  queda para la cabecera carbón de los modales y casos sueltos fuera de esos lugares.
+
 **Campos** (`input`, `select`, `textarea`): ancho completo, alto mínimo 44 px, padding 10 px, radio 10 px, borde `--bdf`; al
 enfocar, borde `--pr` y anillo de 3 px `--pl`. Con error (`aria-invalid="true"`), borde `--rd`. Etiqueta encima en 13 px peso
 500 `--tx`. Casillas con `.chk` y color de acento `--bt`. Formularios en dos columnas con `.g2` (una en móvil).
@@ -118,6 +129,26 @@ borde y radio 14 px.
 **Cajas** (`.caja`, B): fondo `--bg`, borde `--bd`, radio 14 px, sombra `--shc`. Cabecera `.caja-h` (título de 16 px, conteo en
 chip neutro, acciones a la derecha) y cuerpo `.caja-b`. Las listas y los formularios de página van en cajas; la tabla ocupa
 todo el ancho de la caja.
+
+**Barra de acciones de un formulario o detalle** (`.acts-f`): al pie, alineada a la derecha, separada por una línea `--bd`;
+«Cancelar» discreto a la izquierda del principal. Si no hay ninguna acción para el usuario, la barra no se dibuja.
+
+**Cajas dentro de un modal** (0.9.5.2): sin sombra, margen 14 px, cabecera de 15 px; agrupan el detalle en bloques
+(«Datos del candidato», «Lectura del CV», «CV y consentimiento», «Análisis con IA»…). Un chip en la cabecera resume el
+estado del bloque (puntaje, «En curso», «Sin consentimiento», alertas). Lo que se edita poco va en un `details` dentro de
+la caja («Editar datos del candidato»), abierto solo si falta algo.
+
+**Caja de decisión** (`.caja.decide`, 0.9.5.2): caja con borde izquierdo ámbar de 4 px para lo que el usuario debe decidir
+(«Tu decisión» de la requisición, «Decisión sobre la candidatura», ingreso por confirmar). La acción destructiva (rechazar,
+cancelar) va dentro de un `details` con su motivo obligatorio, nunca al mismo nivel que el botón principal.
+
+**Bandeja** (`.bandeja`, 0.9.5.2): rejilla de cajas de mínimo 340 px (una columna en móvil), una por elemento de trabajo; la
+cabecera lleva código y antigüedad en 12 px, título y empresa · unidad; el cuerpo, la barra de avance, los chips de estado y
+la línea de etapas; las acciones quedan al pie (`acts-f`) aunque las cajas tengan alturas distintas.
+
+**Barra de avance** (`.avance` + `.barra`): etiqueta y «n de m» en 13 px sobre una barra de 8 px redondeada, fondo `--sf`,
+relleno en degradado de `--bt` a `#0071CE`; con `role="progressbar"` y sus valores. En la bandeja de selección mide ingresos
+frente a plazas.
 
 **Filtros** (`.filtros`): caja propia sobre la lista, en rejilla con el botón alineado abajo.
 
@@ -137,7 +168,8 @@ hover, borde `--bdf` y sombra mayor. Las que le tocan al usuario llevan el borde
 conteo en una pastilla.
 
 **Chips y etiquetas:** `.chip` redondeado (999 px), 12 px peso 500: acción (`--pl`/`--pr`), atención `.w`, error `.r`, éxito
-`.ok`, neutro `.n`. `.tag` (radio 6 px; variantes `.ok`, `.warn`, `.dot`); `.tchip` para el tipo de unidad.
+`.ok`, neutro `.n` (solo para conteos cortos de 1 a 3 cifras: `.n` es también el círculo numerado de 24 px; para un
+chip con texto se usa `.chip` sin variante). `.tag` (radio 6 px; variantes `.ok`, `.warn`, `.dot`); `.tchip` para el tipo de unidad.
 
 **Avisos:** `.flash` con borde izquierdo de 4 px del color del texto (A) sobre fondo suave (B): información (`--pl`), éxito
 (`.ok`), advertencia (`.wa`), error (`.err`). Flotantes (`.toast`) arriba a la derecha: el de éxito se cierra solo; el de error
@@ -189,7 +221,7 @@ de edición (460 px, 42 % máximo) que en pantallas de menos de 900 px pasa deba
 Un solo juego: iconos de trazo de 24 × 24 al estilo Lucide/Feather (licencia MIT), definidos en
 `src/icons.js` y usados con `<%- ic('nombre') %>`. Tamaño 18 px (16 px en pastillas, 14 px en etiquetas),
 trazo 1.8, color heredado del texto. Sin emojis como iconos de interfaz; los símbolos ★ ❄ ⏳ del diagrama son
-marcas de estado documentadas en su leyenda.
+marcas de estado documentadas en su leyenda. «Selección» (0.9.5.2): persona con marca de verificación.
 
 ## Adaptación
 
@@ -209,10 +241,12 @@ del grupo; estado deshabilitado definido; identidad de marca (ámbar como acento
 
 Pendientes:
 1. **Colores de etapa fuera de los tokens.** Siguen escritos en el CSS y en `diagrama.js`. Propuesta: tokens `--etapa-*`.
-2. **Pantallas aún sin reorganizar en cajas y secciones** (reciben el estilo nuevo, pero no la estructura): Requisiciones y
-   Selección (fase 2), Empleados y Conciliación (fase 3), Estructura, plantilla, perfiles, organigrama, pipelines y cargas
-   (fase 4).
+2. **Pantallas aún sin reorganizar en cajas y secciones** (reciben el estilo nuevo, pero no la estructura): Empleados y
+   Conciliación (fase 3), Estructura, plantilla, perfiles, organigrama, pipelines y cargas (fase 4). Requisiciones y
+   Selección (fase 2) quedaron en la 0.9.5.2.
 3. **Tablas `mid` en móvil:** los valores se muestran sin su encabezado. Propuesta: etiqueta por celda en móvil.
+4. **Estado de la requisición en crudo.** La cabecera del detalle muestra el estado técnico («seleccion», «pendiente
+   director») en vez del nombre de la etapa del pipeline («Selección»). Propuesto para la próxima entrega.
 
 ## Pendiente de decidir
 

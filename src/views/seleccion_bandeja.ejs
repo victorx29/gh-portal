@@ -1,0 +1,16 @@
+<%- include('partials/head') %>
+<div class="top"><div><h1>Selección</h1><p class="sub">Requisiciones en Selección y su avance. Abre el tablero para trabajar con los candidatos. Solo Gestión Humana.</p></div>
+<div class="row"><a class="btn g" href="/pipeline"><%- ic('pipeline') %>Pipeline</a></div></div>
+<% if (!reqs.length) { %><div class="caja"><div class="caja-b"><p class="empty">No hay requisiciones en Selección. Cuando una requisición aprobada llegue a esa etapa, aparece aquí.</p></div></div>
+<% } else { %><div class="bandeja">
+<% reqs.forEach(r => { const pct = r.plazas ? Math.round(100 * Math.min(r.ingresos, r.plazas) / r.plazas) : 0; %>
+<section class="caja">
+  <div class="caja-h"><div><p class="cod"><%= r.codigo %> · <%= r.dias === 0 ? 'hoy' : r.dias === 1 ? '1 día' : r.dias + ' días' %> en selección</p><h2><%= r.cargo %></h2><p class="sub"><%= r.empresa %><%= r.unidad ? ' · ' + r.unidad : '' %></p></div></div>
+  <div class="caja-b">
+    <div class="avance" title="Ingresos frente a las plazas de la requisición"><div class="avance-t"><span>Ingresos</span><b><%= r.ingresos %> de <%= r.plazas %></b></div><div class="barra" role="progressbar" aria-valuemin="0" aria-valuemax="<%= r.plazas %>" aria-valuenow="<%= r.ingresos %>" aria-label="Ingresos"><span style="width:<%= pct %>%"></span></div></div>
+    <p><span class="chip"><%= r.activos %> candidato<%= r.activos === 1 ? '' : 's' %> activo<%= r.activos === 1 ? '' : 's' %></span><span class="chip">IA <%= r.analizados %> de <%= r.activos %></span><% if (r.enCurso) { %><span class="chip"><span class="o-mini" aria-hidden="true"></span><%= r.enCurso %> en curso</span><% } %><% if (r.alertas) { %><span class="chip w"><%- ic('alerta') %><%= r.alertas %> con alertas</span><% } %></p>
+    <% if (r.etapas.length) { %><p class="sub"><%= r.etapas.map(e => e.nombre + ' ' + e.n).join(' · ') %></p><% } else { %><p class="sub">Aún sin candidatos: usa «Cargar CV» en el tablero.</p><% } %>
+    <div class="acts-f"><a class="btn s" href="/requisiciones/<%= r.id %>/resumen" data-modal>Resumen general</a><a class="btn p" href="/requisiciones/<%= r.id %>/seleccion">Abrir tablero</a></div>
+  </div>
+</section><% }) %></div><% } %>
+<%- include('partials/foot') %>

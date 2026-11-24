@@ -2,15 +2,15 @@
 <div class="mh"><div><h2>Resumen general · <%= r.codigo %></h2><p class="sub"><%= r.cargo %> · <%= listos.length %> candidato<%= listos.length === 1 ? '' : 's' %> con análisis listo</p></div><button type="button" class="btn" data-close>Cerrar</button></div>
 <p class="flash" role="note"><span><b>La IA no decide.</b> Compara los análisis de los CV frente al perfil y propone una terna orientativa, basada solo en esos datos. Decide Gestión Humana.</span></p>
 <% avisos.forEach(a => { %><p class="flash err" role="alert"><span><%= a %></span></p><% }) %>
-<h3>Comparativo</h3>
+<section class="caja"><div class="caja-h"><h3>Comparativo</h3><span class="chip"><%= listos.length %> con análisis listo</span></div><div class="caja-b">
 <% if (listos.length) { %><div class="tw"><table><tr><th>Candidato</th><th>Etapa</th><th>Puntaje</th><% columnas.forEach(c => { %><th><%= c.nombre %></th><% }) %><th>Brechas</th><th>Alertas</th></tr>
 <% listos.forEach(x => { %><tr><td><a href="/candidaturas/<%= x.id %>" data-modal2 style="white-space:nowrap"><%= x.codigo %></a><br><small><%= x.nombre %></small></td><td><%= x.etapa_nombre %></td><td><b><%= x.puntaje.toFixed(0) %>/100</b></td>
 <% columnas.forEach(c => { const v = x.porCriterio[c.clave]; %><td><%= v == null ? '—' : v + '/5' %></td><% }) %><td><%= x.n_brechas %></td><td><%= x.n_alertas ? x.n_alertas : '—' %></td></tr><% }) %></table></div>
 <% } else { %><p class="empty">Todavía no hay candidatos con análisis listo.</p><% } %>
 <% if (resto.length) { %><p class="sub">Sin análisis listo de su CV actual: <%= resto.map(x => x.codigo + (x.ia_estado === 'pendiente' ? ' (en curso)' : x.ia_estado === 'error' ? ' (falló)' : '')).join(', ') %>.</p><% } %>
 <% if (fuera) { %><p class="sub"><%= fuera %> candidatura<%= fuera > 1 ? 's' : '' %> rechazada<%= fuera > 1 ? 's' : '' %> o ingresada<%= fuera > 1 ? 's' : '' %> no se compara<%= fuera > 1 ? 'n' : '' %>.</p><% } %>
-
-<h3>Resumen y terna de la IA</h3>
+</div></section>
+<section class="caja"><div class="caja-h"><h3>Resumen y terna de la IA</h3></div><div class="caja-b">
 <% if (pendiente) { %><p class="flash" role="status"><span class="o-mini" aria-hidden="true"></span><span>Generando el resumen. El tablero avisa cuando llegue.</span></p>
 <% } else if (r.estado === 'seleccion') { %><form method="post" action="/requisiciones/<%= r.id %>/resumen" class="act" data-confirm="La IA compara los análisis listos de <%= listos.length %> candidatos (solo sus números, sin nombres ni datos personales) y propone una terna orientativa. El resumen queda guardado." data-ok="Generar"><input type="hidden" name="_csrf" value="<%= csrf %>">
 <button class="btn p"<%= puedePedir ? '' : ' disabled' %>>Generar resumen con IA</button><% if (!puedePedir) { %> <span class="sub">Hacen falta al menos <%= MIN_CANDIDATOS %> candidatos con análisis listo.</span><% } %></form><% } %>
@@ -30,3 +30,4 @@
 <% const hechos = resumenes.filter(s => !(s.estado === 'pendiente' && !s.vencido)); %>
 <% if (hechos.length) { ver(hechos[0], true); } else if (!pendiente) { %><p class="sub">Aún no se ha generado ningún resumen para esta requisición.</p><% } %>
 <% if (hechos.length > 1) { %><details><summary>Resúmenes anteriores (<%= hechos.length - 1 %>)</summary><% hechos.slice(1).forEach(s => { %><div class="blk"><% ver(s, false); %></div><% }) %></details><% } %>
+</div></section>
